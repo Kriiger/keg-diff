@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 64">
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.5">
+    <path d="M22 10h20c7 5 10 12 10 22s-3 17-10 22H22c-7-5-10-12-10-22s3-17 10-22z" stroke="#f1f1f1"/>
+    <path d="M22 24h20" stroke="#7ccf9b"/>
+    <path d="M22 40h20" stroke="#e8a26b"/>
+  </g>
+  <!-- O nome é texto: usa a fonte do sistema (SF no Mac, Segoe no Windows). "keg" pesa 700; "diff", 400 e mais suave. -->
+  <text x="68" y="43" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif" font-size="34" letter-spacing="-.7"><tspan font-weight="700" fill="#f1f1f1">keg</tspan><tspan font-weight="400" fill="#aaaaaa" dx="8">diff</tspan></text>
+</svg>

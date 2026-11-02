@@ -1,5 +1,12 @@
 # keg diff
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/logo-horizontal-escuro.svg">
+    <img src="assets/logo/logo-horizontal.svg" alt="keg diff" height="64">
+  </picture>
+</p>
+
 Revisor de código por fluxo: reorganiza o diff em onde o dado nasce, é processado e termina. Feito para revisar o que agentes de código escrevem em projetos JavaScript e TypeScript (Next.js, React com Vite, Node).
 
 Roda na sua máquina, dentro do seu projeto. Não tem servidor para hospedar nem banco de dados: o resultado vai para arquivos em `.revisao/`.
@@ -158,3 +165,7 @@ Cada arquivo em `fixtures/` é um PR real feito por um agente de código, com o 
 | `memoryai-rota.json` | [MoKarade/MemoryAI#400](https://github.com/MoKarade/MemoryAI/pull/400) | Rotas GET que leem o banco pelo Drizzle; testes fora dos fluxos |
 | `anonyworks-cliente-servidor.json` | [codewithemmax/Anonyworks#2](https://github.com/codewithemmax/Anonyworks/pull/2) | Front Vite chamando a rota do Next por um wrapper, com URL montada e SQL cru |
 | `tbe-componente.json` | [The-Boring-Education/TBE-Web#1302](https://github.com/The-Boring-Education/TBE-Web/pull/1302) | Página do Pages Router com `getServerSideProps` vindo de outro pacote do monorepo |
+
+## Logo
+
+Os arquivos da logo estão em `assets/logo/`: `icone.svg` e `icone-escuro.svg` (só o barril, para fundo claro e escuro), `icone-app.svg` (com fundo próprio, o mesmo do favicon) e `logo-horizontal.svg` e `logo-horizontal-escuro.svg` (ícone e nome; o nome é texto e usa a fonte do sistema).

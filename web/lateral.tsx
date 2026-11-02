@@ -3,6 +3,7 @@
 import { useId, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Estado, Revisao } from '../src/contrato'
 import { Icone, type NomeDoIcone } from './icones'
+import { Logo } from './logo'
 import type { Checklist } from './main'
 import { alternarLateral, fecharGaveta, useLateralAberta } from './recolher'
 import { decididos, encurtarBase } from './telas'
@@ -37,7 +38,6 @@ export function MoldeDaLateral({ cabeca, rodape, children }: { cabeca: ReactNode
 }
 
 // A marca e o quanto da revisão já tem decisão, nos dois modos.
-// A logo entra no lugar de .marca-nome (ou antes dele): o resto do topo já reserva a altura e a folga do botão de recolher.
 export function CabecaDaLateral({ revisao, checklist, estado }: { revisao: Revisao; checklist: Checklist; estado: Estado }) {
   const feitos = decididos(checklist.todos, estado)
   const total = checklist.todos.length
@@ -46,7 +46,7 @@ export function CabecaDaLateral({ revisao, checklist, estado }: { revisao: Revis
   return (
     <>
       <a href="#" className="marca">
-        <span className="marca-nome">keg diff</span>
+        <Logo />
         <span className="marca-base">{encurtarBase(revisao.base)}</span>
       </a>
       <div className={completa ? 'progresso completa' : 'progresso'}>

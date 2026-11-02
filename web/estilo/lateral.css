@@ -42,8 +42,19 @@
 /* O topo: a marca (com a folga do botão de recolher à direita) e o progresso da revisão. */
 .lateral-topo { flex: none; display: flex; flex-direction: column; gap: 14px; padding: 16px 16px 12px; }
 .marca { display: flex; flex-direction: column; justify-content: center; min-height: 40px; padding-right: 40px; border-radius: 10px; }
-.marca-nome { font: var(--peso-titulo) 18px/1.25 var(--fonte); letter-spacing: -.01em; }
-.marca-base { font: var(--peso-rotulo) 12px/1.4 var(--fonte); color: var(--suave); overflow-wrap: anywhere; }
+/* A logo (logo.tsx): o barril à esquerda e o nome em dois pesos. A base fica alinhada ao nome (28px do ícone + 8px de respiro). */
+.logo { display: flex; align-items: center; gap: 8px; }
+.logo-icone { flex: none; width: 28px; height: 28px; stroke-width: 4.5; }
+.logo-barril { stroke: currentColor; }
+.logo-nasce { stroke: var(--nasce); }
+.logo-termina { stroke: var(--termina); }
+.logo-linha { transform-box: fill-box; transform-origin: center; transition: var(--transicao-cores), transform var(--duracao) var(--curva); }
+/* No hover as duas linhas se afastam do centro, como um diff que abre. */
+.marca:hover .logo-nasce { transform: translateY(-2px) scaleX(1.15); }
+.marca:hover .logo-termina { transform: translateY(2px) scaleX(1.15); }
+.logo-nome { font: var(--peso-titulo) 19px/1.25 var(--fonte); letter-spacing: -.02em; }
+.logo-diff { font-weight: var(--peso-texto); color: var(--suave); letter-spacing: -.01em; }
+.marca-base { padding-left: 36px; font: var(--peso-rotulo) 12px/1.4 var(--fonte); color: var(--suave); overflow-wrap: anywhere; }
 .progresso { display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 10px; background: var(--painel-fundo); border: 1px solid var(--painel-borda); border-radius: 18px; }
 .anel { position: relative; flex: none; display: grid; place-items: center; width: 40px; height: 40px; }
 .anel-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
