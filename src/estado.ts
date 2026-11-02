@@ -1,7 +1,7 @@
 // O que a pessoa decidiu na página: o estado.json (decisões por hash de trecho) e a nota do fechamento.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { AchadosEscolhidos, Estado, Nota } from './contrato.js'
+import type { AchadosEscolhidos, Estado, Nota, TipoDoComentario } from './contrato.js'
 
 export function lerEstado(pastaDaRevisao: string): Estado {
   const arquivo = path.join(pastaDaRevisao, 'estado.json')
@@ -25,23 +25,28 @@ export function gravarNota(pastaDaRevisao: string, nota: unknown, base: string):
 export interface PedidoDeDecisao {
   hunkIds: string[]
   decisao: Estado[string]['decisao'] | null    // null desfaz a marca e deixa o comentário, se houver
-  comentario?: string                          // só vale com 'comentado'; texto vazio apaga o comentário
+  comentario?: string                          // só vale com 'comentado'; texto vazio apaga o comentário (e o tipo dele)
+  tipoDoComentario?: TipoDoComentario          // só vale com 'comentado'; sem ele o comentário guarda o tipo que já tinha
   segundos?: number                            // o cronômetro da página no momento da decisão
 }
 
+export const TIPOS_DE_COMENTARIO: readonly TipoDoComentario[] = ['corrija', 'duvida']
+
 // Devolve um estado novo, sem mexer no recebido.
-export function aplicarDecisao(estado: Estado, { hunkIds, decisao, comentario }: PedidoDeDecisao, em = new Date().toISOString()): Estado {
+export function aplicarDecisao(estado: Estado, { hunkIds, decisao, comentario, tipoDoComentario }: PedidoDeDecisao, em = new Date().toISOString()): Estado {
   const novo = { ...estado }
   for (const id of hunkIds) {
     const atual = estado[id]
     let marca = atual && atual.decisao !== 'comentado' ? atual.decisao : undefined
     let texto = atual?.comentario
+    let tipo = atual?.tipoDoComentario
     if (decisao === null) marca = undefined
     else if (decisao === 'comentado') {
       if (typeof comentario === 'string') texto = comentario.trim() || undefined
+      if (tipoDoComentario) tipo = tipoDoComentario
     } else marca = decisao
-    if (marca) novo[id] = texto ? { decisao: marca, comentario: texto, em } : { decisao: marca, em }
-    else if (texto) novo[id] = { decisao: 'comentado', comentario: texto, em }
+    if (marca) novo[id] = texto ? { decisao: marca, comentario: texto, ...(tipo && { tipoDoComentario: tipo }), em } : { decisao: marca, em }
+    else if (texto) novo[id] = { decisao: 'comentado', comentario: texto, ...(tipo && { tipoDoComentario: tipo }), em }
     else delete novo[id]
   }
   return novo

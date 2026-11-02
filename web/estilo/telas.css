@@ -87,6 +87,9 @@ a:focus-visible { border-radius: 10px; }
 .decisoes { margin: 14px 0; }
 .botoes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .comentario { margin-top: 12px; }
+.comentario .tipos { margin-bottom: 8px; }
+.comentario .tipos .detalhe { margin: 0; font-size: 12px; }
+.tipo-do-comentario { display: block; margin-bottom: 2px; font-size: 12px; color: var(--suave); text-transform: uppercase; letter-spacing: 0.04em; }
 .comentario textarea { width: 100%; min-height: 84px; font: inherit; padding: 10px 12px; border-radius: var(--painel-raio); border: 1px solid var(--painel-borda); background: var(--botao-fundo); color: inherit; margin-bottom: 8px; resize: vertical; }
 .comentario textarea:focus { border-color: var(--acento); outline: none; }
 blockquote { margin: 12px 0 0; padding: 8px 14px; border-radius: 8px; background: var(--botao-fundo); box-shadow: inset 3px 0 0 var(--suave); white-space: pre-wrap; }

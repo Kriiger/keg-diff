@@ -10,29 +10,45 @@ import { lerAchados, lerEstado } from './estado.js'
 interface Lugar { arquivo: string; linha?: number; simbolo?: string; hunkIds: string[]; orfao: boolean; frases?: Frase[] }
 
 // Um ajuste que a revisão pede ao agente: um comentário da pessoa, uma frase do narrador que ela confirmou ou um órfão marcado como código morto.
-interface Ajuste { tipo: 'comentario' | 'narrador' | 'codigo-morto'; texto: string }
+// A dúvida é o comentário de tipo 'duvida': o agente responde, não corrige.
+interface Ajuste { tipo: 'comentario' | 'duvida' | 'narrador' | 'codigo-morto'; texto: string }
 
 const SUFIXO_DO_NARRADOR = '(apontado pelo narrador)'
 
 export function montarFeedback(revisao: Revisao, estado: Estado, achados: AchadosEscolhidos = {}): string {
   const ajustes = unicos(ajustesDaRevisao(revisao, estado, achados))
-  const titulo = ajustes.length === 0 ? 'nenhum ajuste' : `${ajustes.length} ${ajustes.length === 1 ? 'ajuste' : 'ajustes'}`
-  const instrucao = ajustes.length === 0 ? [] : [ajustes.some(a => a.tipo === 'narrador')
-    ? `Corrija cada item no código. Os itens "${SUFIXO_DO_NARRADOR}" vieram da IA na revisão e eu confirmei.`
-    : 'Corrija cada item no código.']
-  return [`Revisão de ${revisao.base}: ${titulo}`, ...instrucao, ...ajustes.map((a, i) => `${i + 1}. ${a.texto.replace(/\n+/g, '\n   ')}`)].join('\n') + '\n'
+  const correcoes = ajustes.filter(a => a.tipo !== 'duvida')
+  const duvidas = ajustes.filter(a => a.tipo === 'duvida')
+  const numerados = (lista: Ajuste[]) => lista.map((a, i) => `${i + 1}. ${a.texto.replace(/\n+/g, '\n   ')}`)
+  const contagens = [
+    ...(correcoes.length > 0 ? [`${correcoes.length} ${correcoes.length === 1 ? 'ajuste' : 'ajustes'}`] : []),
+    ...(duvidas.length > 0 ? [`${duvidas.length} ${duvidas.length === 1 ? 'dúvida' : 'dúvidas'}`] : []),
+  ]
+  const blocoDeCorrecao = correcoes.length === 0 ? [] : [
+    correcoes.some(a => a.tipo === 'narrador')
+      ? `Corrija cada item no código. Os itens "${SUFIXO_DO_NARRADOR}" vieram da IA na revisão e eu confirmei.`
+      : 'Corrija cada item no código.',
+    ...numerados(correcoes),
+  ]
+  // As dúvidas têm numeração própria; entre os dois blocos, uma linha em branco.
+  const blocoDeDuvida = duvidas.length === 0 ? [] : [
+    ...(correcoes.length > 0 ? [''] : []),
+    'Responda cada pergunta sem mudar o código, a não ser que a resposta mostre um erro:',
+    ...numerados(duvidas),
+  ]
+  return [`Revisão de ${revisao.base}: ${contagens.join(' e ') || 'nenhum ajuste'}`, ...blocoDeCorrecao, ...blocoDeDuvida].join('\n') + '\n'
 }
 
 // Os achados da revisão, para o historico.jsonl: o mesmo que o feedback.md lista, repetidos não contam duas vezes.
-export function contarAchados(revisao: Revisao, estado: Estado, achados: AchadosEscolhidos = {}): { comentarios: number; codigoMorto: number; narrador: number } {
+export function contarAchados(revisao: Revisao, estado: Estado, achados: AchadosEscolhidos = {}): { comentarios: number; codigoMorto: number; narrador: number; duvidas: number } {
   const lista = unicos(ajustesDaRevisao(revisao, estado, achados))
   const quantos = (tipo: Ajuste['tipo']) => lista.filter(a => a.tipo === tipo).length
-  return { comentarios: quantos('comentario'), codigoMorto: quantos('codigo-morto'), narrador: quantos('narrador') }
+  return { comentarios: quantos('comentario'), codigoMorto: quantos('codigo-morto'), narrador: quantos('narrador'), duvidas: quantos('duvida') }
 }
 
-// O mesmo texto em dois lugares conta uma vez.
+// O mesmo texto em dois lugares conta uma vez; a dúvida e a correção com o mesmo texto são pedidos diferentes.
 function unicos(ajustes: Ajuste[]): Ajuste[] {
-  return [...new Map(ajustes.map(ajuste => [ajuste.texto, ajuste])).values()]
+  return [...new Map(ajustes.map(ajuste => [`${ajuste.tipo === 'duvida'}|${ajuste.texto}`, ajuste])).values()]
 }
 
 // Regera a partir do que está em disco agora. Sem review.json ainda, não há o que escrever.
@@ -52,7 +68,7 @@ function ajustesDe(lugar: Lugar, estado: Estado, achados: AchadosEscolhidos): Aj
   const decisoes = lugar.hunkIds.map(id => estado[id]).filter(d => d !== undefined)
   const onde = `${lugar.arquivo}${lugar.linha ? `:${lugar.linha}` : ''}${lugar.simbolo ? ` (${lugar.simbolo})` : ''}`
   // O comentário vale com qualquer marca: revisado e comentado convivem.
-  const comentarios = decisoes.filter(d => d.comentario).map(d => ({ tipo: 'comentario' as const, texto: `${onde}: ${d.comentario!.trim()}` }))
+  const comentarios = decisoes.filter(d => d.comentario).map(d => ({ tipo: d.tipoDoComentario === 'duvida' ? 'duvida' as const : 'comentario' as const, texto: `${onde}: ${d.comentario!.trim()}` }))
   const narrador = (lugar.frases ?? []).filter(f => achados[chaveDaFrase(lugar.hunkIds, f.texto)]).map(f => ({ tipo: 'narrador' as const, texto: `${ondeDaFrase(lugar, f)}: ${fraseDoNarrador(f.texto)} ${SUFIXO_DO_NARRADOR}` }))
   const morto = lugar.orfao && decisoes.some(d => d.decisao === 'codigo-morto') ? [{ tipo: 'codigo-morto' as const, texto: `${onde}: código morto, apague.` }] : []
   return [...comentarios, ...narrador, ...morto]

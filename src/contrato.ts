@@ -195,9 +195,15 @@ export interface Metricas {
 // então um trecho que o agente mudar depois volta sozinho para "não revisado".
 // "decisao" é a marca do trecho; "comentario" é um anexo independente dela: o trecho pode estar revisado e comentado.
 // 'comentado' só aparece quando há comentário e nenhuma outra marca.
+// "tipoDoComentario" diz o que o comentário pede ao agente: 'corrija' é uma ordem (vira item do "Corrija cada item no código") e 'duvida'
+// é uma pergunta (vira item de "Responda cada pergunta", sem mudar o código). Ausente = 'corrija': estado.json antigo continua valendo.
+// O tipo é do comentário: sem comentário, não existe.
+export type TipoDoComentario = 'corrija' | 'duvida'
+
 export type Estado = Record<string, {
   decisao: 'revisado' | 'codigo-morto' | 'falso-positivo' | 'comentado'
   comentario?: string
+  tipoDoComentario?: TipoDoComentario
   em: string
 }>
 
@@ -237,7 +243,7 @@ export interface LinhaDoHistorico {
   registradoEm: string             // ISO, da última gravação desta linha
   base: string
   tempoSegundos: number            // tempo ativo da página (aba visível), da abertura aos 100%
-  achados: { comentarios: number; codigoMorto: number; narrador?: number }  // narrador: frases do Claude levadas para a correção; linhas antigas não têm
+  achados: { comentarios: number; codigoMorto: number; narrador?: number; duvidas?: number }  // comentarios: os de tipo corrija; narrador: frases do Claude levadas para a correção; duvidas: comentários de tipo dúvida (não contam como achado); linhas antigas não têm narrador nem duvidas
   passos: { total: number; falsosPositivos: number }  // total: passos alterados dos fluxos mais os órfãos
   divergenciasDoManifesto: number
   arquivosNovos: number

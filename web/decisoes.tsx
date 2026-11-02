@@ -1,10 +1,11 @@
 // Os botões de decisão de um passo ou item, e a caixa de comentário.
 import { useState } from 'react'
-import type { Estado } from '../src/contrato'
+import type { Estado, TipoDoComentario } from '../src/contrato'
 import type { Decidir, Decisao } from './main'
 
 const NOMES: Record<Decisao, string> = { revisado: 'Revisado', 'codigo-morto': 'Código morto', 'falso-positivo': 'Falso positivo', comentado: 'Comentado' }
 const TECLAS: Record<Decisao, string> = { revisado: 'x', 'codigo-morto': 'd', 'falso-positivo': 'f', comentado: 'c' }
+const TIPOS: Record<TipoDoComentario, string> = { corrija: 'Corrija', duvida: 'Dúvida' }
 
 interface PropsDasDecisoes {
   hunkIds: string[]
@@ -21,10 +22,13 @@ export function Decisoes({ hunkIds, opcoes, estado, decidir, comentando, setCome
   // A marca (revisado, código morto, falso positivo) e o comentário são independentes: 'comentado' sozinho não é marca.
   const marcas = decisoes.map(d => (d?.decisao === 'comentado' ? undefined : d?.decisao))
   const marca = marcas.every(m => m === marcas[0]) ? marcas[0] : undefined
-  const comentario = decisoes.find(d => d?.comentario)?.comentario
-  const salvar = (texto: string) => {
-    // Texto vazio apaga o comentário que havia; sem comentário anterior, só fecha a caixa.
-    if (texto.trim() !== '' || comentario) decidir(hunkIds, 'comentado', texto.trim())
+  const comentado = decisoes.find(d => d?.comentario)
+  const comentario = comentado?.comentario
+  // Sem tipo gravado (estado.json antigo), o comentário é uma correção.
+  const tipo = comentado?.tipoDoComentario ?? 'corrija'
+  const salvar = (texto: string, tipoEscolhido: TipoDoComentario) => {
+    // Texto vazio apaga o comentário que havia (e o tipo com ele); sem comentário anterior, só fecha a caixa.
+    if (texto.trim() !== '' || comentario) decidir(hunkIds, 'comentado', texto.trim(), tipoEscolhido)
     setComentando(false)
   }
   return (
@@ -39,25 +43,38 @@ export function Decisoes({ hunkIds, opcoes, estado, decidir, comentando, setCome
           {comentario ? 'Editar comentário' : 'Comentar'} <kbd>c</kbd>
         </button>
       </div>
-      {comentando && <CaixaDeComentario inicial={comentario ?? ''} salvar={salvar} cancelar={() => setComentando(false)} />}
-      {!comentando && comentario && <blockquote>{comentario}</blockquote>}
+      {comentando && <CaixaDeComentario inicial={comentario ?? ''} tipoInicial={tipo} salvar={salvar} cancelar={() => setComentando(false)} />}
+      {!comentando && comentario && <blockquote><span className="tipo-do-comentario">{TIPOS[tipo]}</span>{comentario}</blockquote>}
     </div>
   )
 }
 
-function CaixaDeComentario({ inicial, salvar, cancelar }: { inicial: string; salvar: (texto: string) => void; cancelar: () => void }) {
+function CaixaDeComentario({ inicial, tipoInicial, salvar, cancelar }: { inicial: string; tipoInicial: TipoDoComentario; salvar: (texto: string, tipo: TipoDoComentario) => void; cancelar: () => void }) {
   const [texto, setTexto] = useState(inicial)
+  const [tipo, setTipo] = useState(tipoInicial)
+  const alternar = () => setTipo(atual => (atual === 'corrija' ? 'duvida' : 'corrija'))
   return (
     <div className="comentario">
+      <div className="botoes tipos" role="group" aria-label="Tipo do comentário">
+        {(Object.keys(TIPOS) as TipoDoComentario[]).map(opcao => (
+          <button key={opcao} type="button" className={tipo === opcao ? 'ativa' : ''} aria-pressed={tipo === opcao} onClick={() => setTipo(opcao)}>{TIPOS[opcao]}</button>
+        ))}
+        <span className="detalhe"><kbd>⌥D</kbd> alterna</span>
+      </div>
       <textarea
-        autoFocus value={texto} placeholder="O que o agente precisa ajustar aqui?" onChange={e => setTexto(e.target.value)}
+        autoFocus value={texto} placeholder={tipo === 'duvida' ? 'O que o agente precisa responder aqui?' : 'O que o agente precisa ajustar aqui?'} onChange={e => setTexto(e.target.value)}
         onKeyDown={e => {
           if (e.key === 'Escape') cancelar()
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) salvar(texto)
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) salvar(texto, tipo)
+          // ⌥D troca o tipo sem sair da caixa; o code evita o "∂" que o Option+D digita no Mac. Tab fica livre para navegar.
+          if (e.altKey && e.code === 'KeyD') {
+            e.preventDefault()
+            alternar()
+          }
         }}
       />
       <div className="botoes">
-        <button className="ativa" onClick={() => salvar(texto)}>Salvar <kbd>⌘↵</kbd></button>
+        <button className="ativa" onClick={() => salvar(texto, tipo)}>Salvar <kbd>⌘↵</kbd></button>
         <button onClick={cancelar}>Cancelar <kbd>esc</kbd></button>
       </div>
     </div>

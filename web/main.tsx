@@ -3,7 +3,7 @@
 import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { WorkerPoolContextProvider } from '@pierre/diffs/react'
 import { createRoot } from 'react-dom/client'
-import type { AchadosEscolhidos, Estado, Fluxo, Revisao } from '../src/contrato'
+import type { AchadosEscolhidos, Estado, Fluxo, Revisao, TipoDoComentario } from '../src/contrato'
 import './estilo/tema.css'
 import './estilo/base.css'
 import './estilo/lateral.css'
@@ -33,7 +33,7 @@ import { TelaDoFluxo } from './tela-do-fluxo'
 import { TEMAS, TelaDeTrechos, decididos, useAtalhos, type Contexto } from './telas'
 
 export type Decisao = Estado[string]['decisao']
-export type Decidir = (hunkIds: string[], decisao: Decisao | null, comentario?: string) => void
+export type Decidir = (hunkIds: string[], decisao: Decisao | null, comentario?: string, tipoDoComentario?: TipoDoComentario) => void
 // Põe (incluir) ou tira as frases do narrador, pelas chaves de chaveDaFrase, do que vai para a correção.
 export type EscolherAchados = (chaves: string[], incluir: boolean) => void
 
@@ -116,8 +116,8 @@ function App() {
     ...(modo === 'fluxo' && { p: () => (location.hash = ''), t: () => (location.hash = 'fechamento'), ...atalhos }),
   })
 
-  const decidir: Decidir = (hunkIds, decisao, comentario) => {
-    fetch('/api/estado', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hunkIds, decisao, comentario, segundos: segundos() }) })
+  const decidir: Decidir = (hunkIds, decisao, comentario, tipoDoComentario) => {
+    fetch('/api/estado', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hunkIds, decisao, comentario, tipoDoComentario, segundos: segundos() }) })
       .then(r => r.json())
       .then(setEstado)
       .catch(tolerarQueda)
@@ -176,6 +176,7 @@ const ATALHOS = [
   ['[ / ]', 'fluxo anterior e próximo (depois dos fluxos, os grupos de trechos)'],
   ['x', 'marca revisado (de novo desfaz); na árvore, o arquivo inteiro'],
   ['c', 'comenta'],
+  ['⌥D', 'na caixa de comentário, alterna entre corrija e dúvida (a dúvida pede resposta, não correção)'],
   ['d', 'código morto (órfãos)'],
   ['f', 'falso positivo (órfãos); com o mapa aberto, ajusta a vista para ver tudo'],
   ['v', 'modo fluxo ou modo árvore (arquivos e pastas)'],
