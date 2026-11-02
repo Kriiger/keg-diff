@@ -85,7 +85,7 @@ function App() {
   // "fluxo/<id>/<passo>" é o endereço que o mapa usa para levar a um passo de outro fluxo.
   const [tela = '', id, passoDoEndereco] = endereco.split('/')
   const rota = id ? `${tela}/${id}` : tela
-  const { navegacao, atalhos } = useNavegacao(checklist, estado, rota)
+  const { navegacao, atalhos } = useNavegacao(revisao, checklist, estado, rota)
 
   // O mapa em outra janela precisa saber que esta página está viva, não importa a tela.
   useEffect(atenderJanelaExterna, [])
@@ -171,7 +171,7 @@ function TelaAtual({ rota, fluxo, passoInicial, checklist, segundos, contexto }:
 
 // A mesma lista do README e dos useAtalhos: mudou uma, mude as outras.
 const ATALHOS = [
-  ['j / k', 'próximo e anterior (passo no fluxo, item nas listas, arquivo na árvore)'],
+  ['j / k', 'próximo e anterior (passo no fluxo, pulando os já vistos em outro fluxo; item nas listas, arquivo na árvore)'],
   ['n', 'vai ao próximo trecho ainda não revisado, em qualquer tela; sem nenhum, abre o fechamento (modo fluxo)'],
   ['[ / ]', 'fluxo anterior e próximo (depois dos fluxos, os grupos de trechos)'],
   ['x', 'marca revisado (de novo desfaz); na árvore, o arquivo inteiro'],

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { Estado, Fluxo, Passo, Revisao } from '../src/contrato'
 import { Caminho } from './caminho'
 import { Icone } from './icones'
+import type { JaVistosDoFluxo } from './ja-visto'
 import { agruparPassos, type GrupoDePassos } from './resumo'
 import { marcador } from './telas'
 
@@ -16,13 +17,14 @@ interface PropsDosPassos {
   revisao: Revisao
   estado: Estado
   indice: number
+  vistos: JaVistosDoFluxo        // passos já vistos em outro fluxo: esmaecidos na lista, mas o clique chega neles
   escolher: (indice: number) => void
 }
 
 // Cada grupo se identifica pelo índice do seu primeiro passo (o mesmo arquivo pode aparecer em vários grupos).
 const inicioDe = (grupo: GrupoDePassos) => grupo.passos[0]!.indice
 
-export function PassosPorArquivo({ fluxo, revisao, estado, indice, escolher }: PropsDosPassos) {
+export function PassosPorArquivo({ fluxo, revisao, estado, indice, vistos, escolher }: PropsDosPassos) {
   const grupos = useMemo(() => agruparPassos(fluxo, revisao), [fluxo, revisao])
   const [fechados, setFechados] = useState(new Set<number>())
   // Chegar a um passo de grupo recolhido (j, k ou o mapa) reabre o grupo, como a árvore reabre as pastas que escondem o arquivo.
@@ -37,18 +39,18 @@ export function PassosPorArquivo({ fluxo, revisao, estado, indice, escolher }: P
   })
   return (
     <ul className="arvore passos-por-arquivo">
-      {grupos.map(grupo => <GrupoDoArquivo key={inicioDe(grupo)} grupo={grupo} aberto={!fechados.has(inicioDe(grupo))} alternar={alternar} estado={estado} indice={indice} escolher={escolher} />)}
+      {grupos.map(grupo => <GrupoDoArquivo key={inicioDe(grupo)} grupo={grupo} aberto={!fechados.has(inicioDe(grupo))} alternar={alternar} estado={estado} indice={indice} vistos={vistos} escolher={escolher} />)}
     </ul>
   )
 }
 
-interface PropsDoGrupo extends Pick<PropsDosPassos, 'estado' | 'indice' | 'escolher'> {
+interface PropsDoGrupo extends Pick<PropsDosPassos, 'estado' | 'indice' | 'vistos' | 'escolher'> {
   grupo: GrupoDePassos
   aberto: boolean
   alternar: (inicio: number) => void
 }
 
-function GrupoDoArquivo({ grupo, aberto, alternar, estado, indice, escolher }: PropsDoGrupo) {
+function GrupoDoArquivo({ grupo, aberto, alternar, estado, indice, vistos, escolher }: PropsDoGrupo) {
   const hunkIds = grupo.passos.flatMap(({ passo }) => passo.hunkIds)
   return (
     <li>
@@ -63,7 +65,7 @@ function GrupoDoArquivo({ grupo, aberto, alternar, estado, indice, escolher }: P
         <ul style={NIVEL_DO_ARQUIVO}>
           {grupo.passos.map(({ passo, indice: i }) => (
             <li key={passo.id}>
-              <button className={`passo-da-linha papel-${passo.papel} ${i === indice ? 'atual' : ''}`} style={NIVEL_DO_PASSO} aria-current={i === indice ? 'step' : undefined} onClick={() => escolher(i)}>
+              <button className={`passo-da-linha papel-${passo.papel} ${i === indice ? 'atual' : ''} ${vistos.has(passo.id) ? 'ja-visto' : ''}`} style={NIVEL_DO_PASSO} title={vistos.has(passo.id) ? `já visto em ${vistos.get(passo.id)!.fluxo.titulo}` : undefined} aria-current={i === indice ? 'step' : undefined} onClick={() => escolher(i)}>
                 <span className="marcador">{marcadorDoPasso(passo, estado)}</span>
                 <span className="papel"><span className="ordem">{i + 1}</span>{passo.papel}</span>
                 <span className="simbolo">{passo.simbolo}</span>

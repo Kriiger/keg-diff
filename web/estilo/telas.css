@@ -46,6 +46,13 @@ a:focus-visible { border-radius: 10px; }
 .passo-da-linha .marcador { grid-row: 1 / span 4; }
 .passo-da-linha:hover { background: var(--botao-fundo); }
 .passo-da-linha.atual { background: var(--selecionado); }
+/* Passo já visto em outro fluxo: esmaecido na lista (só opacidade) e recolhido na tela; o clique chega nele e o "abrir aqui" o expande. */
+.passo-da-linha.ja-visto > :not(.marcador) { opacity: .55; }
+.ja-visto-aviso { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin: 10px 0 0; padding: 6px 12px; border-radius: 8px; background: var(--botao-fundo); color: var(--texto-miudo); font-size: 13px; }
+.ja-visto-aviso a { color: var(--acento); font-weight: var(--peso-rotulo); }
+.ja-visto-aviso button { margin-left: auto; padding: 2px 10px; font-size: 12px; border-radius: 999px; border: 1px solid var(--painel-borda); background: transparent; }
+.ja-visto-aviso button:hover { background: var(--botao-hover); }
+.passo.recolhido > h2 { opacity: .6; }
 /* O número é a ordem do fluxo inteiro, de um arquivo ao outro: apagado, para o papel colorido continuar sendo o que se lê primeiro. */
 .ordem { margin-right: 6px; font-variant-numeric: tabular-nums; color: var(--suave); }
 .papel { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: var(--peso-destaque); }

@@ -1,10 +1,11 @@
 // A tela do fluxo: os passos agrupados por arquivo à esquerda, o passo atual (frases, decisão e código) à direita e o mapa em gaveta.
 import { Suspense, lazy, useEffect, useState } from 'react'
-import type { Estado, Fluxo, Passo } from '../src/contrato'
+import type { Estado, Fluxo, Passo, Revisao } from '../src/contrato'
 import { Caminho } from './caminho'
 import { Decisoes } from './decisoes'
 import { tolerarQueda } from './eventos'
 import { FrasesDoPasso, semNarracao } from './narracao'
+import { jaVistosDoFluxo, vizinhoNaoVisto } from './ja-visto'
 import { useJanelaExterna } from './janela-do-mapa'
 import { PassosPorArquivo } from './passos-por-arquivo'
 import { indiceInicial, useCursor, type Navegacao } from './proximo'
@@ -17,10 +18,14 @@ const Mapa = lazy(carregarMapa)
 type PropsDaTela = Contexto & { fluxo: Fluxo; passoInicial?: string }
 
 // Abre no passo que o n ou o mapa pediu ou, sem pedido, no primeiro passo alterado que ainda espera decisão.
-function indiceDeAbertura(fluxo: Fluxo, passoInicial: string | undefined, navegacao: Navegacao, estado: Estado): number {
+// Sem pedido, o passo já visto em outro fluxo fica de fora: ele abre recolhido e a leitura começa no que é novo aqui.
+function indiceDeAbertura(fluxo: Fluxo, passoInicial: string | undefined, navegacao: Navegacao, estado: Estado, revisao: Revisao): number {
   const pedido = fluxo.passos.findIndex(p => p.id === passoInicial)
   if (pedido >= 0) return pedido
-  return indiceInicial(navegacao, `fluxo/${fluxo.id}`) ?? Math.max(0, fluxo.passos.findIndex(p => decididos(p.hunkIds, estado) < p.hunkIds.length))
+  const vistos = jaVistosDoFluxo(revisao, fluxo.id)
+  const novos = fluxo.passos.filter(p => !vistos.has(p.id))
+  const primeiro = novos.find(p => decididos(p.hunkIds, estado) < p.hunkIds.length) ?? novos[0]
+  return indiceInicial(navegacao, `fluxo/${fluxo.id}`) ?? Math.max(0, fluxo.passos.findIndex(p => p === primeiro))
 }
 
 // O passo escolhido e o mapa moram aqui, acima do conteúdo de cada fluxo: o mapa não é desmontado ao trocar de fluxo. Desmontado,
@@ -28,12 +33,12 @@ function indiceDeAbertura(fluxo: Fluxo, passoInicial: string | undefined, navega
 // (aba em segundo plano), ficava aberto no estado e fechado na tela: o botão e o m pareciam não responder.
 export function TelaDoFluxo(props: PropsDaTela) {
   const { fluxo, revisao, estado, mapa, navegacao, passoInicial } = props
-  const [indice, setIndice] = useState(() => indiceDeAbertura(fluxo, passoInicial, navegacao, estado))
+  const [indice, setIndice] = useState(() => indiceDeAbertura(fluxo, passoInicial, navegacao, estado, revisao))
   // Outro fluxo recomeça no passo de abertura dele (ajuste durante o render: sem um quadro com o passo do fluxo anterior).
   const [mostrado, setMostrado] = useState(fluxo.id)
   if (mostrado !== fluxo.id) {
     setMostrado(fluxo.id)
-    setIndice(indiceDeAbertura(fluxo, passoInicial, navegacao, estado))
+    setIndice(indiceDeAbertura(fluxo, passoInicial, navegacao, estado, revisao))
   }
   // Baixa e avalia o mapa (>1 MB) com a página ociosa: se o download caísse na primeira abertura, travaria a subida da gaveta.
   useEffect(() => {
@@ -81,20 +86,42 @@ function PassoAPasso({ fluxo, revisao, estado, decidir, achados, escolherAchados
   useEffect(() => {
     if (narradorPronto && faltaNarrar) narrador.pedir([fluxo.id], false)
   }, [fluxo.id, narradorPronto, faltaNarrar])
+  // Os passos que outro fluxo, antes na ordem de leitura, já mostrou: recolhidos, e o j e o k passam direto por eles.
+  // "abertos" são os que a pessoa expandiu aqui; o clique no passo (lateral, mapa, n) chega neles sem expandir.
+  const vistos = jaVistosDoFluxo(revisao, fluxo.id)
+  const [abertos, setAbertos] = useState(new Set<string>())
+  const origem = vistos.get(passo.id)
+  const recolhido = origem !== undefined && !abertos.has(passo.id)
+  const alternarAberto = (id: string) => setAbertos(antes => {
+    const depois = new Set(antes)
+    if (!depois.delete(id)) depois.add(id)
+    return depois
+  })
   // Atualização pela função: j apertado rápido não perde passo entre um render e outro.
-  const andar = (passos: number) => {
+  const andar = (direcao: 1 | -1) => {
     setComentando(false)
     setDestaque(null)
-    setIndice(atual => Math.min(Math.max(atual + passos, 0), fluxo.passos.length - 1))
+    setIndice(atual => vizinhoNaoVisto(fluxo, vistos, atual, direcao))
   }
-  useCursor(navegacao, `fluxo/${fluxo.id}`, indice, destino => andar(destino - indice))
+  // Ir direto a um passo (clique, n) não pula os já vistos.
+  const irPara = (destino: number) => {
+    setComentando(false)
+    setDestaque(null)
+    setIndice(Math.min(Math.max(destino, 0), fluxo.passos.length - 1))
+  }
+  useCursor(navegacao, `fluxo/${fluxo.id}`, indice, irPara)
   const marcar = () => {
     if (passo.hunkIds.length === 0) return andar(1)
     const pronto = passo.hunkIds.every(id => estado[id]?.decisao === 'revisado')
     decidir(passo.hunkIds, pronto ? null : 'revisado')
     if (!pronto) andar(1)
   }
-  useAtalhos({ j: () => andar(1), k: () => andar(-1), x: marcar, c: () => setComentando(passo.hunkIds.length > 0), m: mapa.alternar, Escape: () => mapa.aberto && mapa.alternar() })
+  // A caixa de comentário mora no passo; comentar num passo recolhido o expande.
+  const comentar = () => {
+    if (recolhido) alternarAberto(passo.id)
+    setComentando(passo.hunkIds.length > 0)
+  }
+  useAtalhos({ j: () => andar(1), k: () => andar(-1), x: marcar, c: comentar, m: mapa.alternar, Escape: () => mapa.aberto && mapa.alternar() })
 
   return (
     <section className="tela-do-fluxo">
@@ -106,16 +133,24 @@ function PassoAPasso({ fluxo, revisao, estado, decidir, achados, escolherAchados
       </header>
       <div className="fluxo">
         <div className="linha-do-tempo">
-          <PassosPorArquivo fluxo={fluxo} revisao={revisao} estado={estado} indice={indice} escolher={i => andar(i - indice)} />
+          <PassosPorArquivo fluxo={fluxo} revisao={revisao} estado={estado} indice={indice} vistos={vistos} escolher={irPara} />
         </div>
-        <article className="passo">
+        <article className={recolhido ? 'passo recolhido' : 'passo'}>
           <h2><span className={`papel papel-${passo.papel}`}>{passo.papel}</span> {passo.simbolo} <span className="local"><Caminho caminho={passo.arquivo} />:{passo.linhas[0]}–{passo.linhas[1]}</span></h2>
-          <FrasesDoPasso passo={passo} fluxo={fluxo} narrador={narrador} destacar={setDestaque} achados={achados} escolher={escolherAchados} />
-          {(passo.avisos ?? []).map(aviso => <p key={aviso} className="alerta">{aviso}</p>)}
-          <Decisoes hunkIds={passo.hunkIds} opcoes={['revisado']} estado={estado} decidir={decidir} comentando={comentando} setComentando={setComentando} />
-          {passo.hunkIds.length > 0
-            ? <DiffDosTrechos revisao={revisao} arquivo={passo.arquivo} hunkIds={passo.hunkIds} ladoALado={ladoALado} destaque={destaque} />
-            : <CodigoDoPasso key={passo.id} passo={passo} />}
+          {origem && (
+            <p className="ja-visto-aviso">
+              <span>já visto em <a href={`#fluxo/${origem.fluxo.id}/${origem.passo.id}`}>{origem.fluxo.titulo}</a></span>
+              <button type="button" aria-expanded={!recolhido} onClick={() => alternarAberto(passo.id)}>{recolhido ? 'abrir aqui' : 'recolher'}</button>
+            </p>
+          )}
+          {!recolhido && <>
+            <FrasesDoPasso passo={passo} fluxo={fluxo} narrador={narrador} destacar={setDestaque} achados={achados} escolher={escolherAchados} />
+            {(passo.avisos ?? []).map(aviso => <p key={aviso} className="alerta">{aviso}</p>)}
+            <Decisoes hunkIds={passo.hunkIds} opcoes={['revisado']} estado={estado} decidir={decidir} comentando={comentando} setComentando={setComentando} />
+            {passo.hunkIds.length > 0
+              ? <DiffDosTrechos revisao={revisao} arquivo={passo.arquivo} hunkIds={passo.hunkIds} ladoALado={ladoALado} destaque={destaque} />
+              : <CodigoDoPasso key={passo.id} passo={passo} />}
+          </>}
         </article>
       </div>
     </section>

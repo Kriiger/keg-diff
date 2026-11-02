@@ -1,6 +1,7 @@
 // Para onde o n, o [ e o ] levam. As contas são puras, sobre a checklist; a tela só aplica o resultado.
 import { useEffect, useRef, type MutableRefObject } from 'react'
-import type { Estado } from '../src/contrato'
+import type { Estado, Revisao } from '../src/contrato'
+import { jaVistosDoFluxo } from './ja-visto'
 import type { Checklist } from './main'
 
 export interface Posicao { rota: string; indice: number }
@@ -15,8 +16,13 @@ const GRUPOS = ['orfaos', 'testes', 'outros'] as const
 
 // O primeiro lugar com trecho sem decisão depois da posição atual, na ordem da coluna da esquerda
 // (passos dos fluxos, órfãos, testes, outros), dando a volta até o começo. Sem posição, começa do começo.
-export function proximoNaoRevisado(checklist: Checklist, estado: Estado, atual?: Posicao): Posicao | undefined {
-  const dosFluxos = checklist.fluxos.flatMap(({ fluxo }) => fluxo.passos.map((passo, indice) => ({ rota: `fluxo/${fluxo.id}`, indice, hunkIds: passo.hunkIds })))
+// O passo "já visto em outro fluxo" não é destino: o trecho dele ainda sem decisão também está no passo do fluxo anterior,
+// que o n alcança ao dar a volta, e o passo repetido abriria recolhido.
+export function proximoNaoRevisado(revisao: Revisao, checklist: Checklist, estado: Estado, atual?: Posicao): Posicao | undefined {
+  const dosFluxos = checklist.fluxos.flatMap(({ fluxo }) => {
+    const repetidos = jaVistosDoFluxo(revisao, fluxo.id)
+    return fluxo.passos.map((passo, indice) => ({ rota: `fluxo/${fluxo.id}`, indice, hunkIds: repetidos.has(passo.id) ? [] : passo.hunkIds }))
+  })
   const dosGrupos = GRUPOS.flatMap(grupo => checklist[grupo].map((item, indice) => ({ rota: grupo, indice, hunkIds: item.hunkIds })))
   const lugares = [...dosFluxos, ...dosGrupos]
   const aqui = lugares.findIndex(lugar => lugar.rota === atual?.rota && lugar.indice === atual.indice)
@@ -46,12 +52,12 @@ export function indiceInicial({ pendente }: Navegacao, rota: string): number | u
 }
 
 // Os atalhos n, [ e ] com o estado que eles precisam. "navegacao" vai para as telas, que se registram nela.
-export function useNavegacao(checklist: Checklist | undefined, estado: Estado, rota: string): { navegacao: Navegacao; atalhos: Record<string, () => void> } {
+export function useNavegacao(revisao: Revisao | undefined, checklist: Checklist | undefined, estado: Estado, rota: string): { navegacao: Navegacao; atalhos: Record<string, () => void> } {
   const navegacao: Navegacao = { cursor: useRef(undefined), pendente: useRef(undefined) }
   // Sem trecho pendente em lugar nenhum, o n leva ao Fechamento.
   const proximo = () => {
-    if (!checklist) return
-    const alvo = proximoNaoRevisado(checklist, estado, navegacao.cursor.current)
+    if (!revisao || !checklist) return
+    const alvo = proximoNaoRevisado(revisao, checklist, estado, navegacao.cursor.current)
     if (!alvo) location.hash = 'fechamento'
     else if (navegacao.cursor.current?.rota === alvo.rota) navegacao.cursor.current.ir(alvo.indice)
     else {
