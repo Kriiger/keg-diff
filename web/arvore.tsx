@@ -5,6 +5,7 @@ import { Decisoes } from './decisoes'
 import { Icone } from './icones'
 import { MoldeDaLateral, SecaoRecolhivel } from './lateral'
 import type { Decidir } from './main'
+import { alternarModo } from './modo'
 import { arquivosEmOrdem, contarLinhas, montarArvore, statusDe, type Contagem, type NoDaArvore, type StatusDoArquivo } from './pastas'
 import { DiffDosTrechos, marcador, useAtalhos } from './telas'
 
@@ -15,6 +16,12 @@ const STATUS: Record<StatusDoArquivo, { letra: string; nome: string }> = {
 
 // O arquivo escolhido sobrevive a sair do modo árvore e voltar (o componente desmonta); na primeira entrada, vale o primeiro.
 let ultimoEscolhido: string | undefined
+
+// Os links do panorama levam a um arquivo daqui: escolhe o arquivo e troca para o modo árvore, que o lê ao montar.
+export function abrirNaArvore(caminho: string) {
+  ultimoEscolhido = caminho
+  alternarModo()
+}
 
 interface PropsDaLista {
   escolhido: string | undefined

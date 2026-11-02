@@ -7,6 +7,7 @@ import { Analisador, type Config } from './analisador.js'
 import { coletarDiff } from './coletor.js'
 import type { Revisao } from './contrato.js'
 import { montarRevisao } from './montador.js'
+import { montarPanorama } from './panorama.js'
 import { abrirProjeto, assinaturaDaConfig, atualizarProjeto } from './projeto.js'
 
 export interface Tempos { projetoMs: number; fluxosMs: number; projetoEmMemoria: boolean }
@@ -62,9 +63,19 @@ function escutar() {
       else aberto = { projeto: abrirProjeto(raiz), assinatura }
       const meio = performance.now()
       const revisao = montarRevisao(coletarDiff(argsDoGit), new Analisador(raiz, config, aberto.projeto), argsDoGit.join(' ') || 'HEAD')
+      acrescentarPanorama(revisao, raiz, argsDoGit)
       parentPort!.postMessage({ revisao, tempos: { projetoMs: meio - inicio, fluxosMs: performance.now() - meio, projetoEmMemoria } })
     } catch (erro) {
       parentPort!.postMessage({ erro: erro instanceof Error ? erro.message : String(erro) })
     }
   })
+}
+
+// O panorama é um extra: se o git ou o parser falharem nele, a revisão segue só com os fluxos.
+function acrescentarPanorama(revisao: Revisao, raiz: string, argsDoGit: string[]) {
+  try {
+    revisao.panorama = montarPanorama(revisao, raiz, argsDoGit)
+  } catch (erro) {
+    console.error(`não consegui montar o panorama: ${erro instanceof Error ? erro.message : erro}`)
+  }
 }

@@ -12,7 +12,9 @@ import './estilo/mapa.css'
 import './estilo/ligacoes.css'
 import './estilo/arvore.css'
 import './estilo/alternador.css'
+import './estilo/panorama.css'
 import { AlternadorDeModo } from './alternador'
+import { recarregarSeChunkSumiu } from './chunks'
 import { ModoArvore } from './arvore'
 import { useCronometro } from './cronometro'
 import { escutar, reconectar, tolerarQueda, useServidorDesligado } from './eventos'
@@ -20,10 +22,11 @@ import { Fechamento } from './fechamento'
 import { CabecaDaLateral, LateralDoFluxo } from './lateral'
 import { alternarModo, useModo } from './modo'
 import { AvisoDoNarrador, useNarrador } from './narracao'
+import { Panorama } from './panorama'
 import { useNavegacao } from './proximo'
 import { alternarLateral, fecharGaveta } from './recolher'
 import { BotaoDoTema, ciclarTema } from './tema'
-import { Panorama, TelaDeTrechos, TelaDoFluxo, decididos, useAtalhos, type Contexto } from './telas'
+import { TelaDeTrechos, TelaDoFluxo, decididos, useAtalhos, type Contexto } from './telas'
 
 export type Decisao = Estado[string]['decisao']
 export type Decidir = (hunkIds: string[], decisao: Decisao | null, comentario?: string) => void
@@ -145,7 +148,7 @@ function TelaAtual({ rota, fluxo, passoInicial, checklist, segundos, contexto }:
   if (fluxo) return <TelaDoFluxo key={fluxo.id} fluxo={fluxo} passoInicial={passoInicial} {...contexto} />
   if (rota in SECOES) return <TelaDeTrechos key={rota} rota={rota} {...SECOES[rota as Secao]} itens={checklist[rota as Secao]} {...contexto} />
   if (rota === 'fechamento') return <Fechamento revisao={revisao} checklist={checklist} estado={estado} secoes={SECOES} segundos={segundos} />
-  return <Panorama revisao={revisao} checklist={checklist} estado={estado} narrador={narrador} />
+  return <Panorama revisao={revisao} checklist={checklist} estado={estado} narrador={narrador} segundos={segundos} />
 }
 
 // A mesma lista do README e dos useAtalhos: mudou uma, mude as outras.
@@ -210,4 +213,5 @@ function montarChecklist(revisao: Revisao): Checklist {
   return { fluxos, orfaos, testes, outros, todos: revisao.arquivos.flatMap(a => a.hunks.map(h => h.id)) }
 }
 
+recarregarSeChunkSumiu()
 createRoot(document.getElementById('raiz')!).render(<StrictMode><App /></StrictMode>)

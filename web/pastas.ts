@@ -16,9 +16,13 @@ export function statusDe(arquivo: ArquivoAlterado): StatusDoArquivo {
 }
 
 // O patch do hunk vem com uma linha de cabeçalho (@@) e depois só o que mudou, sem contexto.
-export function contarLinhas(arquivo: ArquivoAlterado): Contagem {
-  const linhas = arquivo.hunks.flatMap(hunk => hunk.patch.split('\n').slice(1))
+export function contarPatch(patch: string): Contagem {
+  const linhas = patch.split('\n').slice(1)
   return { mais: linhas.filter(l => l.startsWith('+')).length, menos: linhas.filter(l => l.startsWith('-')).length }
+}
+
+export function contarLinhas(arquivo: ArquivoAlterado): Contagem {
+  return somar(arquivo.hunks.map(hunk => contarPatch(hunk.patch)))
 }
 
 function somar(contagens: Contagem[]): Contagem {

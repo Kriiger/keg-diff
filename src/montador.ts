@@ -2,7 +2,7 @@
 // termina. O caminho achado é um fluxo; o que não acha as duas pontas vira órfão.
 import { createHash } from 'node:crypto'
 import { ARQUIVO_DE_CODIGO, type Analisador, type Fronteira, type Unidade } from './analisador.js'
-import { ARQUIVO_DE_TESTE, riscoDasSaidas } from './catalogo.js'
+import { ARQUIVO_DE_TESTE, riscoDasSaidas, saidaPrincipal } from './catalogo.js'
 import { darIdsAosHunks, partirHunk } from './coletor.js'
 import { montarGrafo } from './grafo.js'
 import { tiposDe } from './sintaxe.js'
@@ -211,6 +211,8 @@ function montarFluxo(grupo: Trilha[], trechos: Map<Unidade, string[]>, analisado
     id: createHash('sha1').update([...unidades].map(u => u.chave).sort().join('\n')).digest('hex').slice(0, 10),
     titulo: primeira === saida ? rotulo(primeira) : `${rotulo(primeira)} → ${rotulo(saida)}`,
     risco: RISCOS[riscoDasSaidas(saida.saidas)]!,
+    entrada: [...primeira.fontes][0],
+    saida: saidaPrincipal(saida.saidas),
     passos,
   }
 }

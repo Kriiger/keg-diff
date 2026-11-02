@@ -73,6 +73,15 @@ export function riscoDasSaidas(saidas: Iterable<string>): number {
   return maior
 }
 
+// O nome da saída que decide o risco do fluxo ("banco-escrita"): a tela diz por que o risco é alto.
+export function saidaPrincipal(saidas: Iterable<string>): string | undefined {
+  let maior: string | undefined
+  for (const saida of saidas) {
+    if (maior === undefined || (RISCO_DA_SAIDA[saida] ?? 1) > (RISCO_DA_SAIDA[maior] ?? 1)) maior = saida
+  }
+  return maior
+}
+
 export const ROTA_DO_APP = /(?:^|\/)app\/(.*?)\/?route\.[jt]s$/
 export const ROTA_DO_PAGES = /(?:^|\/)pages\/(api(?:\/.*?)?)(?:\/index)?\.[jt]sx?$/
 export const PAGINA_DO_APP = /(^|\/)app\/(.+\/)?(page|layout)\.[jt]sx?$/

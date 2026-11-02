@@ -12,6 +12,7 @@ export interface Revisao {
   testes: Teste[]                  // fora dos fluxos: teste confere o produto, não é caminho do dado
   grafo?: Grafo                    // o que chama o que em volta do diff, para a tela Mapa
   manifesto?: ConferenciaDoManifesto  // só existe quando o executor gravou .revisao/manifesto.json
+  panorama?: Panorama              // o que o git e o código dizem além dos fluxos; review.json antigo não tem
   metricas: Metricas
 }
 
@@ -32,6 +33,8 @@ export interface Fluxo {
   id: string
   titulo: string                   // "POST /api/transacoes"
   risco: 'alto' | 'medio' | 'baixo'
+  entrada?: string                 // de onde o dado nasce, no vocabulário do catálogo: "evento", "rota", "banco-leitura"
+  saida?: string                   // a saída que decide o risco: "banco-escrita", "resposta-http", "tela"
   passos: Passo[]
 }
 
@@ -101,6 +104,68 @@ export interface ArestaDoGrafo {
 // O motor dá a cada função o id "arquivo:linha#símbolo"; o passo de um fluxo tem os mesmos três dados.
 export function idDoNo({ arquivo, linhas, simbolo }: Pick<Passo, 'arquivo' | 'linhas' | 'simbolo'>): string {
   return `${arquivo}:${linhas[0]}#${simbolo}`
+}
+
+// O panorama junta o que só o git e a sintaxe sabem: os commits do intervalo, os símbolos que mudaram, as dependências
+// e o tamanho dos arquivos. Cada lista vazia faz o cartão dela sumir da página.
+export interface Panorama {
+  intervalo?: Intervalo
+  simbolos: SimboloAlterado[]      // funções, componentes, classes e tipos de arquivos de código (testes ficam de fora)
+  endpoints: EndpointTocado[]
+  dependencias: Dependencia[]
+  arquivos: InfoDoArquivo[]        // só arquivos de código que não são teste
+  ritmo?: { segundosPorTrecho: number; revisoes: number }  // a mediana do seu historico.jsonl; sem histórico, não existe
+}
+
+export interface Intervalo {
+  antes: string                    // a ponta de onde o git compara (hash completo, ref ou HEAD)
+  depois: string                   // o commit de chegada, "stage" ou "diretório de trabalho"
+  branch?: string                  // só com o HEAD num branch (detached não tem)
+  commits: Commit[]                // os mais novos primeiro, até 30
+  totalDeCommits: number
+}
+
+export interface Commit {
+  hash: string
+  autor: string
+  em: string                       // ISO
+  assunto: string
+}
+
+export type TipoDeSimbolo = 'funcao' | 'componente' | 'classe' | 'tipo' | 'constante'
+
+export interface SimboloAlterado {
+  arquivo: string
+  nome: string
+  tipo: TipoDeSimbolo
+  mudanca: 'novo' | 'alterado' | 'removido'
+  exportado: boolean               // no código de agora (no removido, no de antes)
+  exportadoAntes?: boolean         // só quando o alterado ganhou ou perdeu o export
+  assinatura: string               // parâmetros e retorno (função), cabeçalho (classe) ou o texto todo (tipo); no removido, a antiga
+  assinaturaAntes?: string         // só quando o alterado mudou de assinatura: aí é a API pública que muda
+  linhas?: number                  // tamanho da função no código de agora
+  complexidade?: number            // ramificações da função no código de agora, a contagem de McCabe
+}
+
+export interface EndpointTocado {
+  metodo: string                   // GET, POST... ou ANY para o handler único do Pages Router
+  rota: string                     // "/api/transacoes/[id]"
+  arquivo: string
+  mudanca: SimboloAlterado['mudanca']
+}
+
+export interface Dependencia {
+  nome: string
+  secao: 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies'
+  antes?: string                   // sem "antes", foi acrescentada; sem "depois", foi removida
+  depois?: string
+  arquivo: string                  // o package.json que mudou
+}
+
+export interface InfoDoArquivo {
+  caminho: string
+  linhas: number                   // linhas do arquivo de agora (sem o arquivo removido)
+  teste: 'tocado' | 'existe' | 'nenhum'  // um teste de mesmo nome mudou, existe no repositório, ou não há
 }
 
 // O que o executor declarou contra o que o código tem. As regras de casamento estão em manifesto.ts.

@@ -36,7 +36,7 @@ function soma(numeros: number[]): number {
   return numeros.reduce((total, n) => total + n, 0)
 }
 
-function mediana(numeros: number[]): number | undefined {
+export function mediana(numeros: number[]): number | undefined {
   if (numeros.length === 0) return undefined
   const ordenados = [...numeros].sort((a, b) => a - b)
   const meio = Math.floor(ordenados.length / 2)

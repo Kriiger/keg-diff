@@ -1,19 +1,15 @@
-// As telas da revisão: o panorama, o fluxo passo a passo e as listas de trechos fora dos fluxos.
+// As telas da revisão: o fluxo passo a passo e as listas de trechos fora dos fluxos.
 import { PatchDiff } from '@pierre/diffs/react'
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import type { Estado, Fluxo, Passo, Revisao } from '../src/contrato'
 import { Decisoes } from './decisoes'
-import { AlertasDoManifesto } from './divergencias'
 import { tolerarQueda } from './eventos'
-import type { Checklist, Decidir, Decisao, Item } from './main'
+import type { Decidir, Decisao, Item } from './main'
 import { useTrocando } from './modo'
-import { BotaoNarrarTodos, FrasesDoPasso, semNarracao, type Narrador } from './narracao'
+import { FrasesDoPasso, semNarracao, type Narrador } from './narracao'
 import { indiceInicial, useCursor, type Navegacao } from './proximo'
 import { MODOS, useTema } from './tema'
 
-// O mesmo limite do cli.ts: acima disso a revisão não fecha.
-const TRECHOS_DEMAIS = 40
-const ORDEM_DO_RISCO = { alto: 0, medio: 1, baixo: 2 }
 // Um tema claro e um escuro; qual vale vem da escolha da pessoa (tema.tsx) ou, em "Sistema", do prefers-color-scheme. O fundo do diff vem de estilo/telas.css.
 const TEMAS = { light: 'github-light', dark: 'github-dark' } as const
 // O mapa leva o React Flow e o ELK (mais de 1 MB): só baixa quando alguém aperta m.
@@ -55,48 +51,6 @@ export function useAtalhos(atalhos: Record<string, () => void>) {
     addEventListener('keydown', aoTeclar)
     return () => removeEventListener('keydown', aoTeclar)
   }, [])
-}
-
-export function Panorama({ revisao, checklist, estado, narrador }: { revisao: Revisao; checklist: Checklist; estado: Estado; narrador: Narrador }) {
-  const { metricas } = revisao
-  const total = checklist.todos.length
-  const feitos = decididos(checklist.todos, estado)
-  const cartoes: [string, number][] = [
-    ['arquivos novos', metricas.arquivosNovos], ['arquivos alterados', metricas.arquivosAlterados],
-    ['fluxos', revisao.fluxos.length], ['órfãos', revisao.orfaos.length],
-    ['saltos no maior fluxo', metricas.saltosMaximo], ['fronteiras cruzadas', metricas.fronteirasCruzadas],
-  ]
-  const fluxos = [...checklist.fluxos].sort((a, b) => ORDEM_DO_RISCO[a.fluxo.risco] - ORDEM_DO_RISCO[b.fluxo.risco])
-  return (
-    <section className="panorama">
-      <header>
-        <h1>Panorama</h1>
-        <p className="detalhe">{encurtarBase(revisao.base)} · gerado às {new Date(revisao.geradoEm).toLocaleTimeString()}</p>
-      </header>
-      {total > TRECHOS_DEMAIS && <p className="alerta">{total} trechos é muito para uma revisão: peça ao agente para fatiar a tarefa.</p>}
-      {total > 0 && feitos === total && <p className="sucesso">Revisão completa: {total} de {total} trechos com decisão.</p>}
-      <div className="cartoes">
-        <div className="cartao destaque"><strong>{total === 0 ? 100 : Math.round((feitos / total) * 100)}%</strong><span>{feitos} de {total} trechos</span></div>
-        {cartoes.map(([rotulo, valor]) => <div key={rotulo} className="cartao"><strong>{valor}</strong><span>{rotulo}</span></div>)}
-      </div>
-      <AlertasDoManifesto manifesto={revisao.manifesto} />
-      <h2>Fluxos por risco</h2>
-      <BotaoNarrarTodos fluxos={revisao.fluxos} narrador={narrador} />
-      {fluxos.length === 0 && <p className="detalhe">Nenhum fluxo: os trechos alterados estão nos órfãos e em outros trechos.</p>}
-      <ol className="fluxos-do-panorama">
-        {fluxos.map(({ fluxo, hunkIds }) => (
-          <li key={fluxo.id}>
-            <a href={`#fluxo/${fluxo.id}`}>
-              <span className={`selo risco-${fluxo.risco}`}>{fluxo.risco}</span>
-              <span className="rotulo">{fluxo.titulo}</span>
-              <span className="detalhe">{fluxo.passos.length} passos</span>
-              <span className="contagem">{decididos(hunkIds, estado)}/{hunkIds.length}</span>
-            </a>
-          </li>
-        ))}
-      </ol>
-    </section>
-  )
 }
 
 export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrador, mapa, navegacao, passoInicial }: Contexto & { fluxo: Fluxo; passoInicial?: string }) {

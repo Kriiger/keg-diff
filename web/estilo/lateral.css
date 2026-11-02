@@ -1,6 +1,6 @@
 /* Moldura da página: a lateral e a barra de atalhos são cápsulas soltas sobre o conteúdo. */
 /* Painéis: cinza discreto e translúcido, sem sombra. Só o que flutua leva vidro: pouco desfoque e um reflexo leve na borda. */
-.cartao, .passo, .item, .linha-do-tempo, .fluxos-do-panorama a, .faltas, .alerta, .sucesso {
+.cartao, .passo, .item, .linha-do-tempo, .faltas, .alerta, .sucesso {
   background: var(--painel-fundo); border: 1px solid var(--painel-borda); border-radius: var(--painel-raio);
 }
 .dicas, .alternador, .ajuda, .mapa-do-fluxo, .botao-da-lateral {

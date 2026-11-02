@@ -178,6 +178,9 @@ function enviarCodigo(resposta: ServerResponse, raiz: string, parametros: URLSea
 function enviarPagina(resposta: ServerResponse, caminho: string) {
   const arquivo = path.join(PASTA_DA_PAGINA, path.normalize(caminho))
   const existe = arquivo.startsWith(PASTA_DA_PAGINA) && existsSync(arquivo) && path.extname(arquivo) !== ''
+  // Só rota de página cai no index.html. Um asset que sumiu (o pedaço de um build antigo) responde 404: com o html no lugar,
+  // o import() da aba aberta recebia text/html, falhava sem um erro que a página entendesse e deixava a tela em branco.
+  if (!existe && caminho.startsWith('/assets/')) return responder(resposta, 404, 'asset não encontrado')
   enviarArquivo(resposta, existe ? arquivo : path.join(PASTA_DA_PAGINA, 'index.html'))
 }
 
