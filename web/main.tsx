@@ -45,6 +45,7 @@ function App() {
   const [erro, setErro] = useState<string>()
   const [endereco, setEndereco] = useState(location.hash.slice(1))
   const [ajuda, setAjuda] = useState(false)
+  const [mapaAberto, setMapaAberto] = useState(false)
   const [ladoALado, setLadoALado] = useState(() => lerPreferencia() === 'lado-a-lado')
   const checklist = useMemo(() => revisao && montarChecklist(revisao), [revisao])
   const narrador = useNarrador()
@@ -80,16 +81,20 @@ function App() {
 
   if (erro) return <p className="aviso-central">{erro} Rode <code>keg diff</code> de novo.</p>
   if (!revisao || !checklist) return <p className="aviso-central">Carregando…</p>
-  const fluxoAberto = checklist.fluxos.find(f => `fluxo/${f.fluxo.id}` === endereco)?.fluxo
-  const secao = endereco in SECOES ? (endereco as Secao) : undefined
-  const contexto = { revisao, estado, decidir, ladoALado, narrador }
+  // "fluxo/<id>/<passo>" é o endereço que o mapa usa para levar a um passo de outro fluxo.
+  const [tela = '', id, passoDoEndereco] = endereco.split('/')
+  const rota = id ? `${tela}/${id}` : tela
+  const fluxoAberto = checklist.fluxos.find(f => `fluxo/${f.fluxo.id}` === rota)?.fluxo
+  const secao = rota in SECOES ? (rota as Secao) : undefined
+  const mapa = { aberto: mapaAberto, alternar: () => setMapaAberto(aberto => !aberto) }
+  const contexto = { revisao, estado, decidir, ladoALado, narrador, mapa }
 
   return (
-    <div className="pagina">
-      <Lateral revisao={revisao} checklist={checklist} estado={estado} endereco={endereco} />
+    <div className={mapaAberto && fluxoAberto ? 'pagina com-mapa' : 'pagina'}>
+      <Lateral revisao={revisao} checklist={checklist} estado={estado} endereco={rota} />
       <main className="conteudo">
         <AvisoDoNarrador narrador={narrador} />
-        {fluxoAberto && <TelaDoFluxo key={fluxoAberto.id} fluxo={fluxoAberto} {...contexto} />}
+        {fluxoAberto && <TelaDoFluxo key={fluxoAberto.id} fluxo={fluxoAberto} passoInicial={passoDoEndereco} {...contexto} />}
         {secao && <TelaDeTrechos key={secao} {...SECOES[secao]} itens={checklist[secao]} {...contexto} />}
         {!fluxoAberto && !secao && <Panorama revisao={revisao} checklist={checklist} estado={estado} narrador={narrador} />}
       </main>
@@ -135,7 +140,7 @@ function Lateral({ revisao, checklist, estado, endereco }: { revisao: Revisao; c
 }
 
 function Ajuda({ fechar }: { fechar: () => void }) {
-  const atalhos = [['j / k', 'próximo e anterior'], ['x', 'marca revisado (de novo desfaz)'], ['c', 'comenta'], ['d', 'código morto (órfãos)'], ['f', 'falso positivo (órfãos)'], ['v', 'diff lado a lado ou empilhado'], ['p', 'volta ao panorama'], ['?', 'abre e fecha esta ajuda']]
+  const atalhos = [['j / k', 'próximo e anterior'], ['x', 'marca revisado (de novo desfaz)'], ['c', 'comenta'], ['d', 'código morto (órfãos)'], ['f', 'falso positivo (órfãos)'], ['v', 'diff lado a lado ou empilhado'], ['m', 'abre e fecha o mapa de quem chama quem (no fluxo)'], ['p', 'volta ao panorama'], ['?', 'abre e fecha esta ajuda']]
   return (
     <div className="fundo-da-ajuda" onClick={fechar}>
       <dl className="ajuda">

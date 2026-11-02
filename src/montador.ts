@@ -4,15 +4,16 @@ import { createHash } from 'node:crypto'
 import { ARQUIVO_DE_CODIGO, type Analisador, type Fronteira, type Unidade } from './analisador.js'
 import { ARQUIVO_DE_TESTE, riscoDasSaidas } from './catalogo.js'
 import { darIdsAosHunks, partirHunk } from './coletor.js'
+import { montarGrafo } from './grafo.js'
 import { tiposDe } from './sintaxe.js'
-import type { ArquivoAlterado, Fluxo, Orfao, Passo, Revisao, Teste } from './contrato.js'
+import { idDoNo, type ArquivoAlterado, type Fluxo, type Orfao, type Passo, type Revisao, type Teste } from './contrato.js'
 
 const SALTOS_MAXIMOS = 6
 const RISCOS = ['baixo', 'baixo', 'medio', 'alto', 'alto'] as const
 
-interface Aresta { de: Unidade; para: Unidade; linha: number; fronteira?: Fronteira }
+export interface Aresta { de: Unidade; para: Unidade; linha: number; fronteira?: Fronteira }
 // Trilha é o caminho de uma unidade alterada: da fonte até ela e dela (ou de quem a chamou) até a saída.
-interface Trilha { fonte: Unidade; saida: Unidade; arestas: Aresta[]; unidades: Set<Unidade> }
+export interface Trilha { fonte: Unidade; saida: Unidade; arestas: Aresta[]; unidades: Set<Unidade> }
 
 export function montarRevisao(alterados: ArquivoAlterado[], analisador: Analisador, base: string): Revisao {
   const arquivos = alterados.map(arquivo => partirAcrescimos(arquivo, analisador))
@@ -42,6 +43,7 @@ export function montarRevisao(alterados: ArquivoAlterado[], analisador: Analisad
     fluxos,
     orfaos,
     testes,
+    grafo: montarGrafo(trechos, trilhas, papeisDosPassos(fluxos), analisador),
     metricas: {
       arquivosNovos: arquivos.filter(a => a.status === 'novo').length,
       arquivosAlterados: arquivos.filter(a => a.status !== 'novo').length,
@@ -50,6 +52,11 @@ export function montarRevisao(alterados: ArquivoAlterado[], analisador: Analisad
       divergenciasDoManifesto: 0,
     },
   }
+}
+
+// O mapa mostra o papel que o fluxo deu à função; as que ficaram fora dos fluxos têm o papel lido do código.
+function papeisDosPassos(fluxos: Fluxo[]): Map<string, Passo['papel']> {
+  return new Map(fluxos.flatMap(f => f.passos).reverse().map(p => [idDoNo(p), p.papel]))
 }
 
 // Um acréscimo que cobre várias funções, como um arquivo novo, vira um trecho por função de fora:

@@ -15,7 +15,8 @@ export const ARQUIVO_DE_CODIGO = /\.(ts|tsx|js|jsx|mjs|cjs)$/
 
 export type Fronteira = 'http' | 'cliente-servidor'
 // usaRetorno: quem chama usa o valor devolvido, como em "const total = await contar()".
-export interface Ligacao { unidade: Unidade; linha: number; fronteira?: Fronteira; usaRetorno?: boolean }
+// dinamico: o compilador não prova a chamada (callback em prop, função num objeto): o mapa a desenha tracejada.
+export interface Ligacao { unidade: Unidade; linha: number; fronteira?: Fronteira; usaRetorno?: boolean; dinamico?: boolean }
 
 // Unidade é a menor declaração que recebe um trecho: função, arrow em const, método ou declaração de módulo.
 export interface Unidade {
@@ -127,7 +128,7 @@ export class Analisador {
       if (chamador !== u) u.chamadores.push({ unidade: chamador, linha: referencia.getStartLineNumber() })
     }
     const recebedora = chamadaQueRecebe(u.no)
-    if (recebedora) u.chamadores.push({ unidade: this.unidadeQueContem(recebedora), linha: recebedora.getStartLineNumber() })
+    if (recebedora) u.chamadores.push({ unidade: this.unidadeQueContem(recebedora), linha: recebedora.getStartLineNumber(), dinamico: true })
     return u.chamadores
   }
 
@@ -298,7 +299,7 @@ export class Analisador {
       const origem = propDoComponente(no.getExpression())
       if (origem?.prop !== prop || origem.componente !== filho.no) return
       const chamador = this.unidadeQueContem(no)
-      u.chamadores!.push({ unidade: chamador, linha: no.getStartLineNumber() })
+      u.chamadores!.push({ unidade: chamador, linha: no.getStartLineNumber(), dinamico: true })
     })
   }
 
@@ -319,7 +320,7 @@ export class Analisador {
         : [expressao]
       for (const chamada of chamadas) {
         const destino = this.unidadeDaDeclaracao(declaracaoDe(chamada))
-        if (destino) u.chamadas.push({ unidade: destino, linha })
+        if (destino) u.chamadas.push({ unidade: destino, linha, dinamico: true })
       }
     }
   }

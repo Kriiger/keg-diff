@@ -113,7 +113,30 @@
     .ajuda { background: var(--painel); border-radius: 10px; padding: 20px 24px; display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; }
     .ajuda dd { margin: 0; }
 
+    .botao-do-mapa, .mapa-do-fluxo > header button { border: 1px solid var(--borda); background: var(--fundo); border-radius: 6px; padding: 2px 10px; }
+    .botao-do-mapa { margin-left: auto; }
+    .pagina.com-mapa .conteudo { padding-bottom: calc(50vh + 24px); }
+    .pagina.com-mapa .dicas { bottom: calc(50vh + 12px); z-index: 6; }
+    .mapa-do-fluxo { position: fixed; left: 260px; right: 0; bottom: 0; height: 50vh; z-index: 5; display: flex; flex-direction: column; background: var(--painel); border-top: 1px solid var(--borda); box-shadow: 0 -6px 20px #0002; }
+    .mapa-do-fluxo > header { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 8px 14px; border-bottom: 1px solid var(--borda); }
+    .mapa-do-fluxo > header .detalhe { flex: 1; font-size: 12px; }
+    .mapa-do-fluxo > .detalhe { padding: 14px; }
+    .pagina .mapa-do-fluxo .react-flow { flex: 1; min-height: 0; --xy-background-color: var(--painel); --xy-edge-stroke-default: var(--suave); --xy-edge-label-color-default: var(--texto); --xy-edge-label-background-color-default: var(--painel); }
+    .mapa-do-fluxo .react-flow__edge-path { stroke-width: 1.5px; }
+    .no-do-mapa { --cor: var(--processa); width: 220px; height: 66px; padding: 6px 10px; border-radius: 8px; display: flex; flex-direction: column; justify-content: center; position: relative; cursor: pointer; background: var(--painel); font-size: 12px; overflow: hidden; }
+    .no-do-mapa.papel-nasce { --cor: var(--nasce); }
+    .no-do-mapa.papel-termina { --cor: var(--termina); }
+    .no-do-mapa.alterado { border: 2px solid var(--cor); background: color-mix(in srgb, var(--cor) 20%, var(--painel)); }
+    .no-do-mapa.vizinho { border: 1.5px dashed var(--suave); }
+    .no-do-mapa.atual { outline: 3px solid var(--acento); outline-offset: 2px; }
+    .no-do-mapa .simbolo, .no-do-mapa .local { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .no-do-mapa .lado { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--suave); }
+    .no-do-mapa .mais { position: absolute; top: 4px; right: 6px; font: 11px var(--mono); border: 1px solid var(--borda); border-radius: 10px; padding: 0 6px; background: var(--fundo); color: var(--suave); }
+    .faixa-da-fronteira { width: 44px; position: relative; border-left: 1px dashed var(--acento); border-right: 1px dashed var(--acento); background: color-mix(in srgb, var(--acento) 8%, transparent); }
+    .faixa-da-fronteira span { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 11px; color: var(--acento); background: var(--painel); border: 1px solid var(--acento); border-radius: 10px; padding: 0 8px; }
+
     @media (max-width: 860px) {
+      .mapa-do-fluxo { left: 0; }
       .pagina { grid-template-columns: 1fr; }
       .lateral { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--borda); }
       .conteudo { padding: 16px; }

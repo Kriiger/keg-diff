@@ -10,6 +10,7 @@ export interface Revisao {
   fluxos: Fluxo[]
   orfaos: Orfao[]
   testes: Teste[]                  // fora dos fluxos: teste confere o produto, não é caminho do dado
+  grafo?: Grafo                    // o que chama o que em volta do diff, para a tela Mapa
   metricas: Metricas
 }
 
@@ -67,6 +68,36 @@ export interface Orfao {
 export interface Teste {
   arquivo: string
   hunkIds: string[]
+}
+
+// O mapa precisa de vizinhos que o diff não tocou. O motor grava só uma vizinhança enxuta
+// (alterados, passos dos fluxos e vizinhos até 2 saltos), então a página não precisa do compilador.
+export interface Grafo {
+  nos: NoDoGrafo[]
+  arestas: ArestaDoGrafo[]
+}
+
+export interface NoDoGrafo {
+  id: string                       // o mesmo id do passo que vem da mesma função: ver idDoNo
+  simbolo: string
+  arquivo: string
+  linhas: [number, number]
+  papel: Papel
+  hunkIds: string[]                // vazio = vizinho sem alteração
+  lado?: 'cliente' | 'servidor'    // só quando se sabe: diretiva, rota do App Router ou ponta de um fetch
+  mais?: number                    // vizinhos que o corte deixou de fora
+}
+
+// de chama para. "http" é o fetch para uma rota do próprio projeto; "dinamico" é o que o compilador não prova.
+export interface ArestaDoGrafo {
+  de: string
+  para: string
+  tipo: 'chamada' | 'http' | 'dinamico'
+}
+
+// O motor dá a cada função o id "arquivo:linha#símbolo"; o passo de um fluxo tem os mesmos três dados.
+export function idDoNo({ arquivo, linhas, simbolo }: Pick<Passo, 'arquivo' | 'linhas' | 'simbolo'>): string {
+  return `${arquivo}:${linhas[0]}#${simbolo}`
 }
 
 export interface Metricas {

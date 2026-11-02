@@ -1,6 +1,6 @@
 // As telas da revisão: o panorama, o fluxo passo a passo e as listas de trechos fora dos fluxos.
 import { PatchDiff } from '@pierre/diffs/react'
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import type { Estado, Fluxo, Passo, Revisao } from '../src/contrato'
 import type { Checklist, Decidir, Decisao, Item } from './main'
 import { BotaoNarrarTodos, FrasesDoPasso, semNarracao, type Narrador } from './narracao'
@@ -10,6 +10,8 @@ const TRECHOS_DEMAIS = 40
 const ORDEM_DO_RISCO = { alto: 0, medio: 1, baixo: 2 }
 const NOMES: Record<Decisao, string> = { revisado: 'Revisado', 'codigo-morto': 'Código morto', 'falso-positivo': 'Falso positivo', comentado: 'Comentado' }
 const TECLAS: Record<Decisao, string> = { revisado: 'x', 'codigo-morto': 'd', 'falso-positivo': 'f', comentado: 'c' }
+// O mapa leva o React Flow e o ELK (mais de 1 MB): só baixa quando alguém aperta m.
+const Mapa = lazy(() => import('./mapa'))
 
 interface Contexto {
   revisao: Revisao
@@ -17,6 +19,7 @@ interface Contexto {
   decidir: Decidir
   ladoALado: boolean
   narrador: Narrador
+  mapa: { aberto: boolean; alternar: () => void }
 }
 
 // "e89d090ae0d6...bf157df72e51" vira "e89d090...bf157df", como o git log --oneline mostra.
@@ -87,9 +90,12 @@ export function Panorama({ revisao, checklist, estado, narrador }: { revisao: Re
   )
 }
 
-export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrador }: Contexto & { fluxo: Fluxo }) {
-  // Abre no primeiro passo alterado que ainda espera decisão.
-  const [indice, setIndice] = useState(() => Math.max(0, fluxo.passos.findIndex(p => decididos(p.hunkIds, estado) < p.hunkIds.length)))
+export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrador, mapa, passoInicial }: Contexto & { fluxo: Fluxo; passoInicial?: string }) {
+  // Abre no passo que o mapa pediu ou, sem pedido, no primeiro passo alterado que ainda espera decisão.
+  const [indice, setIndice] = useState(() => {
+    const pedido = fluxo.passos.findIndex(p => p.id === passoInicial)
+    return pedido >= 0 ? pedido : Math.max(0, fluxo.passos.findIndex(p => decididos(p.hunkIds, estado) < p.hunkIds.length))
+  })
   const [comentando, setComentando] = useState(false)
   const [destaque, setDestaque] = useState<[number, number] | null>(null)
   const passo = fluxo.passos[indice] ?? fluxo.passos[0]!
@@ -111,13 +117,14 @@ export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrad
     decidir(passo.hunkIds, pronto ? null : 'revisado')
     if (!pronto) andar(1)
   }
-  useAtalhos({ j: () => andar(1), k: () => andar(-1), x: marcar, c: () => setComentando(passo.hunkIds.length > 0) })
+  useAtalhos({ j: () => andar(1), k: () => andar(-1), x: marcar, c: () => setComentando(passo.hunkIds.length > 0), m: mapa.alternar, Escape: () => mapa.aberto && mapa.alternar() })
 
   return (
     <section className="tela-do-fluxo">
       <header>
         <h1>{fluxo.titulo}</h1>
         <span className={`selo risco-${fluxo.risco}`}>risco {fluxo.risco}</span>
+        <button className="botao-do-mapa" onClick={mapa.alternar}>Mapa <kbd>m</kbd></button>
       </header>
       <div className="fluxo">
         <ol className="linha-do-tempo">
@@ -143,6 +150,11 @@ export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrad
             : <CodigoDoPasso key={passo.id} passo={passo} />}
         </article>
       </div>
+      {mapa.aberto && (
+        <Suspense fallback={null}>
+          <Mapa revisao={revisao} fluxo={fluxo} indice={indice} irParaPasso={i => andar(i - indice)} fechar={mapa.alternar} />
+        </Suspense>
+      )}
     </section>
   )
 }

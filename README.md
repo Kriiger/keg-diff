@@ -33,9 +33,10 @@ Em seguida a página de revisão abre no navegador, servida em `http://127.0.0.1
 
 - **Panorama:** tamanho do diff, fluxos por risco e a cobertura, quantos trechos já têm decisão.
 - **Fluxo:** a linha do tempo nasce → processa → termina à esquerda e o diff do passo à direita. Passo de contexto mostra o código atual.
+- **Mapa:** responde "quem chama isso?" sem sair do fluxo. Abre num painel embaixo da tela (tecla `m` ou o botão Mapa), com o diff do passo ainda em cima. O React Flow desenha e o ELK organiza em camadas, da fonte à esquerda até a saída à direita. Nó alterado é cheio; vizinho sem alteração é tracejado; o passo atual mostra quem o chama, e clicar num nó mostra os vizinhos dele e, se ele é um passo ou um trecho alterado, leva até ele (também em outro fluxo). A fronteira cliente/servidor aparece como uma faixa. Salto que o compilador não prova, como o `fetch` para uma rota do projeto (`http`) e o callback passado em prop (`dinâmico`), vira aresta tracejada com rótulo. O grafo vem do `review.json` (campo `grafo`): as funções alteradas, os passos dos fluxos e os vizinhos até 2 saltos, com no máximo 5 vizinhos por lado e o aviso "+N" do que ficou de fora.
 - **Órfãos, testes e outros trechos:** o que não entrou em fluxo, cada um com o seu diff. Órfão recebe revisado, código morto ou falso positivo.
 
-Atalhos: `j` e `k` passam de passo, `x` marca revisado, `c` comenta, `d` e `f` marcam código morto e falso positivo nos órfãos, `v` alterna o diff entre lado a lado e empilhado, `p` volta ao panorama, `?` mostra a ajuda. Rodar o `keg diff` de novo em outro terminal atualiza a página aberta.
+Atalhos: `j` e `k` passam de passo, `x` marca revisado, `c` comenta, `d` e `f` marcam código morto e falso positivo nos órfãos, `m` abre e fecha o mapa do fluxo, `v` alterna o diff entre lado a lado e empilhado, `p` volta ao panorama, `?` mostra a ajuda. Rodar o `keg diff` de novo em outro terminal atualiza a página aberta.
 
 Cada decisão fica presa ao hash do trecho: se o agente mudar o trecho depois, ele volta para "não revisado". Sem terminal (num script ou num agente), o keg não abre a página.
 
@@ -55,7 +56,7 @@ Cada passo alterado ganha até três frases curtas, cada uma presa a linhas do p
 
 | Arquivo | Para quê |
 | --- | --- |
-| `.revisao/review.json` | Fluxos, órfãos e métricas do diff (o contrato está em `src/contrato.ts`) |
+| `.revisao/review.json` | Fluxos, órfãos, métricas e o grafo de chamadas do mapa (o contrato está em `src/contrato.ts`) |
 | `.revisao/estado.json` | As suas decisões na página, uma por trecho |
 | `.revisao/cache/` | As frases do narrador, uma por fluxo narrado |
 | `.revisao/keg.config.json` | Opcional: chamadas próprias da equipe, como `{ "nasce": ["api.get"], "termina": ["api.post", "api.*"] }` |
