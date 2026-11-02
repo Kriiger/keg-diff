@@ -53,16 +53,17 @@ const ICONES = {
   escuro: <path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z" />,
 }
 
-// Um botão que cicla, com o ícone do estado de agora: monitor, sol ou lua.
+// Um botão que cicla, com o ícone e o rótulo do estado de agora ("Tema: Escuro"); o title diz para onde o clique leva.
+// O prefixo "Tema:" some nas telas estreitas (estilo/lateral.css), onde o nome e o ícone bastam.
 export function BotaoDoTema() {
   const tema = useTema()
   const proximo = ORDEM[(ORDEM.indexOf(tema) + 1) % ORDEM.length]!
   return (
-    <button onClick={ciclarTema} title={`Tema: ${ROTULOS[tema]}. Clique para ${ROTULOS[proximo]}.`} aria-label={`Tema: ${ROTULOS[tema]}. Trocar para ${ROTULOS[proximo]}.`}>
+    <button onClick={ciclarTema} title={`Tema: ${ROTULOS[tema]}. Próximo: ${ROTULOS[proximo]}.`} aria-label={`Tema: ${ROTULOS[tema]}. Trocar para ${ROTULOS[proximo]}.`}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         {ICONES[tema]}
       </svg>
-      {ROTULOS[tema]} <kbd>a</kbd>
+      <span className="prefixo">Tema: </span>{ROTULOS[tema]} <kbd>a</kbd>
     </button>
   )
 }

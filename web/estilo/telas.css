@@ -79,7 +79,8 @@ diffs-container {
 }
 
 @media (max-width: 860px) {
-  .conteudo { padding: 16px 12px 120px; }
+  /* A barra de atalhos flutua embaixo (43px mais 12px de margem): o fim do conteúdo precisa parar acima dela. */
+  .conteudo { padding: 16px 12px 136px; }
   .fluxo { grid-template-columns: 1fr; }
   .linha-do-tempo { position: static; max-height: none; }
   .passo, .item { padding: 16px; }

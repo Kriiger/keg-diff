@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import type { ArquivoAlterado, Estado, Revisao } from '../src/contrato'
 import { Decisoes } from './decisoes'
+import { Icone } from './icones'
+import { MoldeDaLateral, SecaoRecolhivel } from './lateral'
 import type { Decidir } from './main'
 import { arquivosEmOrdem, contarLinhas, montarArvore, statusDe, type Contagem, type NoDaArvore, type StatusDoArquivo } from './pastas'
 import { DiffDosTrechos, marcador, useAtalhos } from './telas'
@@ -22,7 +24,7 @@ interface PropsDaLista {
   alternarPasta: (caminho: string) => void
 }
 
-// "cabeca" é o topo da lateral (marca e cobertura), igual ao do modo fluxo; "children" são os avisos do topo da página.
+// "cabeca" é o topo da lateral (marca e progresso), igual ao do modo fluxo; "children" são os avisos do topo da página.
 export function ModoArvore({ revisao, estado, decidir, ladoALado, cabeca, children }: { revisao: Revisao; estado: Estado; decidir: Decidir; ladoALado: boolean; cabeca: ReactNode; children: ReactNode }) {
   const nos = useMemo(() => montarArvore(revisao.arquivos), [revisao])
   const ordem = useMemo(() => arquivosEmOrdem(nos), [nos])
@@ -65,11 +67,11 @@ export function ModoArvore({ revisao, estado, decidir, ladoALado, cabeca, childr
   const lista: PropsDaLista = { escolhido: atual?.caminho, fechadas, estado, selecionar, alternarPasta }
   return (
     <>
-      <nav className="lateral">
-        {cabeca}
-        <h2>Arquivos</h2>
-        <ul className="arvore">{nos.map(no => <NoDaLista key={chaveDoNo(no)} no={no} nivel={0} {...lista} />)}</ul>
-      </nav>
+      <MoldeDaLateral cabeca={cabeca}>
+        <SecaoRecolhivel titulo="Arquivos">
+          <ul className="arvore">{nos.map(no => <NoDaLista key={chaveDoNo(no)} no={no} nivel={0} {...lista} />)}</ul>
+        </SecaoRecolhivel>
+      </MoldeDaLateral>
       <main className="conteudo">
         {children}
         {atual
@@ -92,7 +94,7 @@ function NoDaLista({ no, nivel, ...lista }: PropsDaLista & { no: NoDaArvore; niv
     const hunkIds = arquivo.hunks.map(h => h.id)
     return (
       <li>
-        <button id={`arquivo-${arquivo.caminho}`} className={`linha-da-arvore ${lista.escolhido === arquivo.caminho ? 'atual' : ''}`} style={recuo} aria-current={lista.escolhido === arquivo.caminho} onClick={() => lista.selecionar(arquivo.caminho)} title={arquivo.renomeadoDe ? `renomeado de ${arquivo.renomeadoDe}` : arquivo.caminho}>
+        <button id={`arquivo-${arquivo.caminho}`} className={`linha-da-arvore arquivo ${lista.escolhido === arquivo.caminho ? 'atual' : ''}`} style={recuo} aria-current={lista.escolhido === arquivo.caminho} onClick={() => lista.selecionar(arquivo.caminho)} title={arquivo.renomeadoDe ? `renomeado de ${arquivo.renomeadoDe}` : arquivo.caminho}>
           <span className={`status status-${statusDe(arquivo)}`} role="img" aria-label={status.nome}>{status.letra}</span>
           <span className="rotulo">{nome}</span>
           <span className="marcador">{hunkIds.length === 0 ? '○' : marcador(hunkIds, lista.estado)}</span>
@@ -105,7 +107,8 @@ function NoDaLista({ no, nivel, ...lista }: PropsDaLista & { no: NoDaArvore; niv
   return (
     <li>
       <button className="linha-da-arvore pasta" style={recuo} aria-expanded={aberta} onClick={() => lista.alternarPasta(no.caminho)} title={no.caminho}>
-        <svg className={aberta ? 'seta aberta' : 'seta'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+        <Icone nome="chevron" classe={aberta ? 'seta aberta' : 'seta'} />
+        <Icone nome="pasta" />
         <span className="rotulo">{no.nome}</span>
         <Linhas contagem={no.contagem} />
       </button>

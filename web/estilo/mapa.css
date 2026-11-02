@@ -1,16 +1,17 @@
-/* A gaveta do mapa: painel de vidro que sobe de baixo, ao lado da lateral. */
-.mapa-do-fluxo { position: fixed; left: var(--lateral); right: 12px; bottom: 12px; height: var(--gaveta); z-index: 5; display: flex; flex-direction: column; overflow: hidden; border-radius: 16px; opacity: 0; will-change: transform, opacity; }
+/* A gaveta do mapa: painel de vidro que sobe de baixo, ao lado da lateral (12px de vão dela e das bordas; --lateral é 0 com ela recolhida). */
+.mapa-do-fluxo { position: fixed; left: calc(var(--lateral) + 12px); right: 12px; bottom: 12px; height: var(--gaveta); z-index: 5; display: flex; flex-direction: column; overflow: hidden; border-radius: 16px; opacity: 0; will-change: transform, opacity; }
 /* Invisível até o mapa.tsx liberar a subida (um quadro depois da montagem); sem transição de opacidade aqui, a troca é seca. */
 .mapa-do-fluxo[data-subindo="true"] { opacity: 1; animation: subir var(--duracao-longa) var(--curva); }
 @keyframes subir { from { opacity: 0; transform: translateY(28px); } }
 /* O grafo só monta depois da subida (mapa.tsx); aparece com fade quando o layout chega, em vez de pular. */
 .mapa-do-fluxo > .area-do-grafo { flex: 1; min-height: 0; display: flex; flex-direction: column; opacity: 0; transition: opacity var(--duracao-longa) var(--curva); }
 .mapa-do-fluxo > .area-do-grafo[data-pronta="true"] { opacity: 1; }
-.mapa-do-fluxo > header { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 10px 18px; border-bottom: 1px solid var(--painel-borda); }
-.mapa-do-fluxo > header .detalhe { flex: 1; min-width: 220px; font-size: 12px; color: var(--texto-miudo); }
+.mapa-do-fluxo > header { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; padding: 10px 18px; border-bottom: 1px solid var(--painel-borda); }
+.mapa-do-fluxo > header > * { min-width: 0; max-width: 100%; }
+.mapa-do-fluxo > header .detalhe { flex: 1 1 220px; font-size: 12px; color: var(--texto-miudo); }
 .mapa-do-fluxo > .detalhe { padding: 16px 18px; }
 /* Aviso discreto: só contorno, para não competir com Recolher e Fechar. */
-.mapa-do-fluxo > header .fora-da-vista { padding: 2px 10px; font-size: 12px; color: var(--texto-miudo); background: transparent; box-shadow: inset 0 0 0 1px var(--painel-borda); }
+.mapa-do-fluxo > header .fora-da-vista { padding: 2px 10px; font-size: 12px; color: var(--texto-miudo); background: transparent; box-shadow: inset 0 0 0 1px var(--painel-borda); text-align: left; }
 
 /* As variáveis --xy-* são as do React Flow; o seletor longo vence o tema claro/escuro dele. */
 .pagina .mapa-do-fluxo .react-flow {
@@ -64,7 +65,8 @@
 .mapa-do-fluxo .no-do-mapa.relacao-chamado .relacao, .mapa-do-fluxo .no-do-mapa.relacao-destino .relacao { color: var(--acento); }
 
 .faixa-da-fronteira { width: 44px; position: relative; border-radius: 22px; border-left: 1px dashed var(--suave); border-right: 1px dashed var(--suave); background: var(--painel-fundo); }
-.faixa-da-fronteira span { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 13px; font-weight: var(--peso-destaque); color: var(--texto); background: var(--painel-solido); border-radius: 999px; padding: 0 10px; }
+/* O rótulo corre na vertical, dentro dos 44px da faixa: na horizontal ele passava da faixa e do enquadramento (que mede só a faixa) e saía da gaveta. */
+.faixa-da-fronteira span { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); writing-mode: vertical-rl; max-height: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: var(--peso-destaque); color: var(--texto); background: var(--painel-solido); border-radius: 999px; padding: 10px 4px; }
 
 @media (max-width: 860px) {
   .mapa-do-fluxo { left: 12px; }

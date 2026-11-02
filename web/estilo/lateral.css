@@ -3,34 +3,94 @@
 .cartao, .passo, .item, .linha-do-tempo, .fluxos-do-panorama a, .faltas, .alerta, .sucesso {
   background: var(--painel-fundo); border: 1px solid var(--painel-borda); border-radius: var(--painel-raio);
 }
-.lateral, .dicas, .alternador, .ajuda, .mapa-do-fluxo {
+.dicas, .alternador, .ajuda, .mapa-do-fluxo, .botao-da-lateral {
   background: var(--vidro-fundo); border: 1px solid var(--vidro-borda); border-radius: 20px;
   box-shadow: var(--vidro-brilho), var(--vidro-sombra);
   -webkit-backdrop-filter: var(--vidro-filtro); backdrop-filter: var(--vidro-filtro);
 }
 
-.pagina { --lateral: 292px; --gaveta: 50vh; display: grid; grid-template-columns: var(--lateral) 1fr; min-height: 100vh; }
-/* Os itens da lista têm um vão entre si (gap) e a lateral tem folga nas bordas, para o fundo do hover nunca encostar nelas. */
-.lateral, .lateral > div { display: flex; flex-direction: column; gap: 4px; }
-.lateral { position: sticky; top: 12px; align-self: start; height: calc(100vh - 24px); margin: 12px 0 12px 12px; overflow-y: auto; padding: 16px 12px; scrollbar-width: thin; scrollbar-color: rgb(128 128 128 / .45) transparent; }
-.lateral > * { flex: none; }
-.lateral h2 { font: var(--peso-destaque) 11px var(--fonte); text-transform: uppercase; letter-spacing: .06em; color: var(--suave); margin: 16px 10px 2px; }
-.marca { display: block; font: var(--peso-titulo) 16px var(--fonte); padding: 0 10px; border-radius: 10px; }
-.marca span { display: block; font: var(--peso-rotulo) 12px var(--fonte); color: var(--suave); overflow-wrap: anywhere; }
-.cobertura { margin: 12px 10px 8px; font-size: 12px; color: var(--suave); }
-.barra { height: 6px; border-radius: 999px; overflow: hidden; margin-bottom: 6px; background: var(--botao-hover); }
-.barra div { height: 100%; border-radius: inherit; background: var(--ok); transition: width var(--duracao-longa) var(--curva), var(--transicao-cores); }
+/* --largura é o painel da lateral; --lateral é a coluna que ele ocupa (com a folga da esquerda) e vai a 0 quando ele recolhe.
+   Animar a coluna refazia o layout da página inteira (o diff é grande) a cada quadro; agora só o painel anima, por transform e
+   opacidade, e a coluna troca de uma vez: no fim da saída ao recolher (atraso) e no começo da entrada ao expandir (sem atraso). */
+.pagina { --largura: 280px; --lateral: calc(var(--largura) + 12px); --gaveta: 50vh; display: grid; grid-template-columns: var(--lateral) 1fr; min-height: 100vh; transition: grid-template-columns 0s linear 0s; }
+:root[data-lateral='recolhida'] .pagina { --lateral: 0px; transition-delay: var(--duracao-longa); }
+@media (prefers-reduced-motion: reduce) { :root[data-lateral='recolhida'] .pagina { transition-delay: 0s; } }
 
-.item-da-lista { --tinta: transparent; display: flex; gap: 8px; align-items: baseline; padding: 7px 10px; border-radius: 10px; font-weight: var(--peso-rotulo); }
-.item-da-lista::before { content: ''; align-self: center; flex: none; width: 4px; height: 14px; border-radius: 2px; background: var(--tinta); }
-.item-da-lista:hover { background: var(--botao-fundo); }
-.item-da-lista.atual { background: var(--selecionado); font-weight: var(--peso-destaque); }
+/* O painel de vidro. A largura é fixa (o painel não encolhe com a coluna) e quem rola é o miolo, entre o topo e o rodapé. */
+.lateral {
+  position: sticky; top: 12px; align-self: start; width: var(--largura); height: calc(100vh - 24px); margin: 12px 0 12px 12px;
+  display: flex; flex-direction: column; overflow: hidden; will-change: transform, opacity;
+  background: var(--lateral-fundo); border: 1px solid var(--vidro-borda); border-radius: 26px;
+  box-shadow: var(--lateral-realce), var(--vidro-sombra);
+  -webkit-backdrop-filter: var(--vidro-filtro); backdrop-filter: var(--vidro-filtro);
+  transition: var(--transicao-cores), transform var(--duracao-longa) var(--curva), opacity var(--duracao-longa) var(--curva), visibility 0s;
+}
+/* Recolhida, sai pela esquerda e some; "visibility" só vira depois da saída, para o painel não sumir antes de deslizar. */
+:root[data-lateral='recolhida'] .lateral { transform: translateX(calc(-100% - 24px)); opacity: 0; visibility: hidden; transition: var(--transicao-cores), transform var(--duracao-longa) var(--curva), opacity var(--duracao-longa) var(--curva), visibility 0s linear var(--duracao-longa); }
+/* O foco da lateral tem sempre o mesmo anel (2px de --acento). Dentro do painel ele fica por dentro da linha, porque o miolo rola
+   e corta o que passa da borda; no botão solto, por fora. A cor não anima (ver --transicao-cores): sem isso o anel nascia na cor do texto. */
+.lateral :focus-visible { outline: 2px solid var(--acento); outline-offset: -2px; box-shadow: none; }
+.botao-da-lateral:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+
+/* O botão de recolher é um só e anda: aberto, fica no canto do painel, sem fundo; recolhido, vira uma pílula de vidro no canto da página. */
+.botao-da-lateral { position: fixed; z-index: 9; top: 33px; left: calc(var(--largura) - 37px); width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border-radius: 10px; color: var(--suave); background: transparent; border-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; transition: var(--transicao-cores), top var(--duracao-longa) var(--curva), left var(--duracao-longa) var(--curva), border-radius var(--duracao-longa) var(--curva); }
+.botao-da-lateral:hover { background: var(--botao-hover); color: var(--texto); }
+:root[data-lateral='recolhida'] .botao-da-lateral { top: 14px; left: 16px; border-radius: 16px; color: var(--texto); background: var(--vidro-fundo); border-color: var(--vidro-borda); box-shadow: var(--vidro-brilho), var(--vidro-sombra); -webkit-backdrop-filter: var(--vidro-filtro); backdrop-filter: var(--vidro-filtro); }
+:root[data-lateral='recolhida'] .botao-da-lateral:hover { background: var(--vidro-solido); }
+.cortina { display: none; }
+
+/* O topo: a marca (com a folga do botão de recolher à direita) e o progresso da revisão. */
+.lateral-topo { flex: none; display: flex; flex-direction: column; gap: 14px; padding: 16px 16px 12px; }
+.marca { display: flex; flex-direction: column; justify-content: center; min-height: 40px; padding-right: 40px; border-radius: 10px; }
+.marca-nome { font: var(--peso-titulo) 18px/1.25 var(--fonte); letter-spacing: -.01em; }
+.marca-base { font: var(--peso-rotulo) 12px/1.4 var(--fonte); color: var(--suave); overflow-wrap: anywhere; }
+.progresso { display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 10px; background: var(--painel-fundo); border: 1px solid var(--painel-borda); border-radius: 18px; }
+.anel { position: relative; flex: none; display: grid; place-items: center; width: 40px; height: 40px; }
+.anel-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.anel circle { fill: none; stroke-width: 3.5; }
+.anel-fundo { stroke: var(--botao-hover); }
+.anel-arco { stroke: var(--primario); stroke-linecap: round; transition: stroke-dasharray var(--duracao-longa) var(--curva), opacity var(--duracao) var(--curva), var(--transicao-cores); }
+.anel-arco.vazio { opacity: 0; }
+.progresso.completa .anel-arco { stroke: var(--ok); }
+.progresso.completa .anel .icone { color: var(--ok); }
+.anel-numero { font: var(--peso-destaque) 12px var(--fonte); font-variant-numeric: tabular-nums; }
+.progresso-texto { font-size: 12px; line-height: 1.35; color: var(--suave); }
+.progresso-texto strong { display: block; font-size: 14px; color: var(--texto); font-variant-numeric: tabular-nums; }
+
+/* O miolo rola; o rodapé fica preso embaixo, separado por um fio. */
+.lateral-rolagem { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 10px; padding: 4px 8px 12px; scrollbar-width: thin; scrollbar-color: rgb(128 128 128 / .45) transparent; }
+.lateral-rolagem > * { flex: none; }
+.lateral-rodape { flex: none; padding: 8px; border-top: 1px solid var(--painel-borda); }
+
+/* Seção recolhível: o cabeçalho é um botão com chevron e o corpo anima a altura de 1fr a 0fr. Fechada, o corpo fica invisível
+   só depois de encolher (e é inert, no tsx), então nada escondido recebe clique nem Tab. */
+.secao h2 { margin: 0; }
+.secao-titulo { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 4px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--suave); font: var(--peso-destaque) 12px/20px var(--fonte); }
+.secao-titulo:hover { color: var(--texto); }
+.secao-corpo { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--duracao-longa) var(--curva), visibility 0s; }
+.secao.fechada .secao-corpo { grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows var(--duracao-longa) var(--curva), visibility 0s linear var(--duracao-longa); }
+.secao-lista { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 3px; }
+
+/* As linhas, nos dois modos: 32px de altura, canto de 10px e um vão entre elas para o fundo do hover nunca encostar na vizinha.
+   A selecionada é uma pílula preenchida, com um fio de borda; o hover é a mesma pílula, mais fraca. */
+.icone { width: 16px; height: 16px; flex: none; }
+.seta { width: 12px; height: 12px; color: var(--suave); stroke-width: 2; transition: transform var(--duracao) var(--curva); }
+.seta.aberta { transform: rotate(90deg); }
+.item-da-lista, .linha-da-arvore { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; border: 0; background: transparent; text-align: left; padding: 5px 10px; border-radius: 10px; color: var(--texto); font-weight: var(--peso-rotulo); line-height: 20px; transition: var(--transicao-cores), transform var(--duracao) var(--curva); }
+.item-da-lista:hover, .linha-da-arvore:hover { background: var(--botao-fundo); }
+.item-da-lista:active, .linha-da-arvore:active { transform: scale(.985); }
+.item-da-lista[aria-current='page'], .linha-da-arvore.atual { background: var(--selecionado); box-shadow: inset 0 0 0 1px var(--painel-borda); }
+/* O ícone do fluxo leva a cor do risco (só significado, em tom contido); os demais ficam neutros e escurecem na linha atual. */
+.item-da-lista > .icone, .linha-da-arvore > .icone { color: var(--tinta, var(--suave)); }
+.item-da-lista[aria-current='page'] > .icone { color: var(--tinta, var(--texto)); }
 .item-da-lista.risco-alto { --tinta: var(--alto); }
 .item-da-lista.risco-medio { --tinta: var(--medio); }
-.item-da-lista.risco-baixo { --tinta: color-mix(in srgb, var(--baixo) 50%, transparent); }
+.item-da-lista.risco-baixo { --tinta: var(--suave); }
 .rotulo { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .contagem { font: var(--peso-rotulo) 12px var(--fonte); font-variant-numeric: tabular-nums; color: var(--suave); }
 .contagem.completa { color: var(--ok); }
+.lateral .contagem { display: inline-flex; align-items: center; gap: 3px; flex: none; }
+.contagem .icone { width: 12px; height: 12px; }
 
 /* Barra de botões flutuantes. Com a gaveta do mapa aberta, ela sobe para ficar acima da gaveta. */
 .dicas { position: fixed; z-index: 6; right: 16px; bottom: 16px; display: flex; gap: 4px; padding: 6px; border-radius: 999px; transition: transform var(--duracao-longa) var(--curva), var(--transicao-cores); }
@@ -51,8 +111,14 @@
 @keyframes surgir { from { opacity: 0; transform: translateY(8px) scale(.98); } }
 
 @media (max-width: 860px) {
-  .pagina { grid-template-columns: 1fr; }
-  .lateral { position: static; height: auto; margin: 12px 12px 0; }
+  /* No celular a lateral é uma gaveta sobre o conteúdo, com uma cortina atrás; nasce fechada (recolher.ts). */
+  .pagina { --largura: min(320px, calc(100vw - 24px)); --lateral: 0px; grid-template-columns: 1fr; }
+  .lateral { position: fixed; z-index: 8; top: 12px; bottom: 12px; left: 12px; height: auto; margin: 0; }
+  .cortina { display: block; position: fixed; inset: 0; z-index: 7; background: var(--escurecer); transition: opacity var(--duracao-longa) var(--curva), visibility 0s; }
+  :root[data-lateral='recolhida'] .cortina { opacity: 0; visibility: hidden; transition: opacity var(--duracao-longa) var(--curva), visibility 0s linear var(--duracao-longa); }
+  :root[data-lateral='recolhida'] .botao-da-lateral { left: 12px; }
+  /* Sem teclado no celular, as dicas de tecla só ocupam lugar: a barra fica curta e cabe na largura. */
   .dicas { left: 12px; right: 12px; bottom: 12px; justify-content: center; }
+  .dicas kbd, .dicas .prefixo { display: none; }
   .pagina.com-mapa .dicas { transform: translateY(calc(-1 * (var(--gaveta) + 16px))); }
 }

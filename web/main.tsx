@@ -17,11 +17,13 @@ import { ModoArvore } from './arvore'
 import { useCronometro } from './cronometro'
 import { escutar, reconectar, tolerarQueda, useServidorDesligado } from './eventos'
 import { Fechamento } from './fechamento'
+import { CabecaDaLateral, LateralDoFluxo } from './lateral'
 import { alternarModo, useModo } from './modo'
 import { AvisoDoNarrador, useNarrador } from './narracao'
 import { useNavegacao } from './proximo'
+import { alternarLateral, fecharGaveta } from './recolher'
 import { BotaoDoTema, ciclarTema } from './tema'
-import { Panorama, TelaDeTrechos, TelaDoFluxo, decididos, encurtarBase, useAtalhos, type Contexto } from './telas'
+import { Panorama, TelaDeTrechos, TelaDoFluxo, decididos, useAtalhos, type Contexto } from './telas'
 
 export type Decisao = Estado[string]['decisao']
 export type Decidir = (hunkIds: string[], decisao: Decisao | null, comentario?: string) => void
@@ -96,7 +98,7 @@ function App() {
   })
   // Panorama, fechamento, n e [ ] andam pelo endereço do modo fluxo: no modo árvore não há para onde ir.
   useAtalhos({
-    '?': () => setAjuda(aberta => !aberta), Escape: () => setAjuda(false), v: alternarModo, l: alternarVisao, a: ciclarTema,
+    '?': () => setAjuda(aberta => !aberta), Escape: () => { setAjuda(false); fecharGaveta() }, v: alternarModo, l: alternarVisao, a: ciclarTema, s: alternarLateral,
     ...(modo === 'fluxo' && { p: () => (location.hash = ''), t: () => (location.hash = 'fechamento'), ...atalhos }),
   })
 
@@ -119,7 +121,7 @@ function App() {
       {modo === 'arvore'
         ? <ModoArvore revisao={revisao} estado={estado} decidir={decidir} ladoALado={ladoALado} cabeca={<CabecaDaLateral revisao={revisao} checklist={checklist} estado={estado} />}>{avisoDeServidor}</ModoArvore>
         : <>
-          <Lateral revisao={revisao} checklist={checklist} estado={estado} endereco={rota} />
+          <LateralDoFluxo revisao={revisao} checklist={checklist} estado={estado} endereco={rota} secoes={SECOES} />
           <main className="conteudo">
             {avisoDeServidor}
             <AvisoDoNarrador narrador={narrador} />
@@ -146,49 +148,6 @@ function TelaAtual({ rota, fluxo, passoInicial, checklist, segundos, contexto }:
   return <Panorama revisao={revisao} checklist={checklist} estado={estado} narrador={narrador} />
 }
 
-// O topo da lateral nos dois modos: a marca e o quanto da revisão já tem decisão.
-function CabecaDaLateral({ revisao, checklist, estado }: { revisao: Revisao; checklist: Checklist; estado: Estado }) {
-  const feitos = decididos(checklist.todos, estado)
-  const total = checklist.todos.length
-  return (
-    <>
-      <a href="#" className="marca">keg diff <span>{encurtarBase(revisao.base)}</span></a>
-      <div className="cobertura">
-        <div className="barra"><div style={{ width: `${total === 0 ? 100 : (feitos / total) * 100}%` }} /></div>
-        <span>{feitos} de {total} trechos revisados</span>
-      </div>
-    </>
-  )
-}
-
-// A coluna da esquerda é a checklist: cada fluxo e cada grupo de trechos com o quanto falta.
-function Lateral({ revisao, checklist, estado, endereco }: { revisao: Revisao; checklist: Checklist; estado: Estado; endereco: string }) {
-  const link = (destino: string, rotulo: string, hunkIds: string[], classe = '') => (
-    <a key={destino} href={`#${destino}`} className={`item-da-lista ${classe} ${endereco === destino ? 'atual' : ''}`}>
-      <span className="rotulo">{rotulo}</span>
-      <span className={decididos(hunkIds, estado) === hunkIds.length ? 'contagem completa' : 'contagem'}>
-        {decididos(hunkIds, estado)}/{hunkIds.length}
-      </span>
-    </a>
-  )
-  return (
-    <nav className="lateral">
-      <CabecaDaLateral revisao={revisao} checklist={checklist} estado={estado} />
-      <a href="#" className={`item-da-lista ${endereco === '' ? 'atual' : ''}`}><span className="rotulo">Panorama</span></a>
-      <h2>Fluxos</h2>
-      {checklist.fluxos.map(({ fluxo, hunkIds }) => link(`fluxo/${fluxo.id}`, fluxo.titulo, hunkIds, `risco-${fluxo.risco}`))}
-      {(Object.keys(SECOES) as Secao[]).filter(s => checklist[s].length > 0).map(s => (
-        <div key={s}>
-          <h2>{SECOES[s].titulo}</h2>
-          {link(s, `${checklist[s].length} ${checklist[s].length === 1 ? 'item' : 'itens'}`, checklist[s].flatMap(i => i.hunkIds))}
-        </div>
-      ))}
-      <h2>Fechar</h2>
-      {link('fechamento', 'Fechamento', checklist.todos)}
-    </nav>
-  )
-}
-
 // A mesma lista do README e dos useAtalhos: mudou uma, mude as outras.
 const ATALHOS = [
   ['j / k', 'próximo e anterior (passo no fluxo, item nas listas, arquivo na árvore)'],
@@ -202,11 +161,12 @@ const ATALHOS = [
   ['l', 'diff lado a lado ou empilhado'],
   ['a', 'aparência: tema do sistema, claro ou escuro'],
   ['m', 'abre e fecha o mapa de quem chama quem (no fluxo)'],
+  ['s', 'recolhe e mostra a lateral'],
   ['p', 'volta ao panorama'],
   ['t', 'abre o fechamento: terminei?'],
   ['1 a 5', 'dá a nota de controle (no fechamento)'],
   ['y', 'copia o feedback como prompt (no fechamento)'],
-  ['esc', 'fecha a ajuda, o mapa ou a caixa de comentário'],
+  ['esc', 'fecha a ajuda, o mapa, a caixa de comentário ou a lateral no celular'],
   ['?', 'abre e fecha esta ajuda'],
 ]
 

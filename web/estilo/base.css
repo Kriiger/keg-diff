@@ -9,11 +9,12 @@
   --peso-texto: 400; --peso-rotulo: 500; --peso-destaque: 600; --peso-titulo: 700;
 
   --painel-raio: 12px;
-  /* Toda mudança visível usa a mesma duração e curva; as cores têm transição em qualquer elemento (ver abaixo),
+  /* Toda mudança visível usa a mesma duração e curva; as cores têm transição em qualquer elemento (ver abaixo; outline-color fica de
+     fora: o anel de foco nasce em currentColor e animá-lo até o azul mostrava um anel preto ou cinza no meio do caminho),
      o movimento (opacidade e posição) só onde se pede, para não arrastar o desenho do mapa. */
   --duracao: 180ms; --duracao-longa: 280ms; --curva: cubic-bezier(.2, .8, .2, 1);
   --transicao-cores: background-color var(--duracao) var(--curva), color var(--duracao) var(--curva), border-color var(--duracao) var(--curva),
-    box-shadow var(--duracao) var(--curva), outline-color var(--duracao) var(--curva), fill var(--duracao) var(--curva), stroke var(--duracao) var(--curva);
+    box-shadow var(--duracao) var(--curva), fill var(--duracao) var(--curva), stroke var(--duracao) var(--curva);
   --transicao-movimento: opacity var(--duracao) var(--curva), transform var(--duracao) var(--curva);
 }
 

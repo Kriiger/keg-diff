@@ -15,6 +15,9 @@
   --vidro-borda: rgb(0 0 0 / .1); --vidro-brilho: inset 0 1px 0 rgb(255 255 255 / .7);
   --vidro-sombra: 0 6px 24px rgb(0 0 0 / .13), 0 1px 3px rgb(0 0 0 / .08);
   --vidro-filtro: blur(18px) saturate(140%);
+  /* A lateral é o vidro maior da página: um cinza um pouco mais denso que o vidro das pílulas e um realce de borda (topo claro, fundo escuro). */
+  --lateral-fundo: rgb(244 244 246 / .78);
+  --lateral-realce: inset 0 1px 0 rgb(255 255 255 / .85), inset 0 0 0 1px rgb(255 255 255 / .35), inset 0 -1px 0 rgb(0 0 0 / .04);
 
   --escurecer: rgb(0 0 0 / .4);
   --botao-fundo: rgb(0 0 0 / .05); --botao-hover: rgb(0 0 0 / .1);
@@ -36,6 +39,8 @@
     --vidro-fundo: rgb(33 33 33 / .72); --vidro-solido: #212121;
     --vidro-borda: rgb(255 255 255 / .12); --vidro-brilho: inset 0 1px 0 rgb(255 255 255 / .07);
     --vidro-sombra: 0 8px 30px rgb(0 0 0 / .5), 0 1px 3px rgb(0 0 0 / .4);
+    --lateral-fundo: rgb(30 30 32 / .7);
+    --lateral-realce: inset 0 1px 0 rgb(255 255 255 / .1), inset 0 0 0 1px rgb(255 255 255 / .03), inset 0 -1px 0 rgb(0 0 0 / .3);
 
     --escurecer: rgb(0 0 0 / .62);
     --botao-fundo: rgb(255 255 255 / .1); --botao-hover: rgb(255 255 255 / .2);
@@ -55,6 +60,8 @@
   --vidro-fundo: rgb(33 33 33 / .72); --vidro-solido: #212121;
   --vidro-borda: rgb(255 255 255 / .12); --vidro-brilho: inset 0 1px 0 rgb(255 255 255 / .07);
   --vidro-sombra: 0 8px 30px rgb(0 0 0 / .5), 0 1px 3px rgb(0 0 0 / .4);
+  --lateral-fundo: rgb(30 30 32 / .7);
+  --lateral-realce: inset 0 1px 0 rgb(255 255 255 / .1), inset 0 0 0 1px rgb(255 255 255 / .03), inset 0 -1px 0 rgb(0 0 0 / .3);
 
   --escurecer: rgb(0 0 0 / .62);
   --botao-fundo: rgb(255 255 255 / .1); --botao-hover: rgb(255 255 255 / .2);
@@ -65,8 +72,8 @@
 /* Sem transparência, o vidro e os painéis viram fundo sólido; sem backdrop-filter no navegador, idem.
    ":root:root" empata a especificidade dos temas acima, e a ordem faz esta regra vencer. */
 @media (prefers-reduced-transparency: reduce) {
-  :root:root { --vidro-fundo: var(--vidro-solido); --painel-fundo: var(--painel-solido); --vidro-filtro: none; }
+  :root:root { --vidro-fundo: var(--vidro-solido); --lateral-fundo: var(--vidro-solido); --painel-fundo: var(--painel-solido); --vidro-filtro: none; }
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root:root { --vidro-fundo: var(--vidro-solido); }
+  :root:root { --vidro-fundo: var(--vidro-solido); --lateral-fundo: var(--vidro-solido); }
 }
