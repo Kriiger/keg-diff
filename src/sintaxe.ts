@@ -1,7 +1,7 @@
 // Como ler o código do projeto: abrir com o tsconfig, reconhecer funções, nomes, diretivas e props.
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { Node, SyntaxKind } from 'ts-morph'
+import { Node, SyntaxKind, type JsxClosingElement, type JsxOpeningElement, type JsxSelfClosingElement } from 'ts-morph'
 
 // memo, forwardRef e useCallback embrulham a função, mas o nome continua sendo o da const.
 export const EMBRULHO = /^(React\.)?(memo|forwardRef|useCallback|useMemo|cache)$/
@@ -47,6 +47,41 @@ export function ehFuncao(no: Node): boolean {
   let pai: Node | undefined = no.getParent()
   if (Node.isCallExpression(pai) && EMBRULHO.test(pai.getExpression().getText())) pai = pai.getParent()
   return Node.isVariableDeclaration(pai) || Node.isPropertyAssignment(pai) || Node.isPropertyDeclaration(pai) || Node.isExportAssignment(pai)
+}
+
+// O componente (função de nome maiúsculo num .tsx/.jsx) e o hook (use + maiúscula) são a unidade do React: o que se
+// declara dentro deles (handlers, callbacks de useEffect, useMemo/useCallback locais, funções locais) é o corpo do componente,
+// não passo à parte. Fora do React, função dentro de função continua sendo unidade própria.
+export function ehUnidadeDoReact(no: Node): boolean {
+  if (!ehFuncao(no) || Node.isMethodDeclaration(no)) return false
+  const nome = nomeDe(no)?.getText()
+  if (nome !== undefined && /^use[A-Z]/.test(nome)) return true
+  return /\.[jt]sx$/.test(no.getSourceFile().getFilePath()) && (nome === undefined || /^[A-Z]/.test(nome))
+}
+
+// O componente ou hook mais externo que contém o nó, se houver: é nele que a função de dentro é absorvida.
+export function hospedeiroDoReact(no: Node): Node | undefined {
+  let hospedeiro: Node | undefined
+  for (let pai = no.getParent(); pai; pai = pai.getParent()) if (ehFuncao(pai) && ehUnidadeDoReact(pai)) hospedeiro = pai
+  return hospedeiro
+}
+
+// <Filho /> só liga o filho ao pai no fluxo quando algo corre entre os dois: uma prop com expressão (o dado ou o callback
+// que o devolve), um spread ou um filho que seja expressão ({texto}, {lista.map(...)}). Sem isso é composição de layout
+// (<Lateral><Conteudo /></Lateral>, <Icone nome="x" />): o filho não recebe dado do caminho, então não vira o próximo passo do pai.
+export function passaDado(elemento: JsxOpeningElement | JsxSelfClosingElement | JsxClosingElement): boolean {
+  const abertura = Node.isJsxClosingElement(elemento) ? elemento.getParent()?.getOpeningElement() : elemento
+  if (!abertura) return true
+  const ehLiteral = (no: Node | undefined) => no === undefined || Node.isStringLiteral(no) || Node.isNumericLiteral(no) || Node.isNoSubstitutionTemplateLiteral(no)
+    || no.getKind() === SyntaxKind.TrueKeyword || no.getKind() === SyntaxKind.FalseKeyword || no.getKind() === SyntaxKind.NullKeyword
+  const comProp = abertura.getAttributes().some(atributo => {
+    if (!Node.isJsxAttribute(atributo)) return true
+    const valor = atributo.getInitializer()
+    return Node.isJsxExpression(valor) ? !ehLiteral(valor.getExpression()) : false
+  })
+  if (comProp) return true
+  const pai = abertura.getParent()
+  return Node.isJsxElement(pai) && pai.getJsxChildren().some(filho => Node.isJsxExpression(filho) && !ehLiteral(filho.getExpression()))
 }
 
 export function declaracoesDoModulo(instrucao: Node): Node[] {

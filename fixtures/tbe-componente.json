@@ -10,7 +10,7 @@
     {
       "nasce": ["packages/utils/src/global.ts#getCoursePageProps"],
       "termina": ["apps/platform/src/pages/shiksha/[courseSlug]/learn.tsx#CourseLearnPage"],
-      "alterados": ["packages/utils/src/global.ts#getCoursePageProps", "apps/platform/src/pages/shiksha/[courseSlug]/learn.tsx#CourseLearnPage", "apps/platform/src/pages/shiksha/[courseSlug]/learn.tsx#resolveChapterId"],
+      "alterados": ["packages/utils/src/global.ts#getCoursePageProps", "apps/platform/src/pages/shiksha/[courseSlug]/learn.tsx#CourseLearnPage"],
       "fronteiras": ["apps/platform/src/pages/shiksha/[courseSlug]/learn.tsx#CourseLearnPage"]
     }
   ],

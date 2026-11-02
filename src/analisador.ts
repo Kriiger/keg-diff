@@ -8,7 +8,8 @@ import {
 } from './catalogo.js'
 import {
   EMBRULHO, atributoDeEvento, caminhoDaUrl, carregadoPorHtml, chamadaQueRecebe, cortar, declaracaoDe, declaracoesDoModulo, diretiva, diretivaDaFuncao,
-  ehFuncao, ehRedirecionamento, emPosicaoDeTipo, ehSetterDeEstado, lerEntradasDoPacote, propDoComponente, nomeDe, normalizar, semExtensao, usaRetorno,
+  ehFuncao, ehRedirecionamento, ehUnidadeDoReact, emPosicaoDeTipo, ehSetterDeEstado, hospedeiroDoReact, lerEntradasDoPacote, passaDado, propDoComponente,
+  nomeDe, normalizar, semExtensao, usaRetorno,
 } from './sintaxe.js'
 
 export const ARQUIVO_DE_CODIGO = /\.(ts|tsx|js|jsx|mjs|cjs)$/
@@ -17,9 +18,15 @@ export type Fronteira = 'http' | 'cliente-servidor'
 // usaRetorno: quem chama usa o valor devolvido, como em "const total = await contar()".
 // dinamico: o compilador não prova a chamada (callback em prop, função num objeto): o mapa a desenha tracejada.
 // usoDeTipo: a referência está numa anotação (`x as PgError`, `useState<Registro[]>`), não é chamada nem instanciação.
-export interface Ligacao { unidade: Unidade; linha: number; fronteira?: Fronteira; usaRetorno?: boolean; dinamico?: boolean; usoDeTipo?: boolean }
+// composicao: <Filho /> sem prop com expressão nem filho com expressão: o pai só o monta na tela, nenhum dado corre entre os dois.
+// O mapa a mostra, mas o caminho do dado (o montador) só a usa quando não há outro jeito de achar a fonte.
+export interface Ligacao {
+  unidade: Unidade; linha: number; fronteira?: Fronteira; usaRetorno?: boolean; dinamico?: boolean; usoDeTipo?: boolean; composicao?: boolean
+}
 
 // Unidade é a menor declaração que recebe um trecho: função, arrow em const, método ou declaração de módulo.
+// Componente React e hook são a unidade inteira: o que se declara dentro deles (handlers, callbacks, useMemo, funções
+// locais) é absorvido por eles, então as linhas e os trechos do componente cobrem os das funções de dentro.
 export interface Unidade {
   chave: string
   no: Node
@@ -39,6 +46,7 @@ export interface Config { nasce?: string[]; termina?: string[] }
 
 export class Analisador {
   private unidades = new Map<Node, Unidade>()
+  private hospedeiros = new Map<Node, Node | null>()
   private exportsPorArquivo = new Map<SourceFile, ReturnType<SourceFile['getExportedDeclarations']>>()
   private rotas?: { padrao: RegExp; arquivo: SourceFile; app: boolean; dinamicos: number }[]
   private entradasDoPacote: Set<string>
@@ -80,9 +88,10 @@ export class Analisador {
     const contem = sobrepostas.filter(no => no.getStartLineNumber() <= inicio && no.getEndLineNumber() >= fim)
     // As funções de dentro da menor também entram quando o trecho as toca: um arquivo novo inteiro, por exemplo.
     const menor = contem.at(-1)
-    if (menor) return sobrepostas.filter(no => no === menor || menor.containsRange(no.getPos(), no.getEnd())).map(no => this.unidade(no))
+    const distintas = (nos: Node[]) => [...new Set(nos.map(no => this.unidade(no)))]
+    if (menor) return distintas(sobrepostas.filter(no => no === menor || menor.containsRange(no.getPos(), no.getEnd())))
     // Trecho que cobre várias funções, como um arquivo novo: todas entram, as de dentro inclusive.
-    if (sobrepostas.length > 0) return sobrepostas.map(no => this.unidade(no))
+    if (sobrepostas.length > 0) return distintas(sobrepostas)
     const instrucoes = arquivo.getStatements().filter(no => no.getEndLineNumber() >= inicio && no.getStartLineNumber() <= fim)
     const declaracoes = instrucoes.flatMap(declaracoesDoModulo)
     if (declaracoes.length > 0) return declaracoes.map(no => this.unidade(no))
@@ -94,8 +103,9 @@ export class Analisador {
     if (u.preparada) return u
     u.preparada = true
     this.lerPapelDoArquivo(u)
+    const absorve = ehUnidadeDoReact(u.no)
     u.no.forEachDescendant((no, travessia) => {
-      if (ehFuncao(no)) travessia.skip()
+      if (ehFuncao(no) && !absorve) travessia.skip()
       else if (Node.isCallExpression(no)) this.lerChamada(u, no)
       else if (Node.isJsxOpeningElement(no) || Node.isJsxSelfClosingElement(no)) this.lerJsx(u, no.getTagNameNode())
       else if (Node.isJsxFragment(no)) u.saidas.add('tela')
@@ -124,7 +134,9 @@ export class Analisador {
         continue
       }
       const chamador = this.unidadeQueContem(referencia)
-      if (chamador !== u) u.chamadores.push({ unidade: chamador, linha: referencia.getStartLineNumber(), usoDeTipo: emPosicaoDeTipo(referencia) })
+      const elemento = referencia.getParent()
+      const composicao = (Node.isJsxOpeningElement(elemento) || Node.isJsxSelfClosingElement(elemento) || Node.isJsxClosingElement(elemento)) && !passaDado(elemento)
+      if (chamador !== u) u.chamadores.push({ unidade: chamador, linha: referencia.getStartLineNumber(), usoDeTipo: emPosicaoDeTipo(referencia), ...(composicao && { composicao }) })
     }
     const recebedora = chamadaQueRecebe(u.no)
     if (recebedora) u.chamadores.push({ unidade: this.unidadeQueContem(recebedora), linha: recebedora.getStartLineNumber(), dinamico: true })
@@ -140,7 +152,10 @@ export class Analisador {
     return undefined
   }
 
-  private unidade(no: Node): Unidade {
+  // Função dentro de componente ou hook não é unidade: devolve a do componente que a absorve.
+  private unidade(declaracao: Node): Unidade {
+    if (!this.hospedeiros.has(declaracao)) this.hospedeiros.set(declaracao, Node.isSourceFile(declaracao) ? null : hospedeiroDoReact(declaracao) ?? null)
+    const no = this.hospedeiros.get(declaracao) ?? declaracao
     const existente = this.unidades.get(no)
     if (existente) return existente
     const nome = nomeDe(no)
@@ -265,7 +280,9 @@ export class Analisador {
     u.saidas.add('tela')
     if (!/^[A-Z]/.test(tag.getText())) return
     const componente = this.unidadeDaDeclaracao(declaracaoDe(tag))
-    if (componente && componente !== u) u.chamadas.push({ unidade: componente, linha: tag.getStartLineNumber() })
+    const elemento = tag.getParent()
+    const composicao = (Node.isJsxOpeningElement(elemento) || Node.isJsxSelfClosingElement(elemento)) && !passaDado(elemento)
+    if (componente && componente !== u) u.chamadas.push({ unidade: componente, linha: tag.getStartLineNumber(), ...(composicao && { composicao }) })
   }
 
   // onClick={() => ...} num elemento do DOM: o dado nasce num evento do usuário.
@@ -306,7 +323,8 @@ export class Analisador {
   private ligarCallbackPeloFilho(u: Unidade, alvo: Node, linha: number) {
     const origem = propDoComponente(alvo)
     const componente = origem && ehFuncao(origem.componente) ? this.unidade(origem.componente) : undefined
-    if (!origem || !componente?.nome) return
+    // Callback de dentro do componente (um map, um handler) tem parâmetro próprio: só o parâmetro do componente é prop.
+    if (!origem || !componente?.nome || componente.no !== origem.componente) return
     for (const referencia of componente.nome.findReferencesAsNodes()) {
       const elemento = referencia.getParent()
       if (!Node.isJsxOpeningElement(elemento) && !Node.isJsxSelfClosingElement(elemento)) continue

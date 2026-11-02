@@ -13,7 +13,8 @@ const RISCOS = ['baixo', 'baixo', 'medio', 'alto', 'alto'] as const
 
 export interface Aresta { de: Unidade; para: Unidade; linha: number; fronteira?: Fronteira; usoDeTipo?: boolean }
 // Trilha é o caminho de uma unidade alterada: da fonte até ela e dela (ou de quem a chamou) até a saída.
-export interface Trilha { fonte: Unidade; saida: Unidade; arestas: Aresta[]; unidades: Set<Unidade> }
+// junta: a trilha extra de uma chamada HTTP de mais (ver trilhasPorHttp) vai para o mesmo fluxo da trilha principal.
+export interface Trilha { fonte: Unidade; saida: Unidade; arestas: Aresta[]; unidades: Set<Unidade>; junta?: Trilha }
 
 export function montarRevisao(alterados: ArquivoAlterado[], analisador: Analisador, base: string): Revisao {
   const arquivos = alterados.map(arquivo => partirAcrescimos(arquivo, analisador))
@@ -29,7 +30,7 @@ export function montarRevisao(alterados: ArquivoAlterado[], analisador: Analisad
   for (const [unidade, hunkIds] of trechos) {
     const trilha = buscarTrilha(unidade, analisador)
     if (typeof trilha === 'string') orfaos.push({ arquivo: unidade.arquivo, simbolo: unidade.simbolo, hunkIds, motivo: trilha })
-    else trilhas.push(trilha)
+    else trilhas.push(trilha, ...trilhasPorHttp(unidade, trilha, trechos, analisador))
   }
 
   const fluxos = juntarTrilhas(trilhas)
@@ -96,7 +97,8 @@ function distribuirTrechos(arquivo: ArquivoAlterado, analisador: Analisador, tre
 }
 
 function buscarTrilha(alterada: Unidade, analisador: Analisador): Trilha | Orfao['motivo'] {
-  const ateFonte = buscarFonte(alterada, analisador)
+  // O pai que só monta o filho na tela (composição de layout) não é de onde o dado vem: só serve de fonte quando não há outra.
+  const ateFonte = buscarFonte(alterada, analisador, false) ?? buscarFonte(alterada, analisador, true)
   if (!ateFonte) return 'sem-chamador'
   const fonte = ateFonte[0]?.de ?? alterada
   const pontos = [alterada, ...ateFonte.map(a => a.de).reverse()]
@@ -105,6 +107,24 @@ function buscarTrilha(alterada: Unidade, analisador: Analisador): Trilha | Orfao
   if (!achada) return 'sem-saida'
   const arestas = [...ateFonte, ...achada.arestas]
   return { fonte, saida: achada.saida, arestas, unidades: new Set([fonte, alterada, ...arestas.flatMap(a => [a.de, a.para])]) }
+}
+
+// O componente absorve os handlers de dentro, então um só passo chama vários endpoints: createSession → POST, deleteSession → DELETE.
+// A trilha principal acompanha só a saída de maior risco; cada outra rota alterada que ele chama por HTTP ganha a sua trilha,
+// para a fronteira não se perder, e todas vão para o mesmo fluxo (o componente aparece uma vez, não uma por endpoint).
+function trilhasPorHttp(unidade: Unidade, principal: Trilha, trechos: Map<Unidade, string[]>, analisador: Analisador): Trilha[] {
+  const chegada = principal.arestas.findIndex(a => a.para === unidade)
+  const ateAUnidade = principal.arestas.slice(0, chegada + 1)
+  const extras: Trilha[] = []
+  for (const chamada of analisador.preparar(unidade).chamadas) {
+    const rota = chamada.unidade
+    if (chamada.fronteira !== 'http' || !trechos.has(rota) || principal.unidades.has(rota) || extras.some(t => t.arestas.some(a => a.para === rota))) continue
+    const achada = acharSaida([rota], rota, analisador, false) ?? acharSaida([rota], rota, analisador, true)
+    if (!achada) continue
+    const arestas = [...ateAUnidade, { de: unidade, para: rota, linha: chamada.linha, fronteira: chamada.fronteira }, ...achada.arestas]
+    extras.push({ fonte: principal.fonte, saida: achada.saida, arestas, unidades: new Set([principal.fonte, unidade, ...arestas.flatMap(a => [a.de, a.para])]), junta: principal })
+  }
+  return extras
 }
 
 // Sem saída à frente, o valor volta para quem chamou: a saída pode estar nele, como o JSX do componente.
@@ -118,7 +138,7 @@ function acharSaida(pontos: Unidade[], fonte: Unidade, analisador: Analisador, a
 }
 
 // Busca em largura para trás: a primeira fonte achada é a mais próxima.
-function buscarFonte(alterada: Unidade, analisador: Analisador): Aresta[] | undefined {
+function buscarFonte(alterada: Unidade, analisador: Analisador, aceitaComposicao: boolean): Aresta[] | undefined {
   const fila: { unidade: Unidade; arestas: Aresta[] }[] = [{ unidade: alterada, arestas: [] }]
   const vistas = new Set([alterada])
   for (let atual = fila.shift(); atual; atual = fila.shift()) {
@@ -126,7 +146,7 @@ function buscarFonte(alterada: Unidade, analisador: Analisador): Aresta[] | unde
     if (atual.unidade.fontes.size > 0) return atual.arestas
     if (atual.arestas.length >= SALTOS_MAXIMOS) continue
     for (const chamador of chamadores) {
-      if (vistas.has(chamador.unidade)) continue
+      if (vistas.has(chamador.unidade) || (chamador.composicao && !aceitaComposicao)) continue
       vistas.add(chamador.unidade)
       const aresta = { de: chamador.unidade, para: atual.unidade, linha: chamador.linha, fronteira: chamador.fronteira, usoDeTipo: chamador.usoDeTipo }
       fila.push({ unidade: chamador.unidade, arestas: [aresta, ...atual.arestas] })
@@ -137,6 +157,7 @@ function buscarFonte(alterada: Unidade, analisador: Analisador): Aresta[] | unde
 
 // Busca em largura para frente (ou subindo pelos chamadores, quando o valor volta como retorno):
 // fica com a saída de maior risco e, no empate, a mais próxima. A aresta vai sempre de quem chama para quem é chamado.
+// Renderizar um filho sem dado (composição de layout) não é caminho: sem isso o fluxo do pai desceria a árvore de componentes.
 function buscarSaida(inicio: Unidade, analisador: Analisador, subindo: boolean, aceitaLog: boolean): { saida: Unidade; arestas: Aresta[] } | undefined {
   const fila: { unidade: Unidade; arestas: Aresta[] }[] = [{ unidade: inicio, arestas: [] }]
   const vistas = new Set([inicio])
@@ -150,7 +171,7 @@ function buscarSaida(inicio: Unidade, analisador: Analisador, subindo: boolean, 
     }
     if (arestas.length >= SALTOS_MAXIMOS) continue
     for (const vizinha of subindo ? analisador.chamadoresDe(unidade) : unidade.chamadas) {
-      if (vistas.has(vizinha.unidade)) continue
+      if (vistas.has(vizinha.unidade) || vizinha.composicao) continue
       vistas.add(vizinha.unidade)
       const aresta = subindo
         ? { de: vizinha.unidade, para: unidade, linha: vizinha.linha, usoDeTipo: vizinha.usoDeTipo }
@@ -163,16 +184,27 @@ function buscarSaida(inicio: Unidade, analisador: Analisador, subindo: boolean, 
 
 // Trilhas que terminam na mesma saída viram um fluxo só. Juntar por qualquer unidade em comum
 // colava num fluxo gigante tudo o que passa por um helper, como o api.fetch de um front inteiro.
+// A trilha extra de uma chamada HTTP (trilhasPorHttp) leva a saída dela para o fluxo da principal.
 function juntarTrilhas(trilhas: Trilha[]): Trilha[][] {
+  const pai = new Map<Unidade, Unidade>()
+  const raiz = (u: Unidade): Unidade => (pai.get(u) && pai.get(u) !== u ? raiz(pai.get(u)!) : u)
+  for (const trilha of trilhas) {
+    pai.set(trilha.saida, raiz(trilha.saida))
+    if (trilha.junta) pai.set(raiz(trilha.saida), raiz(trilha.junta.saida))
+  }
   const grupos = new Map<Unidade, Trilha[]>()
-  for (const trilha of trilhas) grupos.set(trilha.saida, [...(grupos.get(trilha.saida) ?? []), trilha])
+  for (const trilha of trilhas) grupos.set(raiz(trilha.saida), [...(grupos.get(raiz(trilha.saida)) ?? []), trilha])
   return [...grupos.values()]
+}
+
+function saidaDoGrupo(grupo: Trilha[]): Unidade {
+  return grupo.map(t => t.saida).reduce((a, b) => (riscoDasSaidas(b.saidas) > riscoDasSaidas(a.saidas) ? b : a))
 }
 
 // A ordem dos passos segue a execução: de cada começo, a unidade visita quem ela chama na ordem das linhas.
 // A saída que ainda chama outros passos aparece de novo no fim, quando o valor volta para ela.
 function montarFluxo(grupo: Trilha[], trechos: Map<Unidade, string[]>, analisador: Analisador): Fluxo {
-  const saida = grupo[0]!.saida
+  const saida = saidaDoGrupo(grupo)
   const unidades = new Set(grupo.flatMap(t => [...t.unidades]))
   const arestas = new Map<string, Aresta>()
   for (const aresta of [...grupo.flatMap(t => t.arestas), ...afluentes(unidades, trechos)]) {
@@ -182,8 +214,8 @@ function montarFluxo(grupo: Trilha[], trechos: Map<Unidade, string[]>, analisado
   const filhos = (u: Unidade) => [...arestas.values()].filter(a => a.de === u).sort((a, b) => a.linha - b.linha)
   // Começo é quem ninguém do fluxo chama: a rota que o fetch chama, por exemplo, não é começo.
   const destinos = new Set([...arestas.values()].map(a => a.para))
-  const comecos = [...unidades].filter(u => !destinos.has(u))
-    .sort((a, b) => Number(b.fontes.size > 0) - Number(a.fontes.size > 0) || a.chave.localeCompare(b.chave))
+  const porFonte = (a: Unidade, b: Unidade) => Number(b.fontes.size > 0) - Number(a.fontes.size > 0) || a.chave.localeCompare(b.chave)
+  const comecos = [...unidades].filter(u => !destinos.has(u)).sort(porFonte)
 
   const passos: Passo[] = []
   const passoDe = new Map<Unidade, Passo>()
@@ -198,6 +230,12 @@ function montarFluxo(grupo: Trilha[], trechos: Map<Unidade, string[]>, analisado
     for (const aresta of filhos(unidade)) visitar(aresta.para, aresta)
   }
   for (const comeco of comecos) visitar(comeco)
+  // Ciclo: o componente passa um callback ao filho, que o chama de volta, e ninguém "não é chamado". Começa por quem tem fonte.
+  for (const resto of [...unidades].sort(porFonte)) {
+    if (visitadas.has(resto)) continue
+    comecos.push(resto)
+    visitar(resto)
+  }
   if (!passos.some(p => p.papel === 'termina')) passos.push(criarPasso(saida, 'termina', [], undefined))
   passos.forEach((passo, i) => { passo.id = `p${i + 1}` })
   // O narrador e a frase mecânica precisam de quem chama quem; a ordem dos passos sozinha não diz isso.
@@ -233,6 +271,8 @@ function afluentes(unidades: Set<Unidade>, trechos: Map<Unidade, string[]>): Are
 function papelDe(u: Unidade, comeco: boolean, folha: boolean, saida: Unidade): Passo['papel'] {
   if (u.fontes.has('evento') || (comeco && u.fontes.size > 0)) return 'nasce'
   if (folha && u === saida) return 'termina'
+  // A rota que só recebe a chamada (o DELETE que o front chama) é saída de outro caminho do mesmo fluxo, não fonte.
+  if (folha && !comeco && u.saidas.size > 0 && [...u.fontes].every(fonte => ENTRADAS.has(fonte))) return 'termina'
   if (folha && !comeco && u.fontes.size > 0) return 'nasce'
   return 'processa'
 }

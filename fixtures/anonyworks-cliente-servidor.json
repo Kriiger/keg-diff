@@ -1,5 +1,5 @@
 {
-  "descricao": "Cliente e servidor: o Copilot mexe no Dashboard (Vite + React) e na rota catch-all do Next que grava no Postgres com SQL cru. O front chama a rota por um wrapper, api.fetch, e quase sempre com URL montada.",
+  "descricao": "Cliente e servidor: o Copilot mexe no Dashboard (Vite + React) e na rota catch-all do Next que grava no Postgres com SQL cru. O front chama a rota por um wrapper, api.fetch, e quase sempre com URL montada. O Dashboard é uma unidade só (os handlers de dentro são o corpo dele), e o fluxo dele chega a cada endpoint que ele chama.",
   "pr": "https://github.com/codewithemmax/Anonyworks/pull/2",
   "repositorio": "https://github.com/codewithemmax/Anonyworks.git",
   "numero": 2,
@@ -9,35 +9,10 @@
   "fluxos": [
     {
       "risco": "alto",
-      "nasce": ["frontend/src/pages/Dashboard.tsx#createSession"],
-      "termina": ["app/api/[...route]/route.ts#POST"],
-      "alterados": ["frontend/src/pages/Dashboard.tsx#createSession", "frontend/src/pages/Dashboard.tsx#endSession", "app/api/[...route]/route.ts#POST"],
-      "fronteiras": ["app/api/[...route]/route.ts#POST"]
-    },
-    {
-      "risco": "alto",
-      "nasce": ["frontend/src/pages/Dashboard.tsx#fetchProfile", "frontend/src/pages/Dashboard.tsx#fetchSessions", "frontend/src/pages/Dashboard.tsx#fetchMessages"],
-      "termina": ["app/api/[...route]/route.ts#GET"],
-      "alterados": ["frontend/src/pages/Dashboard.tsx#fetchProfile", "frontend/src/pages/Dashboard.tsx#fetchSessions", "frontend/src/pages/Dashboard.tsx#fetchMessages", "app/api/[...route]/route.ts#GET", "app/api/[...route]/route.ts#mapDatabaseError"],
-      "fronteiras": ["app/api/[...route]/route.ts#GET"]
-    },
-    {
-      "risco": "alto",
-      "termina": ["app/api/[...route]/route.ts#PUT"],
-      "alterados": ["frontend/src/pages/Dashboard.tsx#toggleSessionProfessionalMode", "app/api/[...route]/route.ts#PUT"],
-      "fronteiras": ["app/api/[...route]/route.ts#PUT"]
-    },
-    {
-      "risco": "alto",
-      "termina": ["app/api/[...route]/route.ts#DELETE"],
-      "alterados": ["frontend/src/pages/Dashboard.tsx#deleteSession", "app/api/[...route]/route.ts#DELETE"],
-      "fronteiras": ["app/api/[...route]/route.ts#DELETE"]
-    },
-    {
-      "risco": "baixo",
       "nasce": ["frontend/src/pages/Dashboard.tsx#Dashboard"],
-      "termina": ["frontend/src/pages/Dashboard.tsx#copyLink"],
-      "alterados": ["frontend/src/pages/Dashboard.tsx#copyLink"]
+      "termina": ["app/api/[...route]/route.ts#POST", "app/api/[...route]/route.ts#PUT", "app/api/[...route]/route.ts#DELETE"],
+      "alterados": ["frontend/src/pages/Dashboard.tsx#Dashboard", "app/api/[...route]/route.ts#GET", "app/api/[...route]/route.ts#POST", "app/api/[...route]/route.ts#PUT", "app/api/[...route]/route.ts#DELETE", "app/api/[...route]/route.ts#mapDatabaseError"],
+      "fronteiras": ["app/api/[...route]/route.ts#GET", "app/api/[...route]/route.ts#POST", "app/api/[...route]/route.ts#PUT", "app/api/[...route]/route.ts#DELETE"]
     }
   ],
   "orfaos": [],
