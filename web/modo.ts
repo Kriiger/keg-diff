@@ -55,10 +55,16 @@ export function alternarModo() {
     trocando = false
     avisar()
   }
-  // Pular rejeita "ready" (AbortError) e "updateCallbackDone" é o mesmo caso: ninguém precisa deles, só do "finished".
+  // Pular rejeita "ready" (e "updateCallbackDone" se o pulo vier antes do callback): é o que acontece ao trocar rápido, e quem
+  // precisa só do "finished" não ganha nada com eles. O "ready" repete o motivo do "updateCallbackDone", então só este deixa vazar
+  // o que não for pulo: um erro de verdade dentro da troca continua aparecendo no console, uma vez.
   nova.ready.catch(() => {})
-  nova.updateCallbackDone.catch(() => {})
+  nova.updateCallbackDone.catch(ignorarPulo)
   nova.finished.then(terminar, terminar)
+}
+
+function ignorarPulo(erro: unknown) {
+  if (!(erro instanceof DOMException && erro.name === 'AbortError')) throw erro
 }
 
 export function useModo(): Modo {
