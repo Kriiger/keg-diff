@@ -3,6 +3,7 @@
 import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Estado, Fluxo, Revisao } from '../src/contrato'
+import { AvisoDoNarrador, useNarrador } from './narracao'
 import { Panorama, TelaDeTrechos, TelaDoFluxo, decididos, encurtarBase, useAtalhos } from './telas'
 
 export type Decisao = Estado[string]['decisao']
@@ -46,6 +47,7 @@ function App() {
   const [ajuda, setAjuda] = useState(false)
   const [ladoALado, setLadoALado] = useState(() => lerPreferencia() === 'lado-a-lado')
   const checklist = useMemo(() => revisao && montarChecklist(revisao), [revisao])
+  const narrador = useNarrador()
 
   useEffect(() => {
     const carregar = () => {
@@ -80,15 +82,16 @@ function App() {
   if (!revisao || !checklist) return <p className="aviso-central">Carregando…</p>
   const fluxoAberto = checklist.fluxos.find(f => `fluxo/${f.fluxo.id}` === endereco)?.fluxo
   const secao = endereco in SECOES ? (endereco as Secao) : undefined
-  const contexto = { revisao, estado, decidir, ladoALado }
+  const contexto = { revisao, estado, decidir, ladoALado, narrador }
 
   return (
     <div className="pagina">
       <Lateral revisao={revisao} checklist={checklist} estado={estado} endereco={endereco} />
       <main className="conteudo">
+        <AvisoDoNarrador narrador={narrador} />
         {fluxoAberto && <TelaDoFluxo key={fluxoAberto.id} fluxo={fluxoAberto} {...contexto} />}
         {secao && <TelaDeTrechos key={secao} {...SECOES[secao]} itens={checklist[secao]} {...contexto} />}
-        {!fluxoAberto && !secao && <Panorama revisao={revisao} checklist={checklist} estado={estado} />}
+        {!fluxoAberto && !secao && <Panorama revisao={revisao} checklist={checklist} estado={estado} narrador={narrador} />}
       </main>
       <div className="dicas">
         <button onClick={alternarVisao}>{ladoALado ? 'empilhado' : 'lado a lado'} <kbd>v</kbd></button>

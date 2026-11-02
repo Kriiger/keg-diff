@@ -24,6 +24,7 @@ keg diff --staged        # só o que está no stage
 keg diff HEAD~1 HEAD     # um commit
 keg diff main...HEAD     # o branch inteiro
 keg diff --sem-tela      # só grava o review.json, sem abrir a página
+keg diff --sem-ia        # sem o narrador: cada passo mostra só a frase mecânica
 ```
 
 A saída mostra cada fluxo do nasce ao termina, com os passos alterados (●) e os de contexto (○), e os órfãos: trechos alterados que não estão em nenhum caminho entre uma fonte e uma saída. Arquivos de teste ficam numa lista à parte.
@@ -40,12 +41,23 @@ Cada decisão fica presa ao hash do trecho: se o agente mudar o trecho depois, e
 
 Num monorepo (pnpm, npm ou yarn workspaces), rode na raiz: o keg liga `@equipe/utils` ao fonte do pacote mesmo sem o `node_modules` instalado.
 
+## Narrador
+
+Cada passo alterado ganha até três frases curtas, cada uma presa a linhas do passo: passar o mouse numa frase acende essas linhas no diff, e frase sem âncora válida aparece marcada. Quem escreve é o `claude -p` do Claude Code instalado na sua máquina, com o login da assinatura. O keg nunca chama a API com chave, e o código do fluxo vai para o mesmo serviço a que o Claude Code já manda o projeto.
+
+- **Sob demanda:** uma chamada por fluxo, quando você o abre; o Panorama tem o botão "Narrar todos". O resultado fica em `.revisao/cache/`, e fluxo sem trecho novo não é narrado de novo.
+- **Trava de login:** antes da primeira chamada, o keg roda `claude auth status`. Só narra com `claude.ai` ou `oauth_token`; com chave de API ou provedor de terceiros não narra e mostra o motivo no topo da página, e sem login pede para você entrar com `claude` (depois, rode o `keg diff` de novo). O processo do narrador nasce sem `ANTHROPIC_API_KEY` e as outras variáveis de chave, numa pasta temporária vazia.
+- **Pausa:** uma resposta com erro, como o limite de uso, pausa a narração e mostra um aviso com o botão "Tentar de novo". Nada se repete sozinho.
+- **Sem narrador:** com `--sem-ia`, sem login ou em pausa, o passo mostra uma frase mecânica montada do grafo ("recebe X de Y, chama Z e entrega W a Y"), e a página diz o motivo.
+- **Modelo:** `sonnet`. Para trocar, crie `keg.config.json` na raiz do projeto: `{ "narrador": { "modelo": "opus" } }`.
+
 ## O que fica no seu projeto
 
 | Arquivo | Para quê |
 | --- | --- |
 | `.revisao/review.json` | Fluxos, órfãos e métricas do diff (o contrato está em `src/contrato.ts`) |
 | `.revisao/estado.json` | As suas decisões na página, uma por trecho |
+| `.revisao/cache/` | As frases do narrador, uma por fluxo narrado |
 | `.revisao/keg.config.json` | Opcional: chamadas próprias da equipe, como `{ "nasce": ["api.get"], "termina": ["api.post", "api.*"] }` |
 
 O keg acrescenta `.revisao/` ao `.git/info/exclude` do repositório, então a pasta não aparece no `git status` e o `.gitignore` do projeto não muda.

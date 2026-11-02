@@ -43,11 +43,17 @@ export interface Passo {
   hunkIds: string[]                // vazio = passo de contexto, sem alteração
   fronteira?: 'cliente-servidor' | 'http'
   avisos?: string[]                // o que o compilador não prova: URL montada, chamada dinâmica
+  chama?: string[]                 // ids dos passos do mesmo fluxo que este chama
   explicacao?: Explicacao
 }
 
+export interface Frase {
+  texto: string
+  linhas: [number, number] | null  // null = frase sem âncora válida
+}
+
 export interface Explicacao {
-  frases: { texto: string; linhas: [number, number] | null }[]  // null = frase sem âncora válida
+  frases: Frase[]
   modelo: string
 }
 
@@ -78,3 +84,13 @@ export type Estado = Record<string, {
   comentario?: string
   em: string
 }>
+
+// O que a página sabe do narrador: GET /api/narrador. Sem narrador, o passo mostra a frase mecânica.
+export interface EstadoDoNarrador {
+  ativo: boolean                   // false: --sem-ia, sem login da assinatura ou login que cobraria API
+  motivo?: string                  // por que não está ativo
+  pausa?: string                   // resposta com is_error (limite de uso): só volta quando a pessoa pede
+  narrando: string[]               // ids dos fluxos na fila ou em andamento
+  falhas: Record<string, string>   // id do fluxo -> o que deu errado nele
+  modelo: string
+}

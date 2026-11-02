@@ -6,6 +6,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net'
 import path from 'node:path'
 import type { Estado } from './contrato.js'
+import { FilaDoNarrador } from './fila-do-narrador.js'
+import type { OpcoesDoNarrador } from './narrador.js'
 
 const PASTA_DA_PAGINA = path.join(import.meta.dirname, 'web')
 const PORTA_PREFERIDA = 4747
@@ -23,14 +25,18 @@ interface Decisao {
   comentario?: string
 }
 
-export async function abrirTela(raiz: string): Promise<string> {
+export async function abrirTela(raiz: string, opcoesDoNarrador: OpcoesDoNarrador): Promise<string> {
   const pastaDaRevisao = path.join(raiz, '.revisao')
   const arquivoDeEstado = path.join(pastaDaRevisao, 'estado.json')
   const ouvintes = new Set<ServerResponse>()
+  const avisar = (evento: string) => {
+    for (const ouvinte of ouvintes) ouvinte.write(`event: ${evento}\ndata: {}\n\n`)
+  }
   // Rodar o keg diff de novo em outro terminal regrava o review.json: a página recarrega sozinha.
   watch(pastaDaRevisao, (_, nome) => {
-    if (nome === 'review.json') for (const ouvinte of ouvintes) ouvinte.write('event: revisao\ndata: {}\n\n')
+    if (nome === 'review.json') avisar('revisao')
   })
+  const narrador = new FilaDoNarrador(raiz, opcoesDoNarrador, () => avisar('narrador'))
 
   const servidor = createServer(async (pedido, resposta) => {
     const url = new URL(pedido.url ?? '/', 'http://127.0.0.1')
@@ -45,6 +51,8 @@ export async function abrirTela(raiz: string): Promise<string> {
       return responderJson(resposta, estado)
     }
     if (url.pathname === '/api/estado') return responderJson(resposta, lerEstado(arquivoDeEstado))
+    if (url.pathname === '/api/narrador') return responderJson(resposta, narrador.estado())
+    if (url.pathname === '/api/narrar' && pedido.method === 'POST') return pedirNarracao(pedido, resposta, narrador)
     if (url.pathname === '/api/codigo') return enviarCodigo(resposta, raiz, url.searchParams)
     if (url.pathname === '/api/eventos') {
       resposta.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
@@ -71,6 +79,18 @@ function escutar(servidor: ReturnType<typeof createServer>, porta: number): Prom
       resolver((servidor.address() as AddressInfo).port)
     })
   })
+}
+
+// A página pede a narração dos fluxos que abre; "retomar" só vem de um clique da pessoa depois da pausa.
+async function pedirNarracao(pedido: IncomingMessage, resposta: ServerResponse, narrador: FilaDoNarrador) {
+  if (pedido.headers['content-type'] !== 'application/json') return responder(resposta, 415, 'envie JSON')
+  try {
+    const { fluxos, retomar } = JSON.parse(await lerCorpo(pedido))
+    narrador.pedir(Array.isArray(fluxos) ? fluxos.filter(id => typeof id === 'string') : [], retomar === true)
+  } catch {
+    return responder(resposta, 400, 'JSON inválido')
+  }
+  responderJson(resposta, narrador.estado())
 }
 
 function decidir(estado: Estado, { hunkIds, decisao, comentario }: Decisao): Estado {

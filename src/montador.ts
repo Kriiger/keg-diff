@@ -179,17 +179,25 @@ function montarFluxo(grupo: Trilha[], trechos: Map<Unidade, string[]>, analisado
     .sort((a, b) => Number(b.fontes.size > 0) - Number(a.fontes.size > 0) || a.chave.localeCompare(b.chave))
 
   const passos: Passo[] = []
+  const passoDe = new Map<Unidade, Passo>()
   const visitadas = new Set<Unidade>()
   const visitar = (unidade: Unidade, chegada?: Aresta) => {
     if (visitadas.has(unidade)) return
     visitadas.add(unidade)
     const papel = papelDe(unidade, comecos.includes(unidade), filhos(unidade).length === 0, saida)
-    passos.push(criarPasso(unidade, papel, trechos.get(unidade) ?? [], fronteiraDe(chegada, analisador)))
+    const passo = criarPasso(unidade, papel, trechos.get(unidade) ?? [], fronteiraDe(chegada, analisador))
+    passos.push(passo)
+    passoDe.set(unidade, passo)
     for (const aresta of filhos(unidade)) visitar(aresta.para, aresta)
   }
   for (const comeco of comecos) visitar(comeco)
   if (!passos.some(p => p.papel === 'termina')) passos.push(criarPasso(saida, 'termina', [], undefined))
   passos.forEach((passo, i) => { passo.id = `p${i + 1}` })
+  // O narrador e a frase mecânica precisam de quem chama quem; a ordem dos passos sozinha não diz isso.
+  for (const [unidade, passo] of passoDe) {
+    const chamados = [...new Set(filhos(unidade).map(a => passoDe.get(a.para)?.id).filter(id => id !== undefined))]
+    if (chamados.length > 0) passo.chama = chamados
+  }
 
   const primeira = comecos[0] ?? saida
   return {

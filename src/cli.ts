@@ -7,15 +7,17 @@ import { Analisador, type Config } from './analisador.js'
 import { coletarDiff, git } from './coletor.js'
 import type { Revisao } from './contrato.js'
 import { montarRevisao } from './montador.js'
+import { lerModelo, preencherDoCache } from './narrador.js'
 import { abrirTela } from './servidor.js'
 
-const AJUDA = `uso: keg diff [--sem-tela] [argumentos do git diff]
+const AJUDA = `uso: keg diff [--sem-tela] [--sem-ia] [argumentos do git diff]
 
   keg diff                 tudo o que mudou desde o último commit, arquivos novos inclusive
   keg diff --staged        só o que está no stage
   keg diff HEAD~1 HEAD     um commit
   keg diff main...HEAD     o branch inteiro
   keg diff --sem-tela      só grava o review.json, sem abrir a página
+  keg diff --sem-ia        sem o narrador: os passos mostram só a frase mecânica
 
 Rode dentro do pacote que mudou. O resultado vai para .revisao/review.json
 e a página de revisão abre no navegador até você apertar Ctrl+C.`
@@ -28,7 +30,8 @@ else analisarNaThread()
 
 async function rodar() {
   const [comando, ...argumentos] = process.argv.slice(2)
-  const argsDoGit = argumentos.filter(arg => arg !== '--sem-tela')
+  const argsDoGit = argumentos.filter(arg => arg !== '--sem-tela' && arg !== '--sem-ia')
+  const semIa = argumentos.includes('--sem-ia')
   // Sem terminal, quem chamou é um script ou um agente: a página ficaria aberta esperando ninguém.
   const comTela = !argumentos.includes('--sem-tela') && process.stdout.isTTY
   if (comando !== 'diff' || argsDoGit.includes('--help') || argsDoGit.includes('-h')) {
@@ -50,12 +53,15 @@ async function rodar() {
 
   const inicio = performance.now()
   const revisao = await analisar(argsDoGit, raiz, config)
+  const narrador = { semIa, modelo: lerModelo(raiz) }
+  // O que já foi narrado fica no cache; com --sem-ia, nenhuma frase da IA aparece.
+  if (!semIa) preencherDoCache(revisao, raiz, narrador.modelo)
 
   mkdirSync(pastaDaRevisao, { recursive: true })
   writeFileSync(path.join(pastaDaRevisao, 'review.json'), JSON.stringify(revisao, null, 2) + '\n')
   esconderDoGit()
   imprimir(revisao, performance.now() - inicio)
-  if (comTela) console.log(`\nPágina de revisão em ${await abrirTela(raiz)} · Ctrl+C para sair`)
+  if (comTela) console.log(`\nPágina de revisão em ${await abrirTela(raiz, narrador)} · Ctrl+C para sair`)
 }
 
 // O compilador desce recursivo pelos imports, e a cadeia de tipos de uma biblioteca grande, como o Shiki,

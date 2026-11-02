@@ -1,21 +1,22 @@
 // As telas da revisão: o panorama, o fluxo passo a passo e as listas de trechos fora dos fluxos.
 import { PatchDiff } from '@pierre/diffs/react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Estado, Fluxo, Passo, Revisao } from '../src/contrato'
 import type { Checklist, Decidir, Decisao, Item } from './main'
+import { BotaoNarrarTodos, FrasesDoPasso, semNarracao, type Narrador } from './narracao'
 
 // O mesmo limite do cli.ts: acima disso a revisão não fecha.
 const TRECHOS_DEMAIS = 40
 const ORDEM_DO_RISCO = { alto: 0, medio: 1, baixo: 2 }
 const NOMES: Record<Decisao, string> = { revisado: 'Revisado', 'codigo-morto': 'Código morto', 'falso-positivo': 'Falso positivo', comentado: 'Comentado' }
 const TECLAS: Record<Decisao, string> = { revisado: 'x', 'codigo-morto': 'd', 'falso-positivo': 'f', comentado: 'c' }
-const VERBOS = { nasce: 'O dado nasce em', processa: 'O dado passa por', termina: 'O dado termina em' }
 
 interface Contexto {
   revisao: Revisao
   estado: Estado
   decidir: Decidir
   ladoALado: boolean
+  narrador: Narrador
 }
 
 // "e89d090ae0d6...bf157df72e51" vira "e89d090...bf157df", como o git log --oneline mostra.
@@ -45,7 +46,7 @@ export function useAtalhos(atalhos: Record<string, () => void>) {
   }, [])
 }
 
-export function Panorama({ revisao, checklist, estado }: { revisao: Revisao; checklist: Checklist; estado: Estado }) {
+export function Panorama({ revisao, checklist, estado, narrador }: { revisao: Revisao; checklist: Checklist; estado: Estado; narrador: Narrador }) {
   const { metricas } = revisao
   const total = checklist.todos.length
   const feitos = decididos(checklist.todos, estado)
@@ -68,6 +69,7 @@ export function Panorama({ revisao, checklist, estado }: { revisao: Revisao; che
         {cartoes.map(([rotulo, valor]) => <div key={rotulo} className="cartao"><strong>{valor}</strong><span>{rotulo}</span></div>)}
       </div>
       <h2>Fluxos por risco</h2>
+      <BotaoNarrarTodos fluxos={revisao.fluxos} narrador={narrador} />
       {fluxos.length === 0 && <p className="detalhe">Nenhum fluxo: os trechos alterados estão nos órfãos e em outros trechos.</p>}
       <ol className="fluxos-do-panorama">
         {fluxos.map(({ fluxo, hunkIds }) => (
@@ -85,14 +87,22 @@ export function Panorama({ revisao, checklist, estado }: { revisao: Revisao; che
   )
 }
 
-export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado }: Contexto & { fluxo: Fluxo }) {
+export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrador }: Contexto & { fluxo: Fluxo }) {
   // Abre no primeiro passo alterado que ainda espera decisão.
   const [indice, setIndice] = useState(() => Math.max(0, fluxo.passos.findIndex(p => decididos(p.hunkIds, estado) < p.hunkIds.length)))
   const [comentando, setComentando] = useState(false)
+  const [destaque, setDestaque] = useState<[number, number] | null>(null)
   const passo = fluxo.passos[indice] ?? fluxo.passos[0]!
+  // O fluxo é narrado quando você o abre. Com o narrador em pausa ou desligado, o pedido nem sai.
+  const narradorPronto = narrador.estado?.ativo === true && !narrador.estado.pausa
+  const faltaNarrar = semNarracao(fluxo)
+  useEffect(() => {
+    if (narradorPronto && faltaNarrar) narrador.pedir([fluxo.id], false)
+  }, [fluxo.id, narradorPronto, faltaNarrar])
   // Atualização pela função: j apertado rápido não perde passo entre um render e outro.
   const andar = (passos: number) => {
     setComentando(false)
+    setDestaque(null)
     setIndice(atual => Math.min(Math.max(atual + passos, 0), fluxo.passos.length - 1))
   }
   const marcar = () => {
@@ -125,11 +135,11 @@ export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado }: Cont
         </ol>
         <article className="passo">
           <h2><span className={`papel papel-${passo.papel}`}>{passo.papel}</span> {passo.simbolo} <span className="local">{passo.arquivo}:{passo.linhas[0]}–{passo.linhas[1]}</span></h2>
-          <p className="frase">{fraseDoPasso(passo)}</p>
+          <FrasesDoPasso passo={passo} fluxo={fluxo} narrador={narrador} destacar={setDestaque} />
           {(passo.avisos ?? []).map(aviso => <p key={aviso} className="alerta">{aviso}</p>)}
           <Decisoes hunkIds={passo.hunkIds} opcoes={['revisado']} estado={estado} decidir={decidir} comentando={comentando} setComentando={setComentando} />
           {passo.hunkIds.length > 0
-            ? <DiffDosTrechos revisao={revisao} arquivo={passo.arquivo} hunkIds={passo.hunkIds} ladoALado={ladoALado} />
+            ? <DiffDosTrechos revisao={revisao} arquivo={passo.arquivo} hunkIds={passo.hunkIds} ladoALado={ladoALado} destaque={destaque} />
             : <CodigoDoPasso key={passo.id} passo={passo} />}
         </article>
       </div>
@@ -234,14 +244,16 @@ function CaixaDeComentario({ inicial, salvar, cancelar }: { inicial: string; sal
 
 // Os trechos do review.json vêm sem linhas de contexto: o patch mostra só o que mudou.
 // O diff mostra exatamente os trechos que a decisão marca, nem mais nem menos.
-function DiffDosTrechos({ revisao, arquivo, hunkIds, ladoALado }: { revisao: Revisao; arquivo: string; hunkIds: string[]; ladoALado: boolean }) {
+// "destaque" são as linhas da âncora da frase sob o mouse, no lado novo do arquivo.
+function DiffDosTrechos({ revisao, arquivo, hunkIds, ladoALado, destaque }: { revisao: Revisao; arquivo: string; hunkIds: string[]; ladoALado: boolean; destaque?: [number, number] | null }) {
   const alterado = revisao.arquivos.find(a => a.caminho === arquivo)
   const hunks = alterado?.hunks.filter(h => hunkIds.includes(h.id)) ?? []
   if (!alterado || hunks.length === 0) return null
   const antes = alterado.status === 'novo' ? '/dev/null' : `a/${arquivo}`
   const depois = alterado.status === 'removido' ? '/dev/null' : `b/${arquivo}`
   const patch = [`diff --git a/${arquivo} b/${arquivo}`, `--- ${antes}`, `+++ ${depois}`, ...hunks.map(h => h.patch)].join('\n') + '\n'
-  return <PatchDiff patch={patch} options={{ diffStyle: ladoALado ? 'split' : 'unified', themeType: 'system', overflow: 'wrap' }} />
+  const selecionadas = destaque ? { start: destaque[0], end: destaque[1], side: 'additions' as const, endSide: 'additions' as const } : null
+  return <PatchDiff patch={patch} selectedLines={selecionadas} options={{ diffStyle: ladoALado ? 'split' : 'unified', themeType: 'system', overflow: 'wrap' }} />
 }
 
 // Passo de contexto: não mudou, mas o revisor precisa ver o que ele faz com o dado.
@@ -257,18 +269,6 @@ function CodigoDoPasso({ passo }: { passo: Passo }) {
     <pre className="codigo">
       {codigo.linhas.map((linha, i) => <div key={i}><span className="numero">{codigo.de + i}</span>{linha}</div>)}
     </pre>
-  )
-}
-
-function fraseDoPasso(passo: Passo): ReactNode {
-  const recebe = passo.tipoEntrada ? <>, que recebe <code>({passo.tipoEntrada})</code></> : null
-  const devolve = passo.tipoSaida ? <> e devolve <code>{passo.tipoSaida}</code></> : null
-  return (
-    <>
-      {VERBOS[passo.papel]} <code>{passo.simbolo}</code>{recebe}{devolve}.
-      {passo.fronteira && ` Aqui o fluxo cruza a fronteira ${passo.fronteira}.`}
-      {passo.hunkIds.length === 0 && ' Passo de contexto: não mudou neste diff.'}
-    </>
   )
 }
 
