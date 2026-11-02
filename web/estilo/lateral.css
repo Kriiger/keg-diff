@@ -9,11 +9,14 @@
   -webkit-backdrop-filter: var(--vidro-filtro); backdrop-filter: var(--vidro-filtro);
 }
 
-/* --largura é o painel da lateral; --lateral é a coluna que ele ocupa (com a folga da esquerda) e vai a 0 quando ele recolhe.
+/* --largura é o painel da lateral; a primeira coluna é o que ele ocupa (com a folga da esquerda) e vai a 0 quando ele recolhe.
    Animar a coluna refazia o layout da página inteira (o diff é grande) a cada quadro; agora só o painel anima, por transform e
-   opacidade, e a coluna troca de uma vez: no fim da saída ao recolher (atraso) e no começo da entrada ao expandir (sem atraso). */
-.pagina { --largura: 280px; --lateral: calc(var(--largura) + 12px); --gaveta: 50vh; display: grid; grid-template-columns: var(--lateral) 1fr; min-height: 100vh; transition: grid-template-columns 0s linear 0s; }
-:root[data-lateral='recolhida'] .pagina { --lateral: 0px; transition-delay: var(--duracao-longa); }
+   opacidade, e a coluna troca de uma vez: no fim da saída ao recolher (atraso) e no começo da entrada ao expandir (sem atraso).
+   A coluna troca direto em grid-template-columns, e não por uma variável (--lateral) mudando em .pagina: uma variável herdada que
+   muda obriga o navegador a recalcular o estilo de todos os descendentes, o diff inteiro e o DOM interno dele incluídos. */
+.pagina { --largura: 280px; --gaveta: 50vh; display: grid; grid-template-columns: calc(var(--largura) + 12px) 1fr; min-height: 100vh; transition: grid-template-columns 0s linear 0s; }
+/* Só na tela larga: na estreita a lateral é uma gaveta fora do fluxo e o conteúdo ocupa a coluna única (regra no fim do arquivo). */
+@media (min-width: 861px) { :root[data-lateral='recolhida'] .pagina { grid-template-columns: 0px 1fr; transition-delay: var(--duracao-longa); } }
 @media (prefers-reduced-motion: reduce) { :root[data-lateral='recolhida'] .pagina { transition-delay: 0s; } }
 
 /* O painel de vidro. A largura é fixa (o painel não encolhe com a coluna) e quem rola é o miolo, entre o topo e o rodapé. */
@@ -38,6 +41,39 @@
 :root[data-lateral='recolhida'] .botao-da-lateral { top: 14px; left: 16px; border-radius: 16px; color: var(--texto); background: var(--vidro-fundo); border-color: var(--vidro-borda); box-shadow: var(--vidro-brilho), var(--vidro-sombra); -webkit-backdrop-filter: var(--vidro-filtro); backdrop-filter: var(--vidro-filtro); }
 :root[data-lateral='recolhida'] .botao-da-lateral:hover { background: var(--vidro-solido); }
 .cortina { display: none; }
+
+/* O recolher e o abrir da lateral na tela larga rodam numa View Transition (alternarLateral, em recolher.ts): a coluna do conteúdo
+   muda de largura de uma vez, escondida atrás da foto, em vez de ser animada quadro a quadro (o diff é grande e refazia o layout a
+   cada passo). Dentro da transição as animações do CSS comum ficam desligadas, porque a foto da tela nova tem de nascer no estado
+   final. O painel e o botão ganham nome e viram peças que andam; a gaveta do mapa, que acompanha a coluna, estica até a nova
+   largura (o botão e ela usam a mesma duração e curva do resto); a barra de botões fica viva no lugar; o resto da tela (o conteúdo) se mistura e desliza um pouco, na direção em que a
+   coluna anda. O fundo opaco do grupo "root" impede que a borda descoberta pelo deslize mostre o que está atrás da foto.
+   O --deslize mora no grupo "root" (que as fotos herdam) e não no <html>: uma variável herdada que muda no <html> recalcula o
+   estilo da página inteira, duas vezes (no começo e no fim da transição). */
+:root[data-transicao='lateral'] .pagina, :root[data-transicao='lateral'] .lateral, :root[data-transicao='lateral'] .botao-da-lateral { transition: none; }
+:root[data-transicao='lateral'] .lateral { view-transition-name: lateral; }
+:root[data-transicao='lateral'] .botao-da-lateral { view-transition-name: botao-da-lateral; }
+:root[data-transicao='lateral'] .mapa-do-fluxo { view-transition-name: mapa-do-fluxo; }
+:root[data-transicao='lateral'] .dicas { view-transition-name: dicas; }
+:root[data-transicao='lateral']::view-transition-group(root) { --deslize: -20px; background: var(--fundo); }
+:root[data-transicao='lateral'][data-lateral='recolhida']::view-transition-group(root) { --deslize: 20px; }
+:root[data-transicao='lateral']::view-transition-old(root) { animation: conteudo-sai var(--duracao-longa) var(--curva) both; }
+:root[data-transicao='lateral']::view-transition-new(root) { animation: conteudo-entra var(--duracao-longa) var(--curva) both; }
+/* O painel anda pela propriedade "translate" e não por "transform": o transform do grupo já guarda a posição dele na tela. Sem
+   backdrop-filter no grupo: atrás do painel só há o fundo liso da página (o conteúdo fica na outra coluna), então o desfoque não
+   mostra nada, e custava desfocar a altura inteira da tela a cada quadro. A foto já leva o fundo translúcido do painel. */
+:root[data-transicao='lateral']::view-transition-group(lateral) { animation: painel-entra var(--duracao-longa) var(--curva) both; }
+:root[data-transicao='lateral'][data-lateral='recolhida']::view-transition-group(lateral) { animation-name: painel-sai; }
+:root[data-transicao='lateral']::view-transition-old(lateral), :root[data-transicao='lateral']::view-transition-new(lateral) { animation: none; }
+:root[data-transicao='lateral']::view-transition-group(botao-da-lateral), :root[data-transicao='lateral']::view-transition-old(botao-da-lateral), :root[data-transicao='lateral']::view-transition-new(botao-da-lateral),
+:root[data-transicao='lateral']::view-transition-group(mapa-do-fluxo), :root[data-transicao='lateral']::view-transition-old(mapa-do-fluxo), :root[data-transicao='lateral']::view-transition-new(mapa-do-fluxo) { animation-duration: var(--duracao-longa); animation-timing-function: var(--curva); }
+:root[data-transicao='lateral']::view-transition-group(dicas) { animation: none; }
+:root[data-transicao='lateral']::view-transition-old(dicas) { display: none; }
+:root[data-transicao='lateral']::view-transition-new(dicas) { animation: none; }
+@keyframes painel-entra { from { translate: calc(-100% - 24px); opacity: 0; } }
+@keyframes painel-sai { to { translate: calc(-100% - 24px); opacity: 0; } }
+@keyframes conteudo-sai { to { opacity: 0; transform: translateX(calc(var(--deslize) * -1)); } }
+@keyframes conteudo-entra { from { opacity: 0; transform: translateX(var(--deslize)); } }
 
 /* O topo: a marca (com a folga do botão de recolher à direita) e o progresso da revisão. */
 .lateral-topo { flex: none; display: flex; flex-direction: column; gap: 14px; padding: 16px 16px 12px; }
@@ -67,6 +103,7 @@
 .anel-numero { font: var(--peso-destaque) 12px var(--fonte); font-variant-numeric: tabular-nums; }
 .progresso-texto { font-size: 12px; line-height: 1.35; color: var(--suave); }
 .progresso-texto strong { display: block; font-size: 14px; color: var(--texto); font-variant-numeric: tabular-nums; }
+.progresso-arquivos { display: block; }
 
 /* O miolo rola; o rodapé fica preso embaixo, separado por um fio. */
 .lateral-rolagem { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 10px; padding: 4px 8px 12px; scrollbar-width: thin; scrollbar-color: rgb(128 128 128 / .45) transparent; }
@@ -82,7 +119,7 @@
 .secao.fechada .secao-corpo { grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows var(--duracao-longa) var(--curva), visibility 0s linear var(--duracao-longa); }
 .secao-lista { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 3px; }
 
-/* As linhas, nos dois modos: 32px de altura, canto de 10px e um vão entre elas para o fundo do hover nunca encostar na vizinha.
+/* As linhas, nos dois modos (a árvore refaz a medida em arvore.css): 32px de altura, canto de 10px e um vão entre elas para o fundo do hover nunca encostar na vizinha.
    A selecionada é uma pílula preenchida, com um fio de borda; o hover é a mesma pílula, mais fraca. */
 .icone { width: 16px; height: 16px; flex: none; }
 .seta { width: 12px; height: 12px; color: var(--suave); stroke-width: 2; transition: transform var(--duracao) var(--curva); }
@@ -98,6 +135,10 @@
 .item-da-lista.risco-medio { --tinta: var(--medio); }
 .item-da-lista.risco-baixo { --tinta: var(--suave); }
 .rotulo { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* A linha miúda do fluxo: os arquivos que ele atravessa. Os mesmos nomes se repetem de um fluxo a outro, e é isso que ela mostra. */
+.sub-do-item { display: block; font: var(--peso-texto) 11.5px/16px var(--fonte); color: var(--suave); }
+.nota-da-secao { margin: 0 0 4px; padding: 0 10px; font-size: 11.5px; line-height: 1.4; color: var(--suave); }
+.so-leitor { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .contagem { font: var(--peso-rotulo) 12px var(--fonte); font-variant-numeric: tabular-nums; color: var(--suave); }
 .contagem.completa { color: var(--ok); }
 .lateral .contagem { display: inline-flex; align-items: center; gap: 3px; flex: none; }
@@ -123,7 +164,7 @@
 
 @media (max-width: 860px) {
   /* No celular a lateral é uma gaveta sobre o conteúdo, com uma cortina atrás; nasce fechada (recolher.ts). */
-  .pagina { --largura: min(320px, calc(100vw - 24px)); --lateral: 0px; grid-template-columns: 1fr; }
+  .pagina { --largura: min(320px, calc(100vw - 24px)); grid-template-columns: 1fr; }
   .lateral { position: fixed; z-index: 8; top: 12px; bottom: 12px; left: 12px; height: auto; margin: 0; }
   .cortina { display: block; position: fixed; inset: 0; z-index: 7; background: var(--escurecer); transition: opacity var(--duracao-longa) var(--curva), visibility 0s; }
   :root[data-lateral='recolhida'] .cortina { opacity: 0; visibility: hidden; transition: opacity var(--duracao-longa) var(--curva), visibility 0s linear var(--duracao-longa); }

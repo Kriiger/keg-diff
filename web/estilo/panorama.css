@@ -1,9 +1,19 @@
-/* O panorama: uma grade de cartões. A superfície vem de lateral.css (.cartao); aqui moram o conteúdo dos cartões e as miniaturas
-   (barras em CSS puro). Cor só onde significa algo: risco, revisado e o diff (verde entrou, vermelho saiu). */
-.grade-do-panorama { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 12px; align-items: start; }
-.panorama .cartao { padding: 16px 18px; min-width: 0; }
-.panorama .cartao.largo { grid-column: 1 / -1; }
-.panorama .faixa { margin-bottom: 16px; }
+/* O panorama: risco e fluxos na largura toda, e o resto em colunas independentes (até 4, de 380px ou mais; uma só no celular). É um
+   masonry: colunas.tsx mede os cartões e dá a cada um a coluna e a altura (por transform) e à caixa a altura total; o CSS só os
+   põe em posição absoluta, na largura de uma coluna (--colunas). Um cartão curto não deixa buraco ao lado de um alto. O CSS "columns"
+   e a grade com linhas pequenas e "dense" não serviam: o primeiro enche uma coluna até caber o resto na seguinte, e a segunda
+   põe o cartão no primeiro lugar livre sem olhar a altura das colunas.
+   Cada cartão é um container: o que está dentro reage à largura do cartão. */
+.destaques-do-panorama { display: grid; gap: 12px; margin-bottom: 12px; }
+.colunas-do-panorama { position: relative; }
+.colunas-do-panorama > .cartao { position: absolute; top: 0; left: 0; width: calc((100% - (var(--colunas, 1) - 1) * 12px) / var(--colunas, 1)); }
+.panorama .cartao { padding: 16px 18px; min-width: 0; container-type: inline-size; }
+.panorama .faixa { margin-bottom: 12px; }
+/* A linha "sem manifesto" é texto solto entre o topo e os cartões: leva o mesmo vão que os avisos (12px). */
+.panorama > .detalhe { margin-bottom: 12px; }
+.conteudo > .panorama > header { margin-bottom: 14px; }
+.resumo-do-diff { flex-basis: 100%; margin: 0; color: var(--suave); }
+.resumo-do-diff strong { color: var(--texto); }
 .panorama .cartao > h2 { margin: 0 0 12px; font-size: 13px; }
 .panorama .cartao > h2 .detalhe { margin-left: 8px; font-weight: var(--peso-texto); font-size: 12px; overflow-wrap: anywhere; }
 .panorama .cartao h3 { margin: 16px 0 6px; font-size: 12px; font-weight: var(--peso-destaque); color: var(--suave); }
@@ -14,7 +24,7 @@
 .panorama code { overflow-wrap: anywhere; }
 
 /* Os números grandes. */
-.faixa { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px 24px; }
+.faixa { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px 24px; }
 .numeros { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-bottom: 12px; }
 .numero { min-width: 0; }
 .numero > strong { display: block; white-space: nowrap; font: var(--peso-titulo) 26px/1.2 var(--fonte); font-variant-numeric: tabular-nums; }
@@ -25,7 +35,6 @@
 
 /* O que não pode partir no meio: número com unidade, contagem, +/−, método, hash e o número da linha. O nome do arquivo ainda quebra. */
 .panorama .linhas, .panorama .contagem, .panorama .metodo, .panorama .commits code, .linha-do-passo { white-space: nowrap; }
-.arquivo-do-passo { overflow-wrap: anywhere; }
 .pontos-de-risco .local { overflow-wrap: normal; }
 .ocorrencias .link-do-arquivo { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 
@@ -107,11 +116,25 @@
 .concentradores li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
 .ciclos li { font-size: 13px; overflow-wrap: anywhere; }
 
-@media (max-width: 860px) {
-  .grade-do-panorama { grid-template-columns: 1fr; }
+/* Cartão largo (risco e fluxos, na largura toda): as barras de risco numa linha só, com as colunas alinhadas entre as três, e os pontos a ver primeiro em duas colunas. */
+@container (min-width: 620px) {
+  .linhas-de-risco { grid-template-columns: auto minmax(120px, 1fr) auto; gap: 8px 14px; }
+  .linhas-de-risco li { grid-template-columns: subgrid; grid-column: 1 / -1; }
+  .linhas-de-risco .barra { grid-column: 2; grid-row: 1; }
+  .linhas-de-risco .contagem { text-align: right; }
+  .pontos-de-risco { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 20px; }
+}
+
+/* Cartão estreito (celular, ou uma coluna só): a linha do fluxo empilha o resumo e a barra embaixo do título. */
+@container (max-width: 560px) {
   .lista-de-fluxos a { grid-template-columns: auto minmax(0, 1fr); }
   .lista-de-fluxos .meta { grid-column: 2; text-align: left; }
   .lista-de-fluxos .progresso-do-fluxo { grid-column: 1 / -1; }
+}
+
+.panorama .cartao .nota-dos-fluxos { margin: 0 0 10px; font-size: 12.5px; }
+
+@media (max-width: 860px) {
   .faixa { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
   .numero > strong { font-size: 22px; }
 }

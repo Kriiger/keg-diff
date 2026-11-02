@@ -1,15 +1,32 @@
-/* O modo árvore: pastas e arquivos na lateral, o diff do arquivo escolhido na área principal. As linhas herdam a medida e o hover de lateral.css. */
-.arvore, .arvore ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
-.arvore ul { margin-top: 3px; }
+/* O modo árvore: pastas e arquivos na lateral, o diff do arquivo escolhido na área principal. As linhas vêm de lateral.css, mas aqui
+   ficam como no VS Code: faixas rentes de 24px, sem vão, recuo fixo por nível e linhas-guia verticais. */
+.arvore, .arvore ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.arvore { --recuo: 12px; --base: 6px; }
 
-/* O recuo vai no botão (não na lista) para o fundo do hover ocupar a largura inteira da lateral. O arquivo não tem seta: ganha o
-   espaço dela (12px da seta mais o vão) para o ícone ficar na vertical do ícone das pastas. */
-.arvore .linha-da-arvore { --nivel: 0; gap: 8px; padding-left: calc(10px + var(--nivel) * 14px); }
-.arvore .linha-da-arvore.arquivo { padding-left: calc(30px + var(--nivel) * 14px); }
-.linha-da-arvore .rotulo { overflow-wrap: anywhere; }
+/* O recuo vai no botão (não na lista) para o fundo do hover e da seleção ocupar a largura inteira da lateral. A pasta tem a seta
+   (16px) e o arquivo, que não tem, ganha o espaço dela (16px mais o vão) para o ícone ficar na vertical do ícone das pastas irmãs.
+   O vazio do status, que só o arquivo tem, é reservado nas pastas (20px) para os +N −M das duas ficarem na mesma coluna. */
+.arvore .linha-da-arvore { --nivel: 0; position: relative; gap: 4px; height: 24px; min-height: 0; padding: 0 8px 0 calc(var(--base) + var(--nivel) * var(--recuo)); border-radius: 6px; font-size: 13px; line-height: 24px; }
+.arvore .linha-da-arvore.arquivo { padding-left: calc(var(--base) + var(--nivel) * var(--recuo) + 20px); }
+.arvore .linha-da-arvore.pasta { padding-right: 28px; }
+.arvore .linha-da-arvore:active { transform: none; }
+.arvore .linha-da-arvore.atual { box-shadow: none; }
+.arvore .seta { width: 16px; height: 16px; padding: 2px; }
+
+/* As linhas-guia: cada pasta aberta desenha um fio de 1px ao longo da lista dos filhos, na vertical do centro da própria seta
+   (base + nível × recuo + 8px); listas dentro de listas somam um fio por nível ancestral. Um fio por lista, e não um gradiente
+   repetido em cada linha, nasce contínuo (o gradiente antigo ficava com 7% de opacidade: invisível). Ele vai acima das linhas
+   (z-index) para o fundo do hover e da seleção não o apagar; os filhos começam 12px à direita dele, então nada se sobrepõe.
+   Cinza nos dois temas (vem do --texto, 32% em repouso) que acende (55%) quando o mouse está sobre a árvore, como no VS Code: a 18% o fio sumia no zoom de tela. */
+.arvore ul { position: relative; }
+.arvore ul::before { content: ''; position: absolute; z-index: 1; top: 0; bottom: 0; left: calc(var(--base) + var(--nivel) * var(--recuo) + 8px); width: 1px; pointer-events: none; background: color-mix(in srgb, var(--texto) 32%, transparent); }
+.arvore:hover ul::before { background: color-mix(in srgb, var(--texto) 55%, transparent); }
+
+/* O rótulo não quebra: corta com reticências (o caminho inteiro está no title). */
+.linha-da-arvore .rotulo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pasta .rotulo { color: var(--suave); }
 
-/* A letra do status (A, M, D, R) num selo quadrado no lugar do ícone: só ganha cor quando significa algo (novo, removido e renomeado);
+/* A letra do status (A, M, D, R) num selo quadrado na ponta direita da linha: só ganha cor quando significa algo (novo, removido e renomeado);
    modificado fica neutro. A letra, e não só a cor, diz o que mudou. */
 .status { flex: none; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 5px; font-size: 10px; font-weight: var(--peso-destaque); color: var(--suave); background: var(--botao-fundo); }
 .status-novo { color: var(--ok); }
@@ -23,7 +40,7 @@
 .selo.status-renomeado { --cor: var(--acento); }
 
 .linhas { display: inline-flex; gap: 6px; font-size: 12px; font-weight: var(--peso-rotulo); font-variant-numeric: tabular-nums; }
-.linha-da-arvore .linhas { margin-left: auto; }
+.linha-da-arvore .linhas { margin-left: auto; font-size: 11px; }
 .linha-da-arvore .marcador { font-size: 11px; }
 .linhas .mais { color: var(--ok); }
 .linhas .menos { color: var(--alto); }

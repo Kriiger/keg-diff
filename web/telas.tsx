@@ -2,6 +2,7 @@
 import { PatchDiff } from '@pierre/diffs/react'
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import type { Estado, Fluxo, Passo, Revisao } from '../src/contrato'
+import { Caminho } from './caminho'
 import { Decisoes } from './decisoes'
 import { tolerarQueda } from './eventos'
 import type { Decidir, Decisao, Item } from './main'
@@ -105,14 +106,14 @@ export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrad
                 <span className="marcador">{marcadorDoPasso(p, estado)}</span>
                 <span className="papel">{p.papel}</span>
                 <span className="simbolo">{p.simbolo}</span>
-                <span className="local">{p.arquivo}:{p.linhas[0]}</span>
+                <span className="local"><Caminho caminho={p.arquivo} />:{p.linhas[0]}</span>
                 {p.fronteira && <span className="fronteira">⇄ {p.fronteira}</span>}
               </button>
             </li>
           ))}
         </ol>
         <article className="passo">
-          <h2><span className={`papel papel-${passo.papel}`}>{passo.papel}</span> {passo.simbolo} <span className="local">{passo.arquivo}:{passo.linhas[0]}–{passo.linhas[1]}</span></h2>
+          <h2><span className={`papel papel-${passo.papel}`}>{passo.papel}</span> {passo.simbolo} <span className="local"><Caminho caminho={passo.arquivo} />:{passo.linhas[0]}–{passo.linhas[1]}</span></h2>
           <FrasesDoPasso passo={passo} fluxo={fluxo} narrador={narrador} destacar={setDestaque} />
           {(passo.avisos ?? []).map(aviso => <p key={aviso} className="alerta">{aviso}</p>)}
           <Decisoes hunkIds={passo.hunkIds} opcoes={['revisado']} estado={estado} decidir={decidir} comentando={comentando} setComentando={setComentando} />

@@ -102,10 +102,11 @@ function NoDaLista({ no, nivel, ...lista }: PropsDaLista & { no: NoDaArvore; niv
     return (
       <li>
         <button id={`arquivo-${arquivo.caminho}`} className={`linha-da-arvore arquivo ${lista.escolhido === arquivo.caminho ? 'atual' : ''}`} style={recuo} aria-current={lista.escolhido === arquivo.caminho} onClick={() => lista.selecionar(arquivo.caminho)} title={arquivo.renomeadoDe ? `renomeado de ${arquivo.renomeadoDe}` : arquivo.caminho}>
-          <span className={`status status-${statusDe(arquivo)}`} role="img" aria-label={status.nome}>{status.letra}</span>
+          <Icone nome="arquivo" />
           <span className="rotulo">{nome}</span>
           <span className="marcador">{hunkIds.length === 0 ? '○' : marcador(hunkIds, lista.estado)}</span>
           <Linhas contagem={contagem} />
+          <span className={`status status-${statusDe(arquivo)}`} role="img" aria-label={status.nome}>{status.letra}</span>
         </button>
       </li>
     )
@@ -115,11 +116,11 @@ function NoDaLista({ no, nivel, ...lista }: PropsDaLista & { no: NoDaArvore; niv
     <li>
       <button className="linha-da-arvore pasta" style={recuo} aria-expanded={aberta} onClick={() => lista.alternarPasta(no.caminho)} title={no.caminho}>
         <Icone nome="chevron" classe={aberta ? 'seta aberta' : 'seta'} />
-        <Icone nome="pasta" />
+        <Icone nome={aberta ? 'pastaAberta' : 'pasta'} />
         <span className="rotulo">{no.nome}</span>
         <Linhas contagem={no.contagem} />
       </button>
-      {aberta && <ul>{no.filhos.map(filho => <NoDaLista key={chaveDoNo(filho)} no={filho} nivel={nivel + 1} {...lista} />)}</ul>}
+      {aberta && <ul style={recuo}>{no.filhos.map(filho => <NoDaLista key={chaveDoNo(filho)} no={filho} nivel={nivel + 1} {...lista} />)}</ul>}
     </li>
   )
 }

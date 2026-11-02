@@ -6,6 +6,7 @@ import { Icone, type NomeDoIcone } from './icones'
 import { Logo } from './logo'
 import type { Checklist } from './main'
 import { alternarLateral, fecharGaveta, useLateralAberta } from './recolher'
+import { arquivosDoFluxo, nomesCurtos, plural } from './resumo'
 import { decididos, encurtarBase } from './telas'
 
 type Grupo = 'orfaos' | 'testes' | 'outros'
@@ -57,7 +58,7 @@ export function CabecaDaLateral({ revisao, checklist, estado }: { revisao: Revis
           </svg>
           {completa ? <Icone nome="check" /> : <span className="anel-numero">{Math.floor(porcentagem)}</span>}
         </span>
-        <span className="progresso-texto"><strong>{feitos} de {total}</strong> trechos revisados</span>
+        <span className="progresso-texto"><strong>{feitos} de {total}</strong> trechos revisados<span className="progresso-arquivos">em {plural(revisao.arquivos.length, 'arquivo', 'arquivos')}</span></span>
       </div>
     </>
   )
@@ -88,27 +89,30 @@ interface PropsDoItem {
   rotulo: string
   icone: NomeDoIcone
   endereco: string
-  progresso?: { feitos: number; total: number }
+  progresso?: { feitos: number; total: number; nota?: string }
   risco?: string
   dica?: string
+  sub?: string
 }
 
-function ItemDaLateral({ destino, rotulo, icone, endereco, progresso, risco, dica }: PropsDoItem) {
+function ItemDaLateral({ destino, rotulo, icone, endereco, progresso, risco, dica, sub }: PropsDoItem) {
   return (
     <a href={`#${destino}`} className={risco ? `item-da-lista risco-${risco}` : 'item-da-lista'} aria-current={endereco === destino ? 'page' : undefined} title={dica}>
       <Icone nome={icone} />
-      <span className="rotulo">{rotulo}</span>
+      <span className="rotulo">{rotulo}{sub && <span className="sub-do-item">{sub}</span>}</span>
       {progresso && <Contagem {...progresso} />}
     </a>
   )
 }
 
-// Completo ganha o ✓ além do verde: a cor sozinha não diz que acabou.
-function Contagem({ feitos, total }: { feitos: number; total: number }) {
+// Completo ganha o ✓ além do verde: a cor sozinha não diz que acabou. O "x/y" é trechos revisados sobre trechos do item: o title e o texto
+// para leitor de tela dizem isso, e "nota" avisa o que mais vale (os fluxos dividem trechos entre si).
+function Contagem({ feitos, total, nota }: { feitos: number; total: number; nota?: string }) {
+  const significado = `${feitos} de ${total} trechos revisados`
   return (
-    <span className={feitos === total ? 'contagem completa' : 'contagem'}>
+    <span className={feitos === total ? 'contagem completa' : 'contagem'} title={nota ? `${significado}. ${nota}` : significado}>
       {feitos === total && total > 0 && <Icone nome="check" />}
-      {feitos}/{total}
+      {feitos}/{total}<span className="so-leitor"> trechos revisados</span>
     </span>
   )
 }
@@ -116,6 +120,9 @@ function Contagem({ feitos, total }: { feitos: number; total: number }) {
 // A checklist do modo fluxo: o panorama, cada fluxo e cada grupo de trechos com o quanto falta; o fechamento fica no rodapé.
 export function LateralDoFluxo({ revisao, checklist, estado, endereco, secoes }: { revisao: Revisao; checklist: Checklist; estado: Estado; endereco: string; secoes: Record<Grupo, { titulo: string }> }) {
   const progresso = (hunkIds: string[]) => ({ feitos: decididos(hunkIds, estado), total: hunkIds.length })
+  const todos = revisao.arquivos.map(a => a.caminho)
+  const doFluxo = checklist.fluxos.flatMap(f => f.hunkIds)
+  const nota = doFluxo.length > new Set(doFluxo).size ? 'Um trecho pode estar em mais de um fluxo.' : undefined
   const grupos = (Object.keys(secoes) as Grupo[]).filter(grupo => checklist[grupo].length > 0)
   const fechamento = <ItemDaLateral destino="fechamento" rotulo="Fechamento" icone="fechar" endereco={endereco} progresso={progresso(checklist.todos)} />
   return (
@@ -123,9 +130,11 @@ export function LateralDoFluxo({ revisao, checklist, estado, endereco, secoes }:
       <ItemDaLateral destino="" rotulo="Panorama" icone="panorama" endereco={endereco} />
       {checklist.fluxos.length > 0 && (
         <SecaoRecolhivel titulo="Fluxos">
-          {checklist.fluxos.map(({ fluxo, hunkIds }) => (
-            <ItemDaLateral key={fluxo.id} destino={`fluxo/${fluxo.id}`} rotulo={fluxo.titulo} icone="fluxo" endereco={endereco} progresso={progresso(hunkIds)} risco={fluxo.risco} />
-          ))}
+          <p className="nota-da-secao">{plural(checklist.fluxos.length, 'fluxo', 'fluxos')} atravessando {plural(revisao.arquivos.length, 'arquivo', 'arquivos')} do diff. {nota}</p>
+          {checklist.fluxos.map(({ fluxo, hunkIds }) => {
+            const arquivos = arquivosDoFluxo(fluxo)
+            return <ItemDaLateral key={fluxo.id} destino={`fluxo/${fluxo.id}`} rotulo={fluxo.titulo} icone="fluxo" endereco={endereco} progresso={{ ...progresso(hunkIds), nota }} risco={fluxo.risco} sub={nomesCurtos(arquivos, todos).join(' · ')} dica={arquivos.length > 0 ? `Passa por ${arquivos.join(', ')}` : undefined} />
+          })}
         </SecaoRecolhivel>
       )}
       {grupos.length > 0 && (

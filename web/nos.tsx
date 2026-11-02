@@ -1,6 +1,7 @@
 // Os blocos do mapa: o cartão de cada função, a faixa da fronteira cliente/servidor e a montagem dos nós do React Flow.
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { createContext, useContext } from 'react'
+import { Caminho } from './caminho'
 import type { Destaque, Relacao } from './foco'
 import { ALTURA, LARGURA, type Desenho } from './rotas'
 import type { Grafo, NoDoGrafo } from '../src/contrato'
@@ -42,7 +43,7 @@ function CartaoDoNo({ id, data }: NodeProps<NoDoMapa>) {
         {escondidos > 0 && <span className="mais" title="vizinhos escondidos: clique para mostrar">+{escondidos}</span>}
       </span>
       <span className="simbolo">{no.simbolo}</span>
-      <span className="local">{no.arquivo}:{no.linhas[0]}</span>
+      <span className="local"><Caminho caminho={no.arquivo} />:{no.linhas[0]}</span>
       <Handle type="source" position={Position.Right} />
     </div>
   )

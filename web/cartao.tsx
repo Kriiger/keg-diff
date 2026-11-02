@@ -1,11 +1,13 @@
 // As peças comuns dos cartões do panorama: o cartão, o número grande, as barras e os links para o arquivo.
 import type { ReactNode } from 'react'
 import { abrirNaArvore } from './arvore'
+import { Caminho } from './caminho'
 import type { Contagem } from './pastas'
 
-export function Cartao({ titulo, dica, largo = false, children }: { titulo: string; dica?: string; largo?: boolean; children: ReactNode }) {
+// Um cartão do panorama; a posição dele nas colunas é calculada por quem o contém (colunas.tsx), a partir da altura medida.
+export function Cartao({ titulo, dica, children }: { titulo: string; dica?: string; children: ReactNode }) {
   return (
-    <section className={largo ? 'cartao largo' : 'cartao'}>
+    <section className="cartao">
       <h2>{titulo}{dica && <span className="detalhe">{dica}</span>}</h2>
       {children}
     </section>
@@ -30,14 +32,6 @@ export function BarraDeLinhas({ mais, menos, maximo }: Contagem & { maximo: numb
 
 export function Linhas({ mais, menos }: Contagem) {
   return <span className="linhas"><span className="mais">+{mais}</span><span className="menos">−{menos}</span></span>
-}
-
-// O caminho com a pasta apagada e o nome do arquivo em destaque.
-export function Caminho({ caminho }: { caminho: string }) {
-  const barra = caminho.lastIndexOf('/') + 1
-  // O <wbr> depois de cada barra: o caminho quebra entre as pastas, e só no meio de um nome se este sozinho não couber.
-  const pastas = caminho.slice(0, barra).split('/').filter(Boolean)
-  return <span className="caminho"><span className="pasta-do-caminho">{pastas.map(pasta => <span key={pasta}>{pasta}/<wbr /></span>)}</span>{caminho.slice(barra)}</span>
 }
 
 // Link para o arquivo no modo árvore; com "href", leva ao passo do fluxo que o contém.

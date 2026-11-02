@@ -89,7 +89,18 @@ export function pendentes(hunkIds: string[], estado: Estado): number {
   return hunkIds.filter(id => !estado[id]).length
 }
 
-export interface LinhaDeFluxo { fluxo: Fluxo; hunkIds: string[]; arquivos: number; camadas: Lado[]; nasce: Passo; termina: Passo }
+// Os arquivos alterados que o fluxo atravessa, na ordem dos passos. Passo de contexto (sem trecho) não entra: o que conta é onde o diff está.
+export function arquivosDoFluxo(fluxo: Fluxo): string[] {
+  return [...new Set(fluxo.passos.filter(p => p.hunkIds.length > 0).map(p => p.arquivo))]
+}
+
+// "route.ts · Dashboard.tsx": só o nome de cada arquivo; dois arquivos do diff com o mesmo nome levam a pasta de cima, para não parecerem um só.
+export function nomesCurtos(caminhos: string[], todos: string[]): string[] {
+  const nomeDe = (caminho: string) => caminho.split('/').at(-1)!
+  return caminhos.map(caminho => (todos.filter(outro => nomeDe(outro) === nomeDe(caminho)).length > 1 ? caminho.split('/').slice(-2).join('/') : nomeDe(caminho)))
+}
+
+export interface LinhaDeFluxo { fluxo: Fluxo; hunkIds: string[]; arquivos: string[]; camadas: Lado[]; nasce: Passo; termina: Passo }
 
 // A camada de cada passo vem do grafo do mapa (o motor só sabe o lado quando a diretiva, a rota ou o fetch o dizem).
 export function linhasDeFluxo(fluxos: { fluxo: Fluxo; hunkIds: string[] }[], revisao: Revisao): LinhaDeFluxo[] {
@@ -97,7 +108,7 @@ export function linhasDeFluxo(fluxos: { fluxo: Fluxo; hunkIds: string[] }[], rev
   return fluxos.map(({ fluxo, hunkIds }) => {
     const camadas = new Set(fluxo.passos.map(passo => lados.get(idDoNo(passo))))
     return {
-      fluxo, hunkIds, arquivos: new Set(fluxo.passos.map(p => p.arquivo)).size,
+      fluxo, hunkIds, arquivos: arquivosDoFluxo(fluxo),
       camadas: (['cliente', 'servidor'] as const).filter(lado => camadas.has(lado)),
       nasce: fluxo.passos.find(p => p.papel === 'nasce') ?? fluxo.passos[0]!,
       termina: fluxo.passos.findLast(p => p.papel === 'termina') ?? fluxo.passos.at(-1)!,

@@ -3,6 +3,7 @@
 // Para ligar um botão: chame alternarModo() no clique e leia o modo de agora com useModo() (o seletor está em alternador.tsx).
 import { useSyncExternalStore } from 'react'
 import { flushSync } from 'react-dom'
+import { iniciarTransicao, podeAnimar } from './transicao'
 
 export type Modo = 'fluxo' | 'arvore'
 
@@ -41,13 +42,12 @@ function avisar() {
 
 // A única porta de troca: o atalho v, o seletor e as setas passam por aqui. Com View Transitions, o navegador fotografa a tela,
 // espera a troca e mistura as duas (o CSS está em estilo/alternador.css). O flushSync faz o React aplicar a troca dentro do
-// callback, antes da segunda foto. Sem a API (Firefox, Safari antigo) ou com movimento reduzido, troca direto.
+// callback, antes da segunda foto. Sem a API ou com movimento reduzido, troca direto (ver transicao.ts, que também cuida de
+// pular a transição anterior, inclusive a do recolher da lateral).
 // O modo novo é calculado dentro da troca: duas teclas seguidas alternam duas vezes, em vez de repetir o mesmo destino.
 export function alternarModo() {
-  if (!('startViewTransition' in document) || matchMedia('(prefers-reduced-motion: reduce)').matches) return flushSync(() => aplicarTroca(false))
-  // Pular a anterior termina a animação dela na hora (o callback pendente ainda roda), em vez de empilhar duas.
-  transicao?.skipTransition()
-  const nova = document.startViewTransition(() => flushSync(() => aplicarTroca(true)))
+  if (!podeAnimar()) return flushSync(() => aplicarTroca(false))
+  const nova = iniciarTransicao('modo', () => flushSync(() => aplicarTroca(true)))
   transicao = nova
   const terminar = () => {
     if (transicao !== nova) return
@@ -55,16 +55,7 @@ export function alternarModo() {
     trocando = false
     avisar()
   }
-  // Pular rejeita "ready" (e "updateCallbackDone" se o pulo vier antes do callback): é o que acontece ao trocar rápido, e quem
-  // precisa só do "finished" não ganha nada com eles. O "ready" repete o motivo do "updateCallbackDone", então só este deixa vazar
-  // o que não for pulo: um erro de verdade dentro da troca continua aparecendo no console, uma vez.
-  nova.ready.catch(() => {})
-  nova.updateCallbackDone.catch(ignorarPulo)
   nova.finished.then(terminar, terminar)
-}
-
-function ignorarPulo(erro: unknown) {
-  if (!(erro instanceof DOMException && erro.name === 'AbortError')) throw erro
 }
 
 export function useModo(): Modo {

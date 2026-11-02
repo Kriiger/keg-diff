@@ -5,7 +5,7 @@ export interface Contagem { mais: number; menos: number }
 export type StatusDoArquivo = ArquivoAlterado['status'] | 'renomeado'
 
 export interface Folha { tipo: 'arquivo'; nome: string; arquivo: ArquivoAlterado; contagem: Contagem }
-// "caminho" é o da pasta mais funda do trecho compactado: é ele que identifica a pasta aberta ou fechada.
+// "caminho" é o caminho inteiro da pasta (app/api): é ele que identifica a pasta aberta ou fechada, e cada pasta tem o seu nível.
 export interface Pasta { tipo: 'pasta'; nome: string; caminho: string; filhos: NoDaArvore[]; contagem: Contagem }
 export type NoDaArvore = Folha | Pasta
 
@@ -29,7 +29,8 @@ function somar(contagens: Contagem[]): Contagem {
   return { mais: contagens.reduce((total, c) => total + c.mais, 0), menos: contagens.reduce((total, c) => total + c.menos, 0) }
 }
 
-// Pastas antes de arquivos, cada grupo em ordem alfabética; a pasta que só tem uma subpasta vira "src/web/estilo".
+// Pastas antes de arquivos, cada grupo em ordem alfabética. Cada pasta ganha o seu próprio nível, sem compactar as de filho único
+// (app ▸ api ▸ [...route]), como no VS Code: é o recuo que desenha a árvore, e uma linha só com o caminho não parece uma.
 export function montarArvore(arquivos: ArquivoAlterado[]): NoDaArvore[] {
   const raiz: Rascunho = { pastas: new Map(), folhas: [] }
   for (const arquivo of arquivos) {
@@ -48,15 +49,11 @@ export function montarArvore(arquivos: ArquivoAlterado[]): NoDaArvore[] {
 function fechar(rascunho: Rascunho, caminho: string): NoDaArvore[] {
   const pastas = [...rascunho.pastas]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([nome, filha]) => compactar(nome, caminho === '' ? nome : `${caminho}/${nome}`, filha))
+    .map(([nome, filha]) => montarPasta(nome, caminho === '' ? nome : `${caminho}/${nome}`, filha))
   return [...pastas, ...rascunho.folhas.sort((a, b) => a.nome.localeCompare(b.nome))]
 }
 
-function compactar(nome: string, caminho: string, rascunho: Rascunho): Pasta {
-  if (rascunho.folhas.length === 0 && rascunho.pastas.size === 1) {
-    const [filho, neta] = [...rascunho.pastas][0]!
-    return compactar(`${nome}/${filho}`, `${caminho}/${filho}`, neta)
-  }
+function montarPasta(nome: string, caminho: string, rascunho: Rascunho): Pasta {
   const filhos = fechar(rascunho, caminho)
   return { tipo: 'pasta', nome, caminho, filhos, contagem: somar(filhos.map(f => f.contagem)) }
 }

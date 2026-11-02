@@ -1,5 +1,6 @@
-/* A gaveta do mapa: painel de vidro que sobe de baixo, ao lado da lateral (12px de vão dela e das bordas; --lateral é 0 com ela recolhida). */
-.mapa-do-fluxo { position: fixed; left: calc(var(--lateral) + 12px); right: 12px; bottom: 12px; height: var(--gaveta); z-index: 5; display: flex; flex-direction: column; overflow: hidden; border-radius: 16px; opacity: 0; will-change: transform, opacity; }
+/* A gaveta do mapa: painel de vidro que sobe de baixo, ao lado da lateral (12px de vão dela e das bordas; recolhida ou gaveta, ele começa na borda). */
+.mapa-do-fluxo { position: fixed; left: calc(var(--largura) + 24px); right: 12px; bottom: 12px; height: var(--gaveta); z-index: 5; display: flex; flex-direction: column; overflow: hidden; border-radius: 16px; opacity: 0; will-change: transform, opacity; }
+:root[data-lateral='recolhida'] .mapa-do-fluxo { left: 12px; }
 /* Invisível até o mapa.tsx liberar a subida (um quadro depois da montagem); sem transição de opacidade aqui, a troca é seca. */
 .mapa-do-fluxo[data-subindo="true"] { opacity: 1; animation: subir var(--duracao-longa) var(--curva); }
 @keyframes subir { from { opacity: 0; transform: translateY(28px); } }
@@ -45,6 +46,7 @@
 .no-do-mapa.vizinho { border: 1.5px dashed var(--suave); background: transparent; }
 /* O passo atual é a posição na revisão e fica marcado pela barra à esquerda; o anel de foco é o destaque temporário (nos.tsx diz "fixado"). */
 .no-do-mapa.atual { border-left: 6px solid var(--texto); padding-left: 9px; }
+.no-do-mapa .pasta-do-caminho { display: none; }
 .no-do-mapa .simbolo, .no-do-mapa .local { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .no-do-mapa .simbolo { font-size: 15px; font-weight: var(--peso-destaque); }
 .no-do-mapa .papel { font-size: 13px; color: color-mix(in srgb, var(--cor) 75%, var(--texto)); }
