@@ -18,7 +18,7 @@ for (const nome of readdirSync(pastaDosGabaritos).filter(n => n.endsWith('.json'
   }
   git(repo, 'checkout', '-q', '--detach', gabarito.head)
   const pasta = path.join(repo, gabarito.pasta)
-  execFileSync('node', [cli, 'diff', `${gabarito.base}...${gabarito.head}`], { cwd: pasta, stdio: 'ignore' })
+  execFileSync('node', [cli, 'diff', '--sem-tela', `${gabarito.base}...${gabarito.head}`], { cwd: pasta, stdio: 'ignore' })
   const revisao = JSON.parse(readFileSync(path.join(pasta, '.revisao', 'review.json'), 'utf8'))
   const erros = comparar(gabarito, revisao)
   divergencias += erros.length

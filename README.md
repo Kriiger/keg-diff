@@ -23,9 +23,20 @@ keg diff                 # tudo o que mudou desde o último commit, arquivos nov
 keg diff --staged        # só o que está no stage
 keg diff HEAD~1 HEAD     # um commit
 keg diff main...HEAD     # o branch inteiro
+keg diff --sem-tela      # só grava o review.json, sem abrir a página
 ```
 
 A saída mostra cada fluxo do nasce ao termina, com os passos alterados (●) e os de contexto (○), e os órfãos: trechos alterados que não estão em nenhum caminho entre uma fonte e uma saída. Arquivos de teste ficam numa lista à parte.
+
+Em seguida a página de revisão abre no navegador, servida em `http://127.0.0.1:4747` até você apertar Ctrl+C:
+
+- **Panorama:** tamanho do diff, fluxos por risco e a cobertura, quantos trechos já têm decisão.
+- **Fluxo:** a linha do tempo nasce → processa → termina à esquerda e o diff do passo à direita. Passo de contexto mostra o código atual.
+- **Órfãos, testes e outros trechos:** o que não entrou em fluxo, cada um com o seu diff. Órfão recebe revisado, código morto ou falso positivo.
+
+Atalhos: `j` e `k` passam de passo, `x` marca revisado, `c` comenta, `d` e `f` marcam código morto e falso positivo nos órfãos, `p` volta ao panorama, `?` mostra a ajuda. Rodar o `keg diff` de novo em outro terminal atualiza a página aberta.
+
+Cada decisão fica presa ao hash do trecho: se o agente mudar o trecho depois, ele volta para "não revisado". Sem terminal (num script ou num agente), o keg não abre a página.
 
 Num monorepo (pnpm, npm ou yarn workspaces), rode na raiz: o keg liga `@equipe/utils` ao fonte do pacote mesmo sem o `node_modules` instalado.
 
@@ -34,6 +45,7 @@ Num monorepo (pnpm, npm ou yarn workspaces), rode na raiz: o keg liga `@equipe/u
 | Arquivo | Para quê |
 | --- | --- |
 | `.revisao/review.json` | Fluxos, órfãos e métricas do diff (o contrato está em `src/contrato.ts`) |
+| `.revisao/estado.json` | As suas decisões na página, uma por trecho |
 | `.revisao/keg.config.json` | Opcional: chamadas próprias da equipe, como `{ "nasce": ["api.get"], "termina": ["api.post", "api.*"] }` |
 
 O keg acrescenta `.revisao/` ao `.git/info/exclude` do repositório, então a pasta não aparece no `git status` e o `.gitignore` do projeto não muda.
@@ -42,7 +54,8 @@ O keg acrescenta `.revisao/` ao `.git/info/exclude` do repositório, então a pa
 
 ```bash
 npm install
-npm run build
+npm run build            # motor (tsc) e página (Vite, em dist/web)
+npm run typecheck
 node dist/cli.js diff
 npm run calibrar         # roda o motor nos PRs reais de fixtures/ e compara com o gabarito
 ```
