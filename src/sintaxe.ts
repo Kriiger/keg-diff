@@ -2,14 +2,25 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { Node, Project, SyntaxKind, ts } from 'ts-morph'
+import { caminhosDosPacotes } from './monorepo.js'
 
 // memo, forwardRef e useCallback embrulham a função, mas o nome continua sendo o da const.
 export const EMBRULHO = /^(React\.)?(memo|forwardRef|useCallback|useMemo|cache)$/
 
 export function abrirProjeto(raiz: string): Project {
+  const pacotes = caminhosDosPacotes(raiz)
   const config = ['tsconfig.json', 'jsconfig.json'].map(nome => path.join(raiz, nome)).find(existsSync)
-  if (config) return new Project({ tsConfigFilePath: config, compilerOptions: { allowJs: true } })
-  const projeto = new Project({ compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve } })
+  if (config) {
+    // Os paths do próprio tsconfig ganham dos pacotes do workspace.
+    const paths = { ...pacotes, ...ts.readConfigFile(config, ts.sys.readFile).config?.compilerOptions?.paths }
+    return new Project({ tsConfigFilePath: config, compilerOptions: { allowJs: true, paths } })
+  }
+  const projeto = new Project({
+    compilerOptions: {
+      allowJs: true, jsx: ts.JsxEmit.Preserve, module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.Bundler, baseUrl: raiz, paths: pacotes,
+    },
+  })
   projeto.addSourceFilesAtPaths([`${raiz}/**/*.{ts,tsx,js,jsx,mjs,cjs}`, `!${raiz}/**/{node_modules,dist,build,.next}/**`])
   return projeto
 }
@@ -82,6 +93,31 @@ export function propDoComponente(alvo: Node): { prop: string; componente: Node }
   return undefined
 }
 
+// '/api/x' ou `/api/sessao/${id}`: o caminho que dá para casar com uma rota. A parte montada vira um segmento qualquer.
+export function caminhoDaUrl(url: Node): { url: string; montada: boolean } | undefined {
+  if (Node.isStringLiteral(url) || Node.isNoSubstitutionTemplateLiteral(url)) {
+    const valor = url.getLiteralValue()
+    return valor.startsWith('/') ? { url: valor, montada: false } : undefined
+  }
+  if (!Node.isTemplateExpression(url)) return undefined
+  const valor = url.getHead().getLiteralText() + url.getTemplateSpans().map(trecho => 'x' + trecho.getLiteral().getLiteralText()).join('')
+  return valor.startsWith('/') ? { url: valor, montada: true } : undefined
+}
+
+// "const total = await contar()" usa o valor; "contar()" sozinho na linha, não.
+export function usaRetorno(chamada: Node): boolean {
+  let pai = chamada.getParent()
+  while (Node.isAwaitExpression(pai) || Node.isParenthesizedExpression(pai)) pai = pai.getParent()
+  return !Node.isExpressionStatement(pai)
+}
+
+// return { redirect: { destination } } ou { notFound: true } no getServerSideProps: a página nem chega a renderizar.
+export function ehRedirecionamento(no: Node): boolean {
+  if (!Node.isPropertyAssignment(no)) return false
+  const valor = no.getInitializer()?.getText() ?? ''
+  return (no.getName() === 'redirect' && /\bdestination\b/.test(valor)) || (no.getName() === 'notFound' && valor === 'true')
+}
+
 export function atributoDeEvento(referencia: Node): Node | undefined {
   const atributo = referencia.getParent()?.getParent()
   return Node.isJsxAttribute(atributo) && /^on[A-Z]/.test(atributo.getNameNode().getText()) ? atributo : undefined
@@ -104,6 +140,16 @@ export function normalizar(texto: string): string {
 
 export function semExtensao(caminho: string): string {
   return caminho.replace(/\.[cm]?[jt]sx?$/, '')
+}
+
+// Etiqueta do passo: o que entra e o que sai, como o compilador infere.
+export function tiposDe(no: Node): { entrada?: string; saida?: string } {
+  if (Node.isSourceFile(no)) return {}
+  if (!Node.isFunctionDeclaration(no) && !Node.isArrowFunction(no) && !Node.isFunctionExpression(no) && !Node.isMethodDeclaration(no)) {
+    return { saida: cortar(no.getType().getText(no)) }
+  }
+  const parametros = no.getParameters().map(p => p.getType().getText(p))
+  return { entrada: cortar(parametros.join(', ')), saida: cortar(no.getReturnType().getText(no)) }
 }
 
 export function cortar(tipo: string): string {

@@ -3,18 +3,19 @@
 import path from 'node:path'
 import { Node, Project, SyntaxKind, type CallExpression, type Identifier, type SourceFile } from 'ts-morph'
 import {
-  CHAMADAS_QUE_NASCEM, CHAMADAS_QUE_TERMINAM, INTERCEPTADOR, LEITURAS_QUE_NASCEM, METODO_HTTP,
-  PAGINA_DO_APP, PAGINA_DO_PAGES, ROTA_DO_APP, ROTA_DO_PAGES, padraoDaRota, regraDaConfig,
+  ARQUIVO_DE_TESTE, CHAMADAS_QUE_NASCEM, CHAMADAS_QUE_TERMINAM, CHAMADA_DE_SQL, INTERCEPTADOR, LEITURAS_QUE_NASCEM,
+  METODO_HTTP, PAGINA_DO_APP, PAGINA_DO_PAGES, ROTA_DO_APP, ROTA_DO_PAGES, metodoDaChamada, padraoDaRota, pesoDaRota, regraDaConfig, tipoDoSql,
 } from './catalogo.js'
 import {
-  EMBRULHO, abrirProjeto, atributoDeEvento, cortar, declaracaoDe, declaracoesDoModulo, diretiva, diretivaDaFuncao,
-  ehFuncao, ehSetterDeEstado, lerEntradasDoPacote, propDoComponente, nomeDe, normalizar, semExtensao,
+  EMBRULHO, abrirProjeto, atributoDeEvento, caminhoDaUrl, cortar, declaracaoDe, declaracoesDoModulo, diretiva, diretivaDaFuncao,
+  ehFuncao, ehRedirecionamento, ehSetterDeEstado, lerEntradasDoPacote, propDoComponente, nomeDe, normalizar, semExtensao, usaRetorno,
 } from './sintaxe.js'
 
 export const ARQUIVO_DE_CODIGO = /\.(ts|tsx|js|jsx|mjs|cjs)$/
 
 export type Fronteira = 'http' | 'cliente-servidor'
-export interface Ligacao { unidade: Unidade; linha: number; fronteira?: Fronteira }
+// usaRetorno: quem chama usa o valor devolvido, como em "const total = await contar()".
+export interface Ligacao { unidade: Unidade; linha: number; fronteira?: Fronteira; usaRetorno?: boolean }
 
 // Unidade é a menor declaração que recebe um trecho: função, arrow em const, método ou declaração de módulo.
 export interface Unidade {
@@ -38,7 +39,7 @@ export class Analisador {
   private projeto: Project
   private unidades = new Map<Node, Unidade>()
   private exportsPorArquivo = new Map<SourceFile, ReturnType<SourceFile['getExportedDeclarations']>>()
-  private rotas?: { padrao: RegExp; arquivo: SourceFile; app: boolean }[]
+  private rotas?: { padrao: RegExp; arquivo: SourceFile; app: boolean; dinamicos: number }[]
   private entradasDoPacote: Set<string>
   private regrasDaConfig: [RegExp, string][]
 
@@ -101,8 +102,11 @@ export class Analisador {
       else if (Node.isJsxAttribute(no)) this.lerEventoEmLinha(u, no)
       else if (Node.isPropertyAccessExpression(no)) marcar(u.fontes, LEITURAS_QUE_NASCEM, normalizar(no.getText()))
       else if (Node.isNewExpression(no)) this.lerNew(u, no.getExpression().getText())
+      else if (Node.isPropertyAssignment(no) && ehRedirecionamento(no)) u.saidas.add('navegacao')
     })
-    if (/^get(ServerSide|Static)Props$/.test(u.simbolo) && PAGINA_DO_PAGES.test(u.arquivo)) this.ligarPropsDaPagina(u)
+    if (/^get(ServerSide|Static)Props$/.test(u.simbolo) && PAGINA_DO_PAGES.test(u.arquivo)) this.ligarPropsDaPagina(u, u.no.getSourceFile())
+    // No arquivo da rota, o helper que monta a Response só a devolve; quem responde é o handler exportado.
+    if ((ROTA_DO_APP.test(u.arquivo) || ROTA_DO_PAGES.test(u.arquivo)) && !u.fontes.has('rota')) u.saidas.delete('resposta-http')
     return u
   }
 
@@ -112,7 +116,8 @@ export class Analisador {
     for (const referencia of u.nome?.findReferencesAsNodes() ?? []) {
       // Import e export só repassam o nome; quem chama de verdade está em outro lugar.
       const repasse = referencia.getFirstAncestor(pai => Node.isImportDeclaration(pai) || Node.isExportDeclaration(pai))
-      if (referencia === u.nome || repasse) continue
+      const deTeste = ARQUIVO_DE_TESTE.test(path.relative(this.raiz, referencia.getSourceFile().getFilePath()))
+      if (referencia === u.nome || repasse || deTeste || this.ligarAliasDaPagina(u, referencia)) continue
       const atributo = atributoDeEvento(referencia)
       if (atributo) {
         this.ligarCallbackPeloPai(u, atributo)
@@ -131,16 +136,6 @@ export class Analisador {
     if (diretivaDoArquivo === 'use server' || diretivaDaFuncao(u.no) === 'use server') return 'servidor'
     if (PAGINA_DO_APP.test(u.arquivo) || ROTA_DO_APP.test(u.arquivo)) return 'servidor'
     return undefined
-  }
-
-  tiposDe(u: Unidade): { entrada?: string; saida?: string } {
-    const no = u.no
-    if (Node.isSourceFile(no)) return {}
-    if (!Node.isFunctionDeclaration(no) && !Node.isArrowFunction(no) && !Node.isFunctionExpression(no) && !Node.isMethodDeclaration(no)) {
-      return { saida: cortar(no.getType().getText(no)) }
-    }
-    const parametros = no.getParameters().map(p => p.getType().getText(p))
-    return { entrada: cortar(parametros.join(', ')), saida: cortar(no.getReturnType().getText(no)) }
   }
 
   private unidade(no: Node): Unidade {
@@ -162,9 +157,11 @@ export class Analisador {
   private unidadeQueContem(no: Node): Unidade {
     const funcao = no.getFirstAncestor(ehFuncao)
     if (funcao) return this.unidade(funcao)
-    // Tipo usado dentro de outro tipo liga pela declaração; const solta no módulo fica com o "(módulo)".
+    // Tipo usado dentro de outro tipo liga pela declaração, e const exportada também: outro arquivo a importa.
+    // Const solta de script fica com o "(módulo)", que é quem roda.
     const instrucao = no.getFirstAncestor(pai => Node.isSourceFile(pai.getParent()))
-    const declaracao = instrucao && !Node.isVariableStatement(instrucao) ? declaracoesDoModulo(instrucao)[0] : undefined
+    let declaracao = instrucao && !Node.isVariableStatement(instrucao) ? declaracoesDoModulo(instrucao)[0] : undefined
+    if (Node.isVariableStatement(instrucao) && instrucao.isExported()) declaracao = no.getFirstAncestorByKind(SyntaxKind.VariableDeclaration)
     return this.unidade(declaracao ?? no.getSourceFile())
   }
 
@@ -209,37 +206,51 @@ export class Analisador {
   private lerChamada(u: Unidade, chamada: CallExpression) {
     const alvo = chamada.getExpression()
     const texto = normalizar(alvo.getText())
-    if (texto === 'fetch') return this.lerFetch(u, chamada)
+    this.lerUrl(u, chamada, texto)
+    if (texto === 'fetch') return
     if (ehSetterDeEstado(alvo)) u.saidas.add('estado-local')
+    const sql = chamada.getArguments()[0]
+    if (CHAMADA_DE_SQL.test(texto) && sql) {
+      const tipo = tipoDoSql(sql.getText())
+      if (tipo === 'banco-escrita') u.saidas.add(tipo)
+      else u.fontes.add(tipo)
+      if (!Node.isStringLiteral(sql) && !Node.isNoSubstitutionTemplateLiteral(sql) && !Node.isTemplateExpression(sql)) u.avisos.push(`SQL fora da chamada (${cortar(sql.getText())}): o motor supõe leitura`)
+    }
     marcar(u.fontes, CHAMADAS_QUE_NASCEM, texto)
     marcar(u.saidas, CHAMADAS_QUE_TERMINAM, texto)
     for (const [padrao, tipo] of this.regrasDaConfig) {
       if (padrao.test(texto)) (tipo === 'config' ? u.fontes : u.saidas).add('config')
     }
     const destino = this.unidadeDaDeclaracao(declaracaoDe(alvo))
-    if (destino && destino !== u) u.chamadas.push({ unidade: destino, linha: chamada.getStartLineNumber() })
+    if (destino && destino !== u) u.chamadas.push({ unidade: destino, linha: chamada.getStartLineNumber(), usaRetorno: usaRetorno(chamada) })
     if (!destino) this.ligarCallbackPeloFilho(u, alvo, chamada.getStartLineNumber())
   }
 
-  // fetch('/api/x') para uma rota do próprio projeto: o fluxo atravessa a rede em vez de parar nela.
-  private lerFetch(u: Unidade, chamada: CallExpression) {
+  // fetch('/api/x'), api.fetch('/api/x') ou axios.post('/api/x') para uma rota do próprio projeto:
+  // o fluxo atravessa a rede em vez de parar na chamada. Um wrapper só entra quando a URL casa com uma rota.
+  private lerUrl(u: Unidade, chamada: CallExpression, texto: string) {
     const [url, opcoes] = chamada.getArguments()
-    const metodoNoTexto = Node.isObjectLiteralExpression(opcoes) ? opcoes.getProperty('method')?.getText().match(/['"`](\w+)['"`]/)?.[1] : undefined
-    const metodo = (metodoNoTexto ?? 'GET').toUpperCase()
+    const caminho = url ? caminhoDaUrl(url) : undefined
+    const metodo = metodoDaChamada(texto, opcoes?.getText())
+    const destino = caminho ? this.rotaDaUrl(caminho.url, metodo) : undefined
+    if (texto !== 'fetch' && !destino) return
     if (metodo === 'GET') u.fontes.add('rede')
+    if (destino) {
+      u.chamadas.push({ unidade: destino, linha: chamada.getStartLineNumber(), fronteira: 'http', usaRetorno: true })
+      if (caminho?.montada) u.avisos.push(`URL montada (${url!.getText()}): ligada a ${metodo} ${destino.arquivo} pelo formato, confira`)
+      return
+    }
     if (Node.isTemplateExpression(url)) u.avisos.push(`URL montada (${url.getText()}): o motor não liga o fetch com a rota`)
-    const literal = Node.isStringLiteral(url) || Node.isNoSubstitutionTemplateLiteral(url) ? url.getLiteralValue() : undefined
-    const destino = literal ? this.rotaDaUrl(literal, metodo) : undefined
-    if (destino) u.chamadas.push({ unidade: destino, linha: chamada.getStartLineNumber(), fronteira: 'http' })
-    else if (metodo !== 'GET') u.saidas.add('rede-escrita')
+    if (metodo !== 'GET') u.saidas.add('rede-escrita')
   }
 
   private rotaDaUrl(url: string, metodo: string): Unidade | undefined {
     this.rotas ??= this.projeto.getSourceFiles().flatMap(arquivo => {
       const relativo = path.relative(this.raiz, arquivo.getFilePath())
       const rota = ROTA_DO_APP.exec(relativo) ?? ROTA_DO_PAGES.exec(relativo)
-      return rota ? [{ padrao: padraoDaRota('/' + rota[1]), arquivo, app: ROTA_DO_APP.test(relativo) }] : []
+      return rota ? [{ padrao: padraoDaRota('/' + rota[1]), arquivo, app: ROTA_DO_APP.test(relativo), dinamicos: pesoDaRota(rota[1]!) }] : []
     })
+    this.rotas.sort((a, b) => a.dinamicos - b.dinamicos)
     const caminho = url.split(/[?#]/)[0]!
     const rota = this.rotas.find(r => r.padrao.test(caminho))
     const declaracao = rota?.arquivo.getExportedDeclarations().get(rota.app ? metodo : 'default')?.[0]
@@ -310,9 +321,20 @@ export class Analisador {
   }
 
   // No Pages Router, o retorno de getServerSideProps vira as props do componente da página, como JSON.
-  private ligarPropsDaPagina(u: Unidade) {
-    const componente = this.unidadeDaDeclaracao(u.no.getSourceFile().getExportedDeclarations().get('default')?.[0])
+  private ligarPropsDaPagina(u: Unidade, pagina: SourceFile) {
+    const componente = this.unidadeDaDeclaracao(pagina.getExportedDeclarations().get('default')?.[0])
     if (componente) u.chamadas.push({ unidade: componente, linha: u.linhas[1], fronteira: 'cliente-servidor' })
+  }
+
+  // export const getServerSideProps = getCoursePageProps: a função de outro arquivo vira a entrada da página.
+  private ligarAliasDaPagina(u: Unidade, referencia: Node): boolean {
+    const declaracao = referencia.getParent()
+    if (!Node.isVariableDeclaration(declaracao) || declaracao.getInitializer() !== referencia) return false
+    const pagina = referencia.getSourceFile()
+    if (!/^get(ServerSide|Static)Props$/.test(declaracao.getName()) || !PAGINA_DO_PAGES.test(path.relative(this.raiz, pagina.getFilePath()))) return false
+    u.fontes.add('pagina')
+    this.ligarPropsDaPagina(u, pagina)
+    return true
   }
 }
 

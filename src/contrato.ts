@@ -9,6 +9,7 @@ export interface Revisao {
   arquivos: ArquivoAlterado[]
   fluxos: Fluxo[]
   orfaos: Orfao[]
+  testes: Teste[]                  // fora dos fluxos: teste confere o produto, não é caminho do dado
   metricas: Metricas
 }
 
@@ -55,6 +56,11 @@ export interface Orfao {
   simbolo?: string
   hunkIds: string[]
   motivo: 'sem-chamador' | 'sem-saida' | 'arquivo-sem-import'
+}
+
+export interface Teste {
+  arquivo: string
+  hunkIds: string[]
 }
 
 export interface Metricas {

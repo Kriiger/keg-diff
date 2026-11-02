@@ -15,7 +15,8 @@
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "calibrar": "npm run build && node fixtures/calibrar.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

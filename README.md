@@ -25,7 +25,9 @@ keg diff HEAD~1 HEAD     # um commit
 keg diff main...HEAD     # o branch inteiro
 ```
 
-A saída mostra cada fluxo do nasce ao termina, com os passos alterados (●) e os de contexto (○), e os órfãos: trechos alterados que não estão em nenhum caminho entre uma fonte e uma saída.
+A saída mostra cada fluxo do nasce ao termina, com os passos alterados (●) e os de contexto (○), e os órfãos: trechos alterados que não estão em nenhum caminho entre uma fonte e uma saída. Arquivos de teste ficam numa lista à parte.
+
+Num monorepo (pnpm, npm ou yarn workspaces), rode na raiz: o keg liga `@equipe/utils` ao fonte do pacote mesmo sem o `node_modules` instalado.
 
 ## O que fica no seu projeto
 
@@ -42,4 +44,15 @@ O keg acrescenta `.revisao/` ao `.git/info/exclude` do repositório, então a pa
 npm install
 npm run build
 node dist/cli.js diff
+npm run calibrar         # roda o motor nos PRs reais de fixtures/ e compara com o gabarito
 ```
+
+## Calibragem
+
+Cada arquivo em `fixtures/` é um PR real feito por um agente de código, com o resultado esperado escrito à mão: quais fluxos existem, onde cada um nasce e termina, que passos cruzam cliente e servidor, quais trechos são órfãos e quais são testes. `npm run calibrar` clona os repositórios uma vez em `fixtures/.repos`, roda o keg em cada PR e lista onde o motor diverge do gabarito. Toda mudança no algoritmo passa por aqui.
+
+| Gabarito | PR | O que testa |
+| --- | --- | --- |
+| `memoryai-rota.json` | [MoKarade/MemoryAI#400](https://github.com/MoKarade/MemoryAI/pull/400) | Rotas GET que leem o banco pelo Drizzle; testes fora dos fluxos |
+| `anonyworks-cliente-servidor.json` | [codewithemmax/Anonyworks#2](https://github.com/codewithemmax/Anonyworks/pull/2) | Front Vite chamando a rota do Next por um wrapper, com URL montada e SQL cru |
+| `tbe-componente.json` | [The-Boring-Education/TBE-Web#1302](https://github.com/The-Boring-Education/TBE-Web/pull/1302) | Página do Pages Router com `getServerSideProps` vindo de outro pacote do monorepo |

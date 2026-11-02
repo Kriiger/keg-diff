@@ -16,6 +16,9 @@ const AJUDA = `uso: keg diff [argumentos do git diff]
 
 Rode dentro do pacote que mudou. O resultado vai para .revisao/review.json.`
 
+// Acima disso a revisão não fecha: melhor pedir ao agente que fatie a tarefa.
+const TRECHOS_DEMAIS = 40
+
 const [comando, ...argsDoGit] = process.argv.slice(2)
 if (comando !== 'diff' || argsDoGit.includes('--help') || argsDoGit.includes('-h')) {
   console.log(AJUDA)
@@ -53,13 +56,14 @@ function esconderDoGit() {
 }
 
 function imprimir(revisao: Revisao, milissegundos: number) {
-  const { metricas, fluxos, orfaos, arquivos } = revisao
+  const { metricas, fluxos, orfaos, testes, arquivos } = revisao
   const trechos = arquivos.flatMap(a => a.hunks.map(h => h.id))
   const emFluxo = new Set(fluxos.flatMap(f => f.passos.flatMap(p => p.hunkIds)))
   const linhas = [
     `keg diff · ${revisao.base} · ${arquivos.length} arquivos (${metricas.arquivosNovos} novos) · ${trechos.length} trechos · ${(milissegundos / 1000).toFixed(1)}s`,
     '',
   ]
+  if (trechos.length > TRECHOS_DEMAIS) linhas.push(`atenção: ${trechos.length} trechos é muito para uma revisão; peça ao agente para fatiar a tarefa`, '')
   fluxos.forEach((fluxo, i) => {
     linhas.push(`Fluxo ${i + 1} · ${fluxo.titulo} · risco ${fluxo.risco}`)
     for (const passo of fluxo.passos) {
@@ -76,9 +80,12 @@ function imprimir(revisao: Revisao, milissegundos: number) {
     for (const orfao of orfaos) linhas.push(`  ${orfao.arquivo.padEnd(40)} ${(orfao.simbolo ?? '').padEnd(24)} ${orfao.motivo}`)
     linhas.push('')
   }
-  const semAnalise = arquivos.filter(a => a.status === 'removido' || !/\.[cm]?[jt]sx?$/.test(a.caminho))
+  if (testes.length > 0) linhas.push(`Testes: ${testes.map(t => t.arquivo).join(', ')}`, '')
+  const doProduto = arquivos.filter(a => !testes.some(t => t.arquivo === a.caminho))
+  const semAnalise = doProduto.filter(a => a.status === 'removido' || !/\.[cm]?[jt]sx?$/.test(a.caminho))
   if (semAnalise.length > 0) linhas.push(`Sem fluxo: ${semAnalise.map(a => `${a.caminho} (${a.status})`).join(', ')}`, '')
-  linhas.push(`${emFluxo.size} de ${trechos.length} trechos em fluxos · ${orfaos.length} órfãos · ● alterado  ○ contexto`)
+  const trechosDeTeste = testes.reduce((total, t) => total + t.hunkIds.length, 0)
+  linhas.push(`${emFluxo.size} de ${trechos.length - trechosDeTeste} trechos em fluxos · ${orfaos.length} órfãos · ${trechosDeTeste} trechos de teste · ● alterado  ○ contexto`)
   linhas.push('review.json gravado em .revisao/review.json')
   console.log(linhas.join('\n'))
 }

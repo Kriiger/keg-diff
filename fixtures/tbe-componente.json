@@ -1,0 +1,19 @@
+{
+  "descricao": "Componente: o Copilot corrige a página de aula (Pages Router) e o getServerSideProps que vem de um pacote do monorepo pnpm, sem node_modules instalado.",
+  "pr": "https://github.com/The-Boring-Education/TBE-Web/pull/1302",
+  "repositorio": "https://github.com/The-Boring-Education/TBE-Web.git",
+  "numero": 1302,
+  "base": "1482d4e419c2e2a49849042a8935d8bc3f74c088",
+  "head": "575175e26e4cd93347a8836f0a4fa7fad93aa226",
+  "pasta": ".",
+  "fluxos": [
+    {
+      "nasce": ["packages/utils/src/global.ts#getCoursePageProps"],
+      "termina": ["apps/platform/src/pages/shiksha/[courseSlug]/learn.tsx#CourseLearnPage"],
+      "alterados": ["packages/utils/src/global.ts#getCoursePageProps", "apps/platform/src/pages/shiksha/[courseSlug]/learn.tsx#CourseLearnPage", "apps/platform/src/pages/shiksha/[courseSlug]/learn.tsx#resolveChapterId"],
+      "fronteiras": ["apps/platform/src/pages/shiksha/[courseSlug]/learn.tsx#CourseLearnPage"]
+    }
+  ],
+  "orfaos": [],
+  "testes": ["apps/testing/src/e2e/fixtures/course-mocks.ts", "apps/testing/src/e2e/platform/shiksha-chapter-navigation.spec.ts", "apps/testing/src/unit/utils/coursePageProps.test.ts"]
+}

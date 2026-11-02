@@ -1,0 +1,25 @@
+{
+  "descricao": "Rota: o Copilot publica o número de notas não lidas em duas rotas GET que leem o banco pelo Drizzle.",
+  "pr": "https://github.com/MoKarade/MemoryAI/pull/400",
+  "repositorio": "https://github.com/MoKarade/MemoryAI.git",
+  "numero": 400,
+  "base": "145a267587169599b3b461ff6be00d092371d72e",
+  "head": "01bd9d7778dee163cbb9a4219b0669de4a381fb2",
+  "pasta": ".",
+  "fluxos": [
+    {
+      "risco": "alto",
+      "nasce": ["app/api/etat/route.ts#GET", "lib/lia/notes.ts#comptesNotesLia"],
+      "termina": ["app/api/etat/route.ts#GET"],
+      "alterados": ["app/api/etat/route.ts#GET", "lib/lia/notes.ts#comptesNotesLia", "lib/etatPublic.ts#composerEtatPublic", "lib/etatPublic.ts#EtatPublic"]
+    },
+    {
+      "risco": "alto",
+      "nasce": ["app/hub/summary/route.ts#GET", "lib/lia/notes.ts#comptesNotesLia"],
+      "termina": ["app/hub/summary/route.ts#GET"],
+      "alterados": ["app/hub/summary/route.ts#construireSummary", "lib/lia/notes.ts#comptesNotesLia", "lib/hubSummary.ts#composerSummary", "lib/hubSummary.ts#ComptesMemoire"]
+    }
+  ],
+  "orfaos": [],
+  "testes": ["tests/hubSummary.test.ts", "tests/liaNotes.test.ts", "tests/routeEtat.test.ts"]
+}
