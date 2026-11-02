@@ -1,16 +1,19 @@
 #!/usr/bin/env node
 // keg diff [argumentos do git diff]: analisa o diff, grava .revisao/review.json e mostra os fluxos em texto.
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { isMainThread, parentPort, Worker, workerData } from 'node:worker_threads'
 import { Analisador, type Config } from './analisador.js'
 import { coletarDiff, git } from './coletor.js'
 import type { Revisao } from './contrato.js'
+import { gravarFeedback } from './feedback.js'
+import { aplicarManifesto } from './manifesto.js'
 import { montarRevisao } from './montador.js'
-import { lerModelo, preencherDoCache } from './narrador.js'
+import { lerModelo, preencherDoCache, type OpcoesDoNarrador } from './narrador.js'
+import { observarProjeto } from './observador.js'
 import { abrirTela } from './servidor.js'
 
-const AJUDA = `uso: keg diff [--sem-tela] [--sem-ia] [argumentos do git diff]
+const AJUDA = `uso: keg diff [--sem-tela] [--sem-ia] [--watch] [argumentos do git diff]
 
   keg diff                 tudo o que mudou desde o último commit, arquivos novos inclusive
   keg diff --staged        só o que está no stage
@@ -18,9 +21,12 @@ const AJUDA = `uso: keg diff [--sem-tela] [--sem-ia] [argumentos do git diff]
   keg diff main...HEAD     o branch inteiro
   keg diff --sem-tela      só grava o review.json, sem abrir a página
   keg diff --sem-ia        sem o narrador: os passos mostram só a frase mecânica
+  keg diff --watch         observa os arquivos e analisa de novo quando o agente corrige
 
 Rode dentro do pacote que mudou. O resultado vai para .revisao/review.json
-e a página de revisão abre no navegador até você apertar Ctrl+C.`
+e a página de revisão abre no navegador até você apertar Ctrl+C.
+Se o agente gravou .revisao/manifesto.json, o Panorama mostra onde ele e o código discordam.
+As suas decisões viram .revisao/feedback.md, o texto para devolver ao agente.`
 
 // Acima disso a revisão não fecha: melhor pedir ao agente que fatie a tarefa.
 const TRECHOS_DEMAIS = 40
@@ -30,13 +36,20 @@ else analisarNaThread()
 
 async function rodar() {
   const [comando, ...argumentos] = process.argv.slice(2)
-  const argsDoGit = argumentos.filter(arg => arg !== '--sem-tela' && arg !== '--sem-ia')
+  const argsDoGit = argumentos.filter(arg => !['--sem-tela', '--sem-ia', '--watch'].includes(arg))
   const semIa = argumentos.includes('--sem-ia')
+  const observar = argumentos.includes('--watch')
   // Sem terminal, quem chamou é um script ou um agente: a página ficaria aberta esperando ninguém.
   const comTela = !argumentos.includes('--sem-tela') && process.stdout.isTTY
   if (comando !== 'diff' || argsDoGit.includes('--help') || argsDoGit.includes('-h')) {
     console.log(AJUDA)
     process.exit(comando === 'diff' || comando === undefined || comando === '--help' ? 0 : 1)
+  }
+
+  // Observar só faz sentido com a página aberta para receber o aviso.
+  if (observar && !comTela) {
+    console.error('--watch precisa da página: rode num terminal e sem --sem-tela.')
+    process.exit(1)
   }
 
   try {
@@ -52,16 +65,47 @@ async function rodar() {
   const config: Config = existsSync(arquivoDeConfig) ? JSON.parse(readFileSync(arquivoDeConfig, 'utf8')) : {}
 
   const inicio = performance.now()
-  const revisao = await analisar(argsDoGit, raiz, config)
   const narrador = { semIa, modelo: lerModelo(raiz) }
-  // O que já foi narrado fica no cache; com --sem-ia, nenhuma frase da IA aparece.
-  if (!semIa) preencherDoCache(revisao, raiz, narrador.modelo)
-
-  mkdirSync(pastaDaRevisao, { recursive: true })
-  writeFileSync(path.join(pastaDaRevisao, 'review.json'), JSON.stringify(revisao, null, 2) + '\n')
+  // Antes da análise: o manifesto que o agente gravou em .revisao/ não pode entrar no diff como arquivo novo.
   esconderDoGit()
+  const revisao = await gerarRevisao(argsDoGit, raiz, config, narrador)
   imprimir(revisao, performance.now() - inicio)
-  if (comTela) console.log(`\nPágina de revisão em ${await abrirTela(raiz, narrador)} · Ctrl+C para sair`)
+  if (!comTela) return
+  console.log(`\nPágina de revisão em ${await abrirTela(raiz, narrador)} · Ctrl+C para sair`)
+  if (observar) {
+    console.log('Observando os arquivos do projeto: a página atualiza quando algo mudar.')
+    observarProjeto(raiz, () => reanalisar(argsDoGit, raiz, config, narrador))
+  }
+}
+
+// Analisa e grava o review.json. O que já foi narrado fica no cache; com --sem-ia, nenhuma frase da IA aparece.
+async function gerarRevisao(argsDoGit: string[], raiz: string, config: Config, narrador: OpcoesDoNarrador): Promise<Revisao> {
+  const revisao = await analisar(argsDoGit, raiz, config)
+  aplicarManifesto(revisao, raiz)
+  if (!narrador.semIa) preencherDoCache(revisao, raiz, narrador.modelo)
+  const pastaDaRevisao = path.join(raiz, '.revisao')
+  mkdirSync(pastaDaRevisao, { recursive: true })
+  // Grava num arquivo ao lado e renomeia: a página, avisada no meio da gravação, nunca lê um JSON pela metade.
+  const provisorio = path.join(pastaDaRevisao, 'review.json.tmp')
+  writeFileSync(provisorio, JSON.stringify(revisao, null, 2) + '\n')
+  renameSync(provisorio, path.join(pastaDaRevisao, 'review.json'))
+  return revisao
+}
+
+// Uma análise do --watch. A decisão de cada trecho está presa ao hash dele, então o que o agente mudou volta
+// para "não revisado" e o resto mantém a decisão; só o feedback.md precisa ser regerado. Análise que falha
+// (arquivo no meio de uma edição, por exemplo) deixa o review.json anterior e tenta de novo na próxima mudança.
+async function reanalisar(argsDoGit: string[], raiz: string, config: Config, narrador: OpcoesDoNarrador) {
+  const inicio = performance.now()
+  const hora = new Date().toLocaleTimeString()
+  try {
+    const revisao = await gerarRevisao(argsDoGit, raiz, config, narrador)
+    gravarFeedback(path.join(raiz, '.revisao'))
+    const trechos = revisao.arquivos.reduce((total, a) => total + a.hunks.length, 0)
+    console.log(`${hora} · analisado de novo: ${revisao.fluxos.length} fluxos · ${revisao.orfaos.length} órfãos · ${trechos} trechos · ${((performance.now() - inicio) / 1000).toFixed(1)}s`)
+  } catch (erro) {
+    console.error(`${hora} · a análise falhou, a página segue com a anterior: ${erro instanceof Error ? erro.message : erro}`)
+  }
 }
 
 // O compilador desce recursivo pelos imports, e a cadeia de tipos de uma biblioteca grande, como o Shiki,

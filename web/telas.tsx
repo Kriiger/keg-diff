@@ -2,6 +2,7 @@
 import { PatchDiff } from '@pierre/diffs/react'
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import type { Estado, Fluxo, Passo, Revisao } from '../src/contrato'
+import { AlertasDoManifesto } from './divergencias'
 import type { Checklist, Decidir, Decisao, Item } from './main'
 import { BotaoNarrarTodos, FrasesDoPasso, semNarracao, type Narrador } from './narracao'
 
@@ -71,6 +72,7 @@ export function Panorama({ revisao, checklist, estado, narrador }: { revisao: Re
         <div className="cartao destaque"><strong>{total === 0 ? 100 : Math.round((feitos / total) * 100)}%</strong><span>{feitos} de {total} trechos</span></div>
         {cartoes.map(([rotulo, valor]) => <div key={rotulo} className="cartao"><strong>{valor}</strong><span>{rotulo}</span></div>)}
       </div>
+      <AlertasDoManifesto manifesto={revisao.manifesto} />
       <h2>Fluxos por risco</h2>
       <BotaoNarrarTodos fluxos={revisao.fluxos} narrador={narrador} />
       {fluxos.length === 0 && <p className="detalhe">Nenhum fluxo: os trechos alterados estão nos órfãos e em outros trechos.</p>}

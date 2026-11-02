@@ -5,7 +5,9 @@ import { existsSync, readFileSync, watch, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import path from 'node:path'
-import type { Estado } from './contrato.js'
+import type { Estado, Revisao } from './contrato.js'
+import { gravarNota, lerEstado, lerNota } from './estado.js'
+import { gravarFeedback } from './feedback.js'
 import { FilaDoNarrador } from './fila-do-narrador.js'
 import type { OpcoesDoNarrador } from './narrador.js'
 
@@ -46,11 +48,16 @@ export async function abrirTela(raiz: string, opcoesDoNarrador: OpcoesDoNarrador
     if (url.pathname === '/api/estado' && pedido.method === 'POST') {
       // JSON obrigatório: um formulário de outro site não consegue mandar esse tipo sem pedir licença ao navegador.
       if (pedido.headers['content-type'] !== 'application/json') return responder(resposta, 415, 'envie JSON')
-      const estado = decidir(lerEstado(arquivoDeEstado), JSON.parse(await lerCorpo(pedido)))
+      const estado = decidir(lerEstado(pastaDaRevisao), JSON.parse(await lerCorpo(pedido)))
       writeFileSync(arquivoDeEstado, JSON.stringify(estado, null, 2) + '\n')
+      // O feedback.md acompanha cada decisão: quem lê o arquivo (o agente, por exemplo) nunca vê uma versão velha.
+      gravarFeedback(pastaDaRevisao)
       return responderJson(resposta, estado)
     }
-    if (url.pathname === '/api/estado') return responderJson(resposta, lerEstado(arquivoDeEstado))
+    if (url.pathname === '/api/estado') return responderJson(resposta, lerEstado(pastaDaRevisao))
+    if (url.pathname === '/api/feedback') return responder(resposta, 200, gravarFeedback(pastaDaRevisao))
+    if (url.pathname === '/api/nota' && pedido.method === 'POST') return receberNota(pedido, resposta, pastaDaRevisao)
+    if (url.pathname === '/api/nota') return responderJson(resposta, lerNota(pastaDaRevisao))
     if (url.pathname === '/api/narrador') return responderJson(resposta, narrador.estado())
     if (url.pathname === '/api/narrar' && pedido.method === 'POST') return pedirNarracao(pedido, resposta, narrador)
     if (url.pathname === '/api/codigo') return enviarCodigo(resposta, raiz, url.searchParams)
@@ -93,6 +100,17 @@ async function pedirNarracao(pedido: IncomingMessage, resposta: ServerResponse, 
   responderJson(resposta, narrador.estado())
 }
 
+// A nota avalia a revisão que está aberta: a base vem do review.json, não da página.
+async function receberNota(pedido: IncomingMessage, resposta: ServerResponse, pastaDaRevisao: string) {
+  if (pedido.headers['content-type'] !== 'application/json') return responder(resposta, 415, 'envie JSON')
+  try {
+    const revisao: Revisao = JSON.parse(readFileSync(path.join(pastaDaRevisao, 'review.json'), 'utf8'))
+    const nota = gravarNota(pastaDaRevisao, JSON.parse(await lerCorpo(pedido)).nota, revisao.base)
+    if (nota) return responderJson(resposta, nota)
+  } catch {}
+  responder(resposta, 400, 'a nota é um inteiro de 1 a 5')
+}
+
 function decidir(estado: Estado, { hunkIds, decisao, comentario }: Decisao): Estado {
   const em = new Date().toISOString()
   for (const id of hunkIds) {
@@ -100,10 +118,6 @@ function decidir(estado: Estado, { hunkIds, decisao, comentario }: Decisao): Est
     else estado[id] = comentario ? { decisao, comentario, em } : { decisao, em }
   }
   return estado
-}
-
-function lerEstado(arquivo: string): Estado {
-  return existsSync(arquivo) ? JSON.parse(readFileSync(arquivo, 'utf8')) : {}
 }
 
 // O passo de contexto não tem diff: a página mostra o código atual dele.

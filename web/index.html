@@ -59,6 +59,12 @@
     .selo.risco-medio { color: var(--medio); }
     .selo.risco-baixo { color: var(--baixo); }
     .alerta { border-left: 3px solid var(--medio); background: var(--painel); padding: 8px 12px; margin: 0 0 12px; }
+    .alerta.grave { border-left-color: var(--alto); }
+    .divergencias, .faltas { list-style: none; padding: 0; margin: 0 0 14px; }
+    .cobertura-completa strong { color: var(--ok); font-size: 20px; margin-right: 8px; }
+    .fechamento h2 { margin: 24px 0 6px; }
+    .notas button { min-width: 40px; }
+    .feedback { background: var(--painel); border: 1px solid var(--borda); border-radius: 8px; padding: 12px 14px; white-space: pre-wrap; font: 13px/1.55 var(--mono); }
     .sucesso { border-left: 3px solid var(--ok); background: var(--painel); padding: 8px 12px; margin: 0 0 12px; }
 
     .cartoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 28px; }

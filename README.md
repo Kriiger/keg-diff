@@ -25,6 +25,7 @@ keg diff HEAD~1 HEAD     # um commit
 keg diff main...HEAD     # o branch inteiro
 keg diff --sem-tela      # só grava o review.json, sem abrir a página
 keg diff --sem-ia        # sem o narrador: cada passo mostra só a frase mecânica
+keg diff --watch         # fica observando os arquivos e analisa de novo quando o agente corrige
 ```
 
 A saída mostra cada fluxo do nasce ao termina, com os passos alterados (●) e os de contexto (○), e os órfãos: trechos alterados que não estão em nenhum caminho entre uma fonte e uma saída. Arquivos de teste ficam numa lista à parte.
@@ -34,11 +35,44 @@ Em seguida a página de revisão abre no navegador, servida em `http://127.0.0.1
 - **Panorama:** tamanho do diff, fluxos por risco e a cobertura, quantos trechos já têm decisão.
 - **Fluxo:** a linha do tempo nasce → processa → termina à esquerda e o diff do passo à direita. Passo de contexto mostra o código atual.
 - **Mapa:** responde "quem chama isso?" sem sair do fluxo. Abre num painel embaixo da tela (tecla `m` ou o botão Mapa), com o diff do passo ainda em cima. O React Flow desenha e o ELK organiza em camadas, da fonte à esquerda até a saída à direita. Nó alterado é cheio; vizinho sem alteração é tracejado; o passo atual mostra quem o chama, e clicar num nó mostra os vizinhos dele e, se ele é um passo ou um trecho alterado, leva até ele (também em outro fluxo). A fronteira cliente/servidor aparece como uma faixa. Salto que o compilador não prova, como o `fetch` para uma rota do projeto (`http`) e o callback passado em prop (`dinâmico`), vira aresta tracejada com rótulo. O grafo vem do `review.json` (campo `grafo`): as funções alteradas, os passos dos fluxos e os vizinhos até 2 saltos, com no máximo 5 vizinhos por lado e o aviso "+N" do que ficou de fora.
+- **Fechamento:** responde "terminei?". Mostra a cobertura (com destaque em 100%), o que ainda falta, uma nota de 1 a 5 para a sensação de controle e o feedback pronto para o agente, com o botão "copiar como prompt".
 - **Órfãos, testes e outros trechos:** o que não entrou em fluxo, cada um com o seu diff. Órfão recebe revisado, código morto ou falso positivo.
 
-Atalhos: `j` e `k` passam de passo, `x` marca revisado, `c` comenta, `d` e `f` marcam código morto e falso positivo nos órfãos, `m` abre e fecha o mapa do fluxo, `v` alterna o diff entre lado a lado e empilhado, `p` volta ao panorama, `?` mostra a ajuda. Rodar o `keg diff` de novo em outro terminal atualiza a página aberta.
+Atalhos: `j` e `k` passam de passo, `x` marca revisado, `c` comenta, `d` e `f` marcam código morto e falso positivo nos órfãos, `m` abre e fecha o mapa do fluxo, `v` alterna o diff entre lado a lado e empilhado, `p` volta ao panorama, `t` abre o fechamento, `?` mostra a ajuda. Rodar o `keg diff` de novo em outro terminal atualiza a página aberta.
 
 Cada decisão fica presa ao hash do trecho: se o agente mudar o trecho depois, ele volta para "não revisado". Sem terminal (num script ou num agente), o keg não abre a página.
+
+## Agentes
+
+**Manifesto.** Ao terminar, o agente executor grava `.revisao/manifesto.json` com o fluxo que acha que fez. O formato e as instruções para o executor estão no Roteiro 2 (seção do executor, "Ao terminar"):
+
+```json
+{ "tarefa": "Cadastrar transação", "fluxos": [{
+  "nome": "POST /api/transacoes",
+  "nasce": "app/api/transacoes/route.ts:8",
+  "passos": ["lib/transacao.ts:5 parseTransacao", "lib/transacao.ts:21 salvarTransacao"],
+  "termina": "app/api/transacoes/route.ts:15"
+}] }
+```
+
+O keg compara o manifesto com os fluxos que calculou e mostra no Panorama duas divergências, também gravadas em `review.json` (`manifesto.divergencias` e `metricas.divergenciasDoManifesto`): **Não fez**, um passo ou fluxo declarado que não existe no código, e **Não contou**, um fluxo do código que o manifesto não declara (a mais grave, em vermelho). Sem manifesto, nada muda: a página só diz que não há o que conferir. Como o casamento funciona:
+
+- O arquivo é o mesmo (`./` e prefixo de pasta de monorepo não contam).
+- A linha declarada cai dentro do intervalo do passo, ou o símbolo declarado é o do passo: uma das duas basta, porque o agente erra a linha depois de editar.
+- Um passo declarado existe se casa com um passo dos fluxos, com uma função alterada ou com um trecho alterado do arquivo.
+- Um fluxo do código está declarado se alguma referência do manifesto (nasce, termina ou passo) casa com um passo dele que foi alterado ou que é ponta. Passo de contexto do meio não conta.
+
+**Feedback.** Os seus comentários e os órfãos marcados como código morto viram `.revisao/feedback.md`, regerado a cada decisão e ao abrir o Fechamento:
+
+```markdown
+Revisão de HEAD: 2 ajustes
+1. lib/transacao.ts:21 (salvarTransacao): o saldo não é recalculado quando a transação é excluída.
+2. lib/utils/formatarMoeda.ts: código morto, apague.
+```
+
+O botão "copiar como prompt" do Fechamento copia esse texto para colar no agente. A nota do Fechamento fica em `.revisao/nota.json` (`{ "nota": 4, "em": "...", "base": "HEAD" }`).
+
+**Ciclo fechado (`--watch`).** O servidor observa os arquivos do projeto (menos `.revisao`, `node_modules`, `.git`, `dist`, `.next`, `.turbo` e `coverage`). Quando algo muda, espera 400 ms de sossego, roda a análise de novo com os mesmos argumentos do git, regrava o `review.json` e a página atualiza sozinha. Como a decisão é presa ao hash do trecho, só o que o agente mudou volta para "não revisado"; o feedback perde os comentários dos trechos já corrigidos. Mudança no meio de uma análise vira uma análise só, depois dela. O `--watch` precisa da página: não funciona com `--sem-tela` nem sem terminal.
 
 Num monorepo (pnpm, npm ou yarn workspaces), rode na raiz: o keg liga `@equipe/utils` ao fonte do pacote mesmo sem o `node_modules` instalado.
 
@@ -58,6 +92,9 @@ Cada passo alterado ganha até três frases curtas, cada uma presa a linhas do p
 | --- | --- |
 | `.revisao/review.json` | Fluxos, órfãos, métricas e o grafo de chamadas do mapa (o contrato está em `src/contrato.ts`) |
 | `.revisao/estado.json` | As suas decisões na página, uma por trecho |
+| `.revisao/manifesto.json` | Escrito pelo agente executor: o fluxo que ele diz ter feito |
+| `.revisao/feedback.md` | Comentários e código morto, prontos para colar no agente |
+| `.revisao/nota.json` | A nota de 1 a 5 do Fechamento |
 | `.revisao/cache/` | As frases do narrador, uma por fluxo narrado |
 | `.revisao/keg.config.json` | Opcional: chamadas próprias da equipe, como `{ "nasce": ["api.get"], "termina": ["api.post", "api.*"] }` |
 

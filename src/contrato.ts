@@ -11,6 +11,7 @@ export interface Revisao {
   orfaos: Orfao[]
   testes: Teste[]                  // fora dos fluxos: teste confere o produto, não é caminho do dado
   grafo?: Grafo                    // o que chama o que em volta do diff, para a tela Mapa
+  manifesto?: ConferenciaDoManifesto  // só existe quando o executor gravou .revisao/manifesto.json
   metricas: Metricas
 }
 
@@ -100,6 +101,21 @@ export function idDoNo({ arquivo, linhas, simbolo }: Pick<Passo, 'arquivo' | 'li
   return `${arquivo}:${linhas[0]}#${simbolo}`
 }
 
+// O que o executor declarou contra o que o código tem. As regras de casamento estão em manifesto.ts.
+export interface ConferenciaDoManifesto {
+  tarefa?: string
+  erro?: string                    // manifesto ilegível: sem erro, a lista abaixo é a conferência inteira
+  divergencias: Divergencia[]
+}
+
+export interface Divergencia {
+  // declarado-inexistente: o agente descreveu algo que o código não tem.
+  // calculado-nao-declarado: o código tem um fluxo que o agente não contou, a mais grave.
+  tipo: 'declarado-inexistente' | 'calculado-nao-declarado'
+  texto: string
+  fluxoId?: string                 // id do fluxo calculado, quando a divergência é sobre um
+}
+
 export interface Metricas {
   arquivosNovos: number
   arquivosAlterados: number
@@ -115,6 +131,14 @@ export type Estado = Record<string, {
   comentario?: string
   em: string
 }>
+
+// .revisao/nota.json — a sensação de controle de 1 a 5 ao fechar a revisão. Fica fora do estado.json,
+// cujas chaves são todas hashes de trecho. A Fase 6 lê este arquivo para montar o historico.jsonl.
+export interface Nota {
+  nota: 1 | 2 | 3 | 4 | 5
+  em: string                       // ISO
+  base: string                     // a base da revisão que ela avalia
+}
 
 // O que a página sabe do narrador: GET /api/narrador. Sem narrador, o passo mostra a frase mecânica.
 export interface EstadoDoNarrador {

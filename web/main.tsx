@@ -3,6 +3,7 @@
 import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Estado, Fluxo, Revisao } from '../src/contrato'
+import { Fechamento } from './fechamento'
 import { AvisoDoNarrador, useNarrador } from './narracao'
 import { Panorama, TelaDeTrechos, TelaDoFluxo, decididos, encurtarBase, useAtalhos } from './telas'
 
@@ -71,7 +72,7 @@ function App() {
     gravarPreferencia(atual ? 'empilhado' : 'lado-a-lado')
     return !atual
   })
-  useAtalhos({ '?': () => setAjuda(aberta => !aberta), Escape: () => setAjuda(false), p: () => (location.hash = ''), v: alternarVisao })
+  useAtalhos({ '?': () => setAjuda(aberta => !aberta), Escape: () => setAjuda(false), p: () => (location.hash = ''), t: () => (location.hash = 'fechamento'), v: alternarVisao })
 
   const decidir: Decidir = (hunkIds, decisao, comentario) => {
     fetch('/api/estado', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hunkIds, decisao, comentario }) })
@@ -85,6 +86,7 @@ function App() {
   const [tela = '', id, passoDoEndereco] = endereco.split('/')
   const rota = id ? `${tela}/${id}` : tela
   const fluxoAberto = checklist.fluxos.find(f => `fluxo/${f.fluxo.id}` === rota)?.fluxo
+  const fechando = rota === 'fechamento'
   const secao = rota in SECOES ? (rota as Secao) : undefined
   const mapa = { aberto: mapaAberto, alternar: () => setMapaAberto(aberto => !aberto) }
   const contexto = { revisao, estado, decidir, ladoALado, narrador, mapa }
@@ -96,7 +98,8 @@ function App() {
         <AvisoDoNarrador narrador={narrador} />
         {fluxoAberto && <TelaDoFluxo key={fluxoAberto.id} fluxo={fluxoAberto} passoInicial={passoDoEndereco} {...contexto} />}
         {secao && <TelaDeTrechos key={secao} {...SECOES[secao]} itens={checklist[secao]} {...contexto} />}
-        {!fluxoAberto && !secao && <Panorama revisao={revisao} checklist={checklist} estado={estado} narrador={narrador} />}
+        {fechando && <Fechamento revisao={revisao} checklist={checklist} estado={estado} secoes={SECOES} />}
+        {!fluxoAberto && !secao && !fechando && <Panorama revisao={revisao} checklist={checklist} estado={estado} narrador={narrador} />}
       </main>
       <div className="dicas">
         <button onClick={alternarVisao}>{ladoALado ? 'empilhado' : 'lado a lado'} <kbd>v</kbd></button>
@@ -135,12 +138,14 @@ function Lateral({ revisao, checklist, estado, endereco }: { revisao: Revisao; c
           {link(s, `${checklist[s].length} ${checklist[s].length === 1 ? 'item' : 'itens'}`, checklist[s].flatMap(i => i.hunkIds))}
         </div>
       ))}
+      <h2>Fechar</h2>
+      {link('fechamento', 'Fechamento', checklist.todos)}
     </nav>
   )
 }
 
 function Ajuda({ fechar }: { fechar: () => void }) {
-  const atalhos = [['j / k', 'próximo e anterior'], ['x', 'marca revisado (de novo desfaz)'], ['c', 'comenta'], ['d', 'código morto (órfãos)'], ['f', 'falso positivo (órfãos)'], ['v', 'diff lado a lado ou empilhado'], ['m', 'abre e fecha o mapa de quem chama quem (no fluxo)'], ['p', 'volta ao panorama'], ['?', 'abre e fecha esta ajuda']]
+  const atalhos = [['j / k', 'próximo e anterior'], ['x', 'marca revisado (de novo desfaz)'], ['c', 'comenta'], ['d', 'código morto (órfãos)'], ['f', 'falso positivo (órfãos)'], ['v', 'diff lado a lado ou empilhado'], ['m', 'abre e fecha o mapa de quem chama quem (no fluxo)'], ['p', 'volta ao panorama'], ['t', 'abre o fechamento: terminei?'], ['?', 'abre e fecha esta ajuda']]
   return (
     <div className="fundo-da-ajuda" onClick={fechar}>
       <dl className="ajuda">
