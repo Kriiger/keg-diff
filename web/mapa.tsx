@@ -4,6 +4,7 @@ import '@xyflow/react/dist/style.css'
 import { Background, Controls, Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type NodeProps } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk.bundled.js'
 import { useEffect, useMemo, useState } from 'react'
+import { MODOS, useTema } from './tema'
 import { idDoNo, type ArestaDoGrafo, type Fluxo, type Grafo, type NoDoGrafo, type Revisao } from '../src/contrato'
 
 const LARGURA = 232
@@ -38,6 +39,7 @@ interface PropsDoMapa {
 export default function Mapa({ revisao, fluxo, indice, irParaPasso, fechar }: PropsDoMapa) {
   const [abertos, setAbertos] = useState(new Set<string>())
   const [desenho, setDesenho] = useState<Desenho>()
+  const tema = useTema()
   const grafo = revisao.grafo
   const atual = idDoNo(fluxo.passos[indice] ?? fluxo.passos[0]!)
   const visiveis = useMemo(() => (grafo ? idsVisiveis(grafo, fluxo, abertos, atual) : new Set<string>()), [grafo, fluxo, abertos, atual])
@@ -75,7 +77,7 @@ export default function Mapa({ revisao, fluxo, indice, irParaPasso, fechar }: Pr
         <button onClick={fechar}>Fechar <kbd>m</kbd></button>
       </header>
       {/* Remontar o React Flow a cada layout reenquadra o desenho, e a expansão sempre cabe na tela. */}
-      <ReactFlow key={desenho?.chave} nodes={nos} edges={ligacoes} nodeTypes={TIPOS} onNodeClick={escolher} colorMode="system"
+      <ReactFlow key={desenho?.chave} nodes={nos} edges={ligacoes} nodeTypes={TIPOS} onNodeClick={escolher} colorMode={MODOS[tema]}
         nodesConnectable={false} fitView fitViewOptions={{ padding: 0.15, minZoom: ZOOM_LEGIVEL, maxZoom: 1 }} minZoom={0.1} attributionPosition="bottom-left">
         <Background gap={20} />
         <Controls showInteractive={false} position="bottom-right" />

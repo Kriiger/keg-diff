@@ -1,0 +1,70 @@
+/* As cores da página. O claro é o padrão; o escuro vale quando o sistema pede e a pessoa não forçou o claro,
+   ou quando ela forçou o escuro (data-tema no <html>, gravado por tema.tsx). O bloco escuro aparece duas vezes
+   porque o CSS não deixa um seletor de media query e um de atributo dividirem a mesma regra: mudou um, mude o outro. */
+:root {
+  --fundo: #ffffff; --texto: #0f0f0f; --suave: #5f5f5f;
+  --acento: #065fd4; --selecionado: rgb(0 0 0 / .08);
+  --nasce: #1b6e3c; --processa: #4a4a4a; --termina: #8a4a12;
+  --alto: #b3261e; --medio: #7a5200; --baixo: #5f5f5f; --ok: #1b6e3c;
+
+  /* Painel: o cinza discreto das caixas do YouTube. Vidro: o que flutua sobre o conteúdo. */
+  --painel-fundo: rgb(0 0 0 / .05); --painel-solido: #f2f2f2; --painel-borda: rgb(0 0 0 / .06);
+  --vidro-fundo: rgb(255 255 255 / .74); --vidro-solido: #ffffff;
+  --vidro-borda: rgb(0 0 0 / .1); --vidro-brilho: inset 0 1px 0 rgb(255 255 255 / .7);
+  --vidro-sombra: 0 6px 24px rgb(0 0 0 / .13), 0 1px 3px rgb(0 0 0 / .08);
+  --vidro-filtro: blur(18px) saturate(140%);
+
+  --escurecer: rgb(0 0 0 / .4);
+  --botao-fundo: rgb(0 0 0 / .05); --botao-hover: rgb(0 0 0 / .1);
+  --primario: #0f0f0f; --primario-hover: #272727; --primario-texto: #ffffff;
+  --codigo-fundo: #fbfbfb; --codigo-borda: rgb(0 0 0 / .1);
+  --foco: 0 0 0 2px var(--fundo), 0 0 0 4px var(--acento);
+  color-scheme: light dark;
+}
+:root[data-tema="claro"] { color-scheme: light; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    --fundo: #0f0f0f; --texto: #f1f1f1; --suave: #aaaaaa;
+    --acento: #3ea6ff; --selecionado: rgb(255 255 255 / .12);
+    --nasce: #7ccf9b; --processa: #b4b4b4; --termina: #e8a26b;
+    --alto: #f28f8f; --medio: #e0b457; --baixo: #aaaaaa; --ok: #7ccf9b;
+
+    --painel-fundo: rgb(255 255 255 / .07); --painel-solido: #212121; --painel-borda: rgb(255 255 255 / .08);
+    --vidro-fundo: rgb(33 33 33 / .72); --vidro-solido: #212121;
+    --vidro-borda: rgb(255 255 255 / .12); --vidro-brilho: inset 0 1px 0 rgb(255 255 255 / .07);
+    --vidro-sombra: 0 8px 30px rgb(0 0 0 / .5), 0 1px 3px rgb(0 0 0 / .4);
+
+    --escurecer: rgb(0 0 0 / .62);
+    --botao-fundo: rgb(255 255 255 / .1); --botao-hover: rgb(255 255 255 / .2);
+    --primario: #f1f1f1; --primario-hover: #d9d9d9; --primario-texto: #0f0f0f;
+    --codigo-fundo: #141414; --codigo-borda: rgb(255 255 255 / .12);
+  }
+}
+
+:root[data-tema="escuro"] {
+  color-scheme: dark;
+  --fundo: #0f0f0f; --texto: #f1f1f1; --suave: #aaaaaa;
+  --acento: #3ea6ff; --selecionado: rgb(255 255 255 / .12);
+  --nasce: #7ccf9b; --processa: #b4b4b4; --termina: #e8a26b;
+  --alto: #f28f8f; --medio: #e0b457; --baixo: #aaaaaa; --ok: #7ccf9b;
+
+  --painel-fundo: rgb(255 255 255 / .07); --painel-solido: #212121; --painel-borda: rgb(255 255 255 / .08);
+  --vidro-fundo: rgb(33 33 33 / .72); --vidro-solido: #212121;
+  --vidro-borda: rgb(255 255 255 / .12); --vidro-brilho: inset 0 1px 0 rgb(255 255 255 / .07);
+  --vidro-sombra: 0 8px 30px rgb(0 0 0 / .5), 0 1px 3px rgb(0 0 0 / .4);
+
+  --escurecer: rgb(0 0 0 / .62);
+  --botao-fundo: rgb(255 255 255 / .1); --botao-hover: rgb(255 255 255 / .2);
+  --primario: #f1f1f1; --primario-hover: #d9d9d9; --primario-texto: #0f0f0f;
+  --codigo-fundo: #141414; --codigo-borda: rgb(255 255 255 / .12);
+}
+
+/* Sem transparência, o vidro e os painéis viram fundo sólido; sem backdrop-filter no navegador, idem.
+   ":root:root" empata a especificidade dos temas acima, e a ordem faz esta regra vencer. */
+@media (prefers-reduced-transparency: reduce) {
+  :root:root { --vidro-fundo: var(--vidro-solido); --painel-fundo: var(--painel-solido); --vidro-filtro: none; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root:root { --vidro-fundo: var(--vidro-solido); }
+}

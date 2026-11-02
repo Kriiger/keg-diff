@@ -52,6 +52,7 @@ Atalhos (a mesma lista aparece na ajuda, tecla `?`), todos fora das caixas de te
 | `c` | comenta; `esc` cancela e `⌘↵` salva |
 | `d` `f` | código morto e falso positivo, nos órfãos |
 | `v` | diff lado a lado ou empilhado |
+| `a` | aparência: alterna entre tema do sistema, claro e escuro (a escolha fica neste navegador) |
 | `m` | abre e fecha o mapa do fluxo |
 | `p` `t` | volta ao panorama; abre o fechamento |
 | `1` a `5` `y` | no fechamento: dá a nota; copia o feedback como prompt |

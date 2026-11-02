@@ -2,18 +2,18 @@
 import { PatchDiff } from '@pierre/diffs/react'
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import type { Estado, Fluxo, Passo, Revisao } from '../src/contrato'
+import { Decisoes } from './decisoes'
 import { AlertasDoManifesto } from './divergencias'
 import type { Checklist, Decidir, Decisao, Item } from './main'
 import { BotaoNarrarTodos, FrasesDoPasso, semNarracao, type Narrador } from './narracao'
 import { indiceInicial, useCursor, type Navegacao } from './proximo'
+import { MODOS, useTema } from './tema'
 
 // O mesmo limite do cli.ts: acima disso a revisão não fecha.
 const TRECHOS_DEMAIS = 40
 const ORDEM_DO_RISCO = { alto: 0, medio: 1, baixo: 2 }
-// Um tema claro e um escuro, escolhidos pelo prefers-color-scheme; o fundo do diff vem de estilo/telas.css.
+// Um tema claro e um escuro; qual vale vem da escolha da pessoa (tema.tsx) ou, em "Sistema", do prefers-color-scheme. O fundo do diff vem de estilo/telas.css.
 const TEMAS = { light: 'github-light', dark: 'github-dark' } as const
-const NOMES: Record<Decisao, string> = { revisado: 'Revisado', 'codigo-morto': 'Código morto', 'falso-positivo': 'Falso positivo', comentado: 'Comentado' }
-const TECLAS: Record<Decisao, string> = { revisado: 'x', 'codigo-morto': 'd', 'falso-positivo': 'f', comentado: 'c' }
 // O mapa leva o React Flow e o ELK (mais de 1 MB): só baixa quando alguém aperta m.
 const Mapa = lazy(() => import('./mapa'))
 
@@ -209,64 +209,11 @@ export function TelaDeTrechos(props: Contexto & { rota: string; titulo: string; 
   )
 }
 
-interface PropsDasDecisoes {
-  hunkIds: string[]
-  opcoes: readonly Decisao[]
-  estado: Estado
-  decidir: Decidir
-  comentando: boolean
-  setComentando: (comentando: boolean) => void
-}
-
-function Decisoes({ hunkIds, opcoes, estado, decidir, comentando, setComentando }: PropsDasDecisoes) {
-  if (hunkIds.length === 0) return null
-  const decisoes = hunkIds.map(id => estado[id])
-  const comum = decisoes.every(d => d?.decisao === decisoes[0]?.decisao) ? decisoes[0] : undefined
-  const salvar = (texto: string) => {
-    if (texto.trim() !== '') decidir(hunkIds, 'comentado', texto.trim())
-    setComentando(false)
-  }
-  return (
-    <div className="decisoes">
-      <div className="botoes">
-        {opcoes.map(opcao => (
-          <button key={opcao} className={comum?.decisao === opcao ? 'ativa' : ''} onClick={() => decidir(hunkIds, comum?.decisao === opcao ? null : opcao)}>
-            {NOMES[opcao]} <kbd>{TECLAS[opcao]}</kbd>
-          </button>
-        ))}
-        <button className={comum?.decisao === 'comentado' ? 'ativa' : ''} onClick={() => setComentando(true)}>
-          {comum?.decisao === 'comentado' ? 'Editar comentário' : 'Comentar'} <kbd>c</kbd>
-        </button>
-      </div>
-      {comentando && <CaixaDeComentario inicial={comum?.comentario ?? ''} salvar={salvar} cancelar={() => setComentando(false)} />}
-      {!comentando && comum?.comentario && <blockquote>{comum.comentario}</blockquote>}
-    </div>
-  )
-}
-
-function CaixaDeComentario({ inicial, salvar, cancelar }: { inicial: string; salvar: (texto: string) => void; cancelar: () => void }) {
-  const [texto, setTexto] = useState(inicial)
-  return (
-    <div className="comentario">
-      <textarea
-        autoFocus value={texto} placeholder="O que o agente precisa ajustar aqui?" onChange={e => setTexto(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Escape') cancelar()
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) salvar(texto)
-        }}
-      />
-      <div className="botoes">
-        <button className="ativa" onClick={() => salvar(texto)}>Salvar <kbd>⌘↵</kbd></button>
-        <button onClick={cancelar}>Cancelar <kbd>esc</kbd></button>
-      </div>
-    </div>
-  )
-}
-
 // Os trechos do review.json vêm sem linhas de contexto: o patch mostra só o que mudou.
 // O diff mostra exatamente os trechos que a decisão marca, nem mais nem menos.
 // "destaque" são as linhas da âncora da frase sob o mouse, no lado novo do arquivo.
 function DiffDosTrechos({ revisao, arquivo, hunkIds, ladoALado, destaque }: { revisao: Revisao; arquivo: string; hunkIds: string[]; ladoALado: boolean; destaque?: [number, number] | null }) {
+  const tema = useTema()
   const alterado = revisao.arquivos.find(a => a.caminho === arquivo)
   const hunks = alterado?.hunks.filter(h => hunkIds.includes(h.id)) ?? []
   if (!alterado || hunks.length === 0) return null
@@ -274,7 +221,7 @@ function DiffDosTrechos({ revisao, arquivo, hunkIds, ladoALado, destaque }: { re
   const depois = alterado.status === 'removido' ? '/dev/null' : `b/${arquivo}`
   const patch = [`diff --git a/${arquivo} b/${arquivo}`, `--- ${antes}`, `+++ ${depois}`, ...hunks.map(h => h.patch)].join('\n') + '\n'
   const selecionadas = destaque ? { start: destaque[0], end: destaque[1], side: 'additions' as const, endSide: 'additions' as const } : null
-  return <PatchDiff patch={patch} selectedLines={selecionadas} options={{ diffStyle: ladoALado ? 'split' : 'unified', theme: TEMAS, themeType: 'system', overflow: 'wrap' }} />
+  return <PatchDiff patch={patch} selectedLines={selecionadas} options={{ diffStyle: ladoALado ? 'split' : 'unified', theme: TEMAS, themeType: MODOS[tema], overflow: 'wrap' }} />
 }
 
 // Passo de contexto: não mudou, mas o revisor precisa ver o que ele faz com o dado.

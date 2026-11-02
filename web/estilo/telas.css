@@ -6,61 +6,55 @@ a:focus-visible { border-radius: 10px; }
 .conteudo h2 { margin-top: 22px; }
 .conteudo > section > h2 { margin-bottom: 8px; }
 
-.selo { --cor: var(--baixo); font-size: 12px; font-weight: 500; padding: 1px 10px; border-radius: 999px; white-space: nowrap; color: color-mix(in srgb, var(--cor) 75%, var(--texto)); background: color-mix(in srgb, var(--cor) 10%, transparent); border: 1px solid color-mix(in srgb, var(--cor) 35%, transparent); }
+.selo { --cor: var(--baixo); font-size: 12px; font-weight: var(--peso-rotulo); padding: 1px 10px; border-radius: 999px; white-space: nowrap; color: color-mix(in srgb, var(--cor) 75%, var(--texto)); background: color-mix(in srgb, var(--cor) 10%, transparent); border: 1px solid color-mix(in srgb, var(--cor) 35%, transparent); }
 .selo.risco-alto { --cor: var(--alto); }
 .selo.risco-medio { --cor: var(--medio); }
 .sem-ancora { font-size: 12px; color: color-mix(in srgb, var(--alto) 75%, var(--texto)); background: color-mix(in srgb, var(--alto) 10%, transparent); border: 1px solid color-mix(in srgb, var(--alto) 35%, transparent); border-radius: 999px; padding: 0 8px; white-space: nowrap; }
 
-/* Avisos: painel cinza com uma risca de cor à esquerda; o servidor desligado fica preso no topo. */
-.alerta, .sucesso { --tinta: var(--medio); padding: 10px 16px; margin: 0 0 12px; box-shadow: inset 3px 0 0 var(--tinta); }
-.alerta.grave { --tinta: var(--alto); }
-.sucesso { --tinta: var(--ok); }
-.alerta button { margin-left: 8px; padding: 2px 12px; }
-.servidor-desligado { background: var(--painel-solido); }
-/* Preso no topo, com fundo sólido: o painel translúcido deixaria o conteúdo passar por baixo. */
-.servidor-desligado { position: sticky; top: 12px; z-index: 4; animation: descer .24s cubic-bezier(.2, .7, .3, 1); }
-@keyframes descer { from { opacity: 0; transform: translateY(-8px); } }
 .divergencias, .faltas { list-style: none; padding: 0; margin: 0 0 14px; }
-.faltas li { padding: 2px 0; }
-.cobertura-completa strong { color: var(--ok); font-size: 20px; margin-right: 8px; }
+/* O fechamento lista o que falta num cartão: o fundo do hover de cada linha fica longe da borda e das outras linhas. */
+.faltas { display: grid; gap: 4px; padding: 8px; }
+.faltas li { display: flex; gap: 12px; align-items: baseline; padding: 6px 12px; border-radius: 10px; }
+.faltas li:hover { background: var(--botao-fundo); }
+.faltas a { font-weight: var(--peso-destaque); }
+.cobertura-completa strong { color: var(--ok); font-size: 20px; font-weight: var(--peso-titulo); margin-right: 8px; }
 .fechamento h2 { margin: 26px 0 6px; }
-.feedback { background: var(--codigo-fundo); border: 1px solid var(--codigo-borda); border-radius: var(--painel-raio); padding: 14px 16px; white-space: pre-wrap; font: 13px/1.55 var(--mono); }
+.feedback { background: var(--codigo-fundo); border: 1px solid var(--codigo-borda); border-radius: var(--painel-raio); padding: 14px 16px; white-space: pre-wrap; font: var(--peso-texto) 13px/1.55 var(--fonte-codigo); }
 
 .cartoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 28px; }
 .cartao { padding: 14px 16px; }
-.cartao strong { display: block; font: 600 28px/1.2 var(--titulo); font-variant-numeric: tabular-nums; }
+.cartao strong { display: block; font: var(--peso-titulo) 28px/1.2 var(--fonte); font-variant-numeric: tabular-nums; }
 .cartao span { color: var(--suave); font-size: 13px; }
 .cartao.destaque strong { color: var(--ok); }
-.fluxos-do-panorama { list-style: none; padding: 0; margin: 12px 0; }
-.fluxos-do-panorama a { display: flex; gap: 12px; align-items: baseline; padding: 12px 16px; margin-bottom: 8px; font-weight: 500; transition: background var(--ritmo); }
+.fluxos-do-panorama { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 8px; }
+.fluxos-do-panorama a { display: flex; gap: 12px; align-items: baseline; padding: 12px 16px; font-weight: var(--peso-rotulo); }
 .fluxos-do-panorama a:hover { background: var(--botao-hover); }
 
 .fluxo { display: grid; grid-template-columns: minmax(230px, 310px) 1fr; gap: 20px; align-items: start; }
-.linha-do-tempo { list-style: none; margin: 0; padding: 8px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
-.passo-da-linha { display: grid; grid-template-columns: 20px 1fr; width: 100%; text-align: left; background: transparent; border: 0; border-radius: 10px; padding: 8px 12px; transition: background var(--ritmo); }
+.linha-do-tempo { list-style: none; margin: 0; padding: 10px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+.passo-da-linha { display: grid; grid-template-columns: 20px 1fr; width: 100%; text-align: left; background: transparent; border: 0; border-radius: 10px; padding: 8px 12px; }
 .passo-da-linha > :not(.marcador) { grid-column: 2; }
 .passo-da-linha .marcador { grid-row: 1 / span 4; }
 .passo-da-linha:hover { background: var(--botao-fundo); }
 .passo-da-linha.atual { background: var(--selecionado); }
-.papel { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; }
+.papel { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: var(--peso-destaque); }
 .papel-nasce .papel, .papel.papel-nasce { color: var(--nasce); }
 .papel-processa .papel, .papel.papel-processa { color: var(--processa); }
 .papel-termina .papel, .papel.papel-termina { color: var(--termina); }
-.simbolo { font-family: var(--mono); font-weight: 600; overflow-wrap: anywhere; }
-.local { font: 12px var(--mono); color: var(--suave); overflow-wrap: anywhere; }
+.simbolo { font-weight: var(--peso-destaque); overflow-wrap: anywhere; }
+.local { font: var(--peso-rotulo) 12px var(--fonte); color: var(--suave); overflow-wrap: anywhere; }
 .fronteira { font-size: 12px; color: var(--acento); }
-.marcador { font-family: var(--mono); color: var(--suave); }
+.marcador { color: var(--suave); }
 
 .passo, .item { padding: 20px; min-width: 0; }
 .passo h2, .item h2 { margin: 0; }
-.passo h2 .local { font-weight: 400; }
+.passo h2 .local { font-weight: var(--peso-rotulo); }
 .frase { margin: 10px 0 12px; }
-.frases { list-style: none; padding: 0; margin: 10px 0 12px; }
-.frases li { padding: 4px 10px; margin-bottom: 2px; border-radius: 8px; transition: background var(--ritmo); }
+.frases { list-style: none; padding: 0; margin: 10px 0 12px; display: grid; gap: 4px; }
+.frases li { padding: 6px 12px; border-radius: 8px; }
 .frases li:hover, .frases li:focus { background: var(--selecionado); }
-.frases li.atencao { border-left: 3px solid var(--medio); }
 .narrar-todos { margin: 8px 0 12px; }
-.item { margin-bottom: 16px; transition: border-color var(--ritmo); }
+.item { margin-bottom: 16px; }
 .item.atual { border-color: color-mix(in srgb, var(--texto) 45%, transparent); background: var(--selecionado); }
 .item > .detalhe { margin-top: 2px; }
 
@@ -72,14 +66,14 @@ a:focus-visible { border-radius: 10px; }
 blockquote { margin: 12px 0 0; padding: 8px 14px; border-radius: 8px; background: var(--botao-fundo); box-shadow: inset 3px 0 0 var(--suave); white-space: pre-wrap; }
 
 /* O código e o diff ficam numa superfície opaca: a translucidez só emoldura, nunca atrapalha a leitura. */
-.codigo { font: 12.5px/1.55 var(--mono); background: var(--codigo-fundo); border: 1px solid var(--codigo-borda); border-radius: var(--painel-raio); padding: 10px 0; overflow-x: auto; margin: 0; }
+.codigo { font: var(--peso-texto) 12.5px/1.55 var(--fonte-codigo); background: var(--codigo-fundo); border: 1px solid var(--codigo-borda); border-radius: var(--painel-raio); padding: 10px 0; overflow-x: auto; margin: 0; }
 .codigo div { padding: 0 14px; white-space: pre; }
 .codigo .numero { display: inline-block; width: 4ch; margin-right: 12px; text-align: right; color: var(--suave); user-select: none; }
 diffs-container {
   display: block; border: 1px solid var(--codigo-borda); border-radius: var(--painel-raio); overflow: hidden;
   --diffs-light-bg: #fcfcfc; --diffs-dark-bg: #141414;
-  --diffs-font-family: var(--mono); --diffs-font-size: 12.5px; --diffs-line-height: 1.55;
-  --diffs-header-font-family: var(--sans);
+  --diffs-font-family: var(--fonte-codigo); --diffs-font-size: 12.5px; --diffs-line-height: 1.55;
+  --diffs-header-font-family: var(--fonte);
 }
 
 @media (max-width: 860px) {

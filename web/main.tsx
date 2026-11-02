@@ -3,15 +3,18 @@
 import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Estado, Fluxo, Revisao } from '../src/contrato'
+import './estilo/tema.css'
 import './estilo/base.css'
 import './estilo/lateral.css'
 import './estilo/telas.css'
+import './estilo/alertas.css'
 import './estilo/mapa.css'
 import { useCronometro } from './cronometro'
 import { escutar, reconectar, useServidorDesligado } from './eventos'
 import { Fechamento } from './fechamento'
 import { AvisoDoNarrador, useNarrador } from './narracao'
 import { useNavegacao } from './proximo'
+import { BotaoDoTema, ciclarTema } from './tema'
 import { Panorama, TelaDeTrechos, TelaDoFluxo, decididos, encurtarBase, useAtalhos, type Contexto } from './telas'
 
 export type Decisao = Estado[string]['decisao']
@@ -85,7 +88,7 @@ function App() {
     return !atual
   })
   useAtalhos({
-    '?': () => setAjuda(aberta => !aberta), Escape: () => setAjuda(false), p: () => (location.hash = ''), t: () => (location.hash = 'fechamento'), v: alternarVisao,
+    '?': () => setAjuda(aberta => !aberta), Escape: () => setAjuda(false), p: () => (location.hash = ''), t: () => (location.hash = 'fechamento'), v: alternarVisao, a: ciclarTema,
     ...atalhos,
   })
 
@@ -111,6 +114,7 @@ function App() {
       </main>
       <div className="dicas">
         <button onClick={alternarVisao}>{ladoALado ? 'empilhado' : 'lado a lado'} <kbd>v</kbd></button>
+        <BotaoDoTema />
         <button onClick={() => setAjuda(true)}>atalhos <kbd>?</kbd></button>
       </div>
       {ajuda && <Ajuda fechar={() => setAjuda(false)} />}
@@ -171,6 +175,7 @@ const ATALHOS = [
   ['d', 'código morto (órfãos)'],
   ['f', 'falso positivo (órfãos)'],
   ['v', 'diff lado a lado ou empilhado'],
+  ['a', 'aparência: tema do sistema, claro ou escuro'],
   ['m', 'abre e fecha o mapa de quem chama quem (no fluxo)'],
   ['p', 'volta ao panorama'],
   ['t', 'abre o fechamento: terminei?'],

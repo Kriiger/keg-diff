@@ -1,0 +1,26 @@
+/* Avisos: cartão cinza arredondado com um ícone de status à esquerda. A cor de significado mora só no ícone.
+   O ícone é uma máscara SVG: o HTML dos avisos continua sendo só texto, e a forma (não só a cor) diz o tipo:
+   triângulo para aviso, círculo com ! para o grave, círculo com ✓ para o que deu certo. */
+:root {
+  --icone-aviso: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' stroke='black' stroke-width='2' stroke-linejoin='round' d='M12 3 22 20.5H2zM11 9h2v6h-2zM11 16.5h2v2h-2z'/%3E%3C/svg%3E");
+  --icone-grave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM11 7h2v6.5h-2zM11 15.5h2v2h-2z'/%3E%3C/svg%3E");
+  --icone-ok: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM10.5 16.5 6 12l1.4-1.4 3.1 3.1 6.1-6.1L18 9z'/%3E%3C/svg%3E");
+}
+
+.alerta, .sucesso, .frases li.atencao { --tinta: var(--medio); --icone: var(--icone-aviso); position: relative; }
+.alerta.grave { --tinta: var(--alto); --icone: var(--icone-grave); }
+.sucesso { --tinta: var(--ok); --icone: var(--icone-ok); }
+.alerta::before, .sucesso::before, .frases li.atencao::before {
+  content: ''; position: absolute; left: 14px; top: 12px; width: 18px; height: 18px; background: var(--tinta);
+  -webkit-mask: var(--icone) center / contain no-repeat; mask: var(--icone) center / contain no-repeat;
+}
+
+.alerta, .sucesso { padding: 10px 16px 10px 44px; margin: 0 0 12px; }
+.alerta button { margin-left: 8px; padding: 2px 12px; }
+/* O servidor desligado fica preso no topo, com fundo sólido: o painel translúcido deixaria o conteúdo passar por baixo. */
+.servidor-desligado { position: sticky; top: 12px; z-index: 4; background: var(--painel-solido); animation: descer var(--duracao-longa) var(--curva); }
+@keyframes descer { from { opacity: 0; transform: translateY(-8px); } }
+
+/* A frase do narrador que pede atenção leva o mesmo ícone, sem faixa na lateral. */
+.frases li.atencao { padding-left: 36px; }
+.frases li.atencao::before { left: 10px; top: 8px; }
