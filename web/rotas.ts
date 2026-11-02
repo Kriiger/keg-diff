@@ -6,11 +6,16 @@ import type { ArestaDoGrafo } from '../src/contrato'
 export const LARGURA = 232
 export const ALTURA = 72
 export const ROTULOS: Partial<Record<ArestaDoGrafo['tipo'], string>> = { http: 'http', dinamico: 'dinâmico' }
+const ROTULO_DA_VOLTA = 'volta'
+// O texto vem da ligação e de a rota andar para trás; "http · volta" é o fetch que fecha um ciclo.
+export const textoDoRotulo = (tipo: ArestaDoGrafo['tipo'], retorno: boolean) => [ROTULOS[tipo], retorno && ROTULO_DA_VOLTA].filter(Boolean).join(' · ')
 
 export interface Ponto { x: number; y: number }
 // retorno: a ligação anda para trás (o chamado está numa camada antes do chamador), o que só acontece num ciclo.
 export type Rota = { pontos: Ponto[]; rotulo?: Ponto; retorno: boolean }
 export interface Layout { posicoes: Map<string, Ponto>; rotas: Map<string, Rota> }
+// O que o ELK desenhou: a chave diz quais nós e arestas entraram, para o desenho antigo ficar até o novo chegar.
+export interface Desenho extends Layout { chave: string; visiveis: Set<string>; arestas: ArestaDoGrafo[] }
 
 const RAIO_DO_CANTO = 6
 // Texto de 12px: o ELK só precisa de uma caixa que reserve o vão do rótulo, o React Flow mede o texto de verdade.
@@ -22,24 +27,38 @@ const OPCOES_DO_ELK = {
   'elk.layered.spacing.nodeNodeBetweenLayers': '110', 'elk.spacing.nodeNode': '32',
   'elk.layered.spacing.edgeNodeBetweenLayers': '24', 'elk.spacing.edgeNode': '24',
   'elk.layered.spacing.edgeEdgeBetweenLayers': '14', 'elk.spacing.edgeEdge': '14',
+  // Medido nos cenários da fixture (cliques sorteados): o network simplex puxa as ligações longas para perto dos blocos que unem
+  // (a BK deixava o fetch para a rota fazer um desvio de 500px pelo alto), e considerar a ordem das arestas e uma passada a mais
+  // de cruzamentos ainda tiram cerca de 6% dos cruzamentos. Partições cliente|servidor pioraram tudo (+35% de cruzamentos).
+  'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX', 'elk.layered.considerModelOrder.strategy': 'PREFER_EDGES', 'elk.layered.thoroughness': '20',
 }
+// http e dinâmico atravessam o desenho: a prioridade de retidão faz o ELK alinhar as pontas deles em vez de empurrá-los para o alto.
+const OPCOES_DA_LIGACAO_LONGA = { 'elk.layered.priority.straightness': '10' }
 
 export const idDaAresta = ({ de, para }: Pick<ArestaDoGrafo, 'de' | 'para'>) => `${de}>${para}`
 
 export async function calcularLayout(elk: ELK, ids: string[], arestas: ArestaDoGrafo[]): Promise<Layout> {
+  const layout = await rodarElk(elk, ids, arestas, new Set())
+  const voltas = new Set([...layout.rotas].filter(([, rota]) => rota.retorno).map(([id]) => id))
+  // O ELK só diz quem volta depois de rodar: havendo ciclo, uma segunda rodada reserva o vão do rótulo "volta" nessas ligações.
+  return voltas.size > 0 ? rodarElk(elk, ids, arestas, voltas) : layout
+}
+
+async function rodarElk(elk: ELK, ids: string[], arestas: ArestaDoGrafo[], voltas: Set<string>): Promise<Layout> {
   const resultado = await elk.layout({
     id: 'raiz', layoutOptions: OPCOES_DO_ELK,
     children: ids.map(id => ({ id, width: LARGURA, height: ALTURA })),
-    edges: arestas.map(ligacaoDoElk),
+    edges: arestas.map(aresta => ligacaoDoElk(aresta, voltas.has(idDaAresta(aresta)))),
   })
   const posicoes = new Map((resultado.children ?? []).map((no): [string, Ponto] => [no.id, { x: no.x ?? 0, y: no.y ?? 0 }]))
   const rotas = new Map((resultado.edges ?? []).map((aresta): [string, Rota] => [aresta.id, rotaDoElk(aresta, posicoes)]))
   return { posicoes, rotas }
 }
 
-function ligacaoDoElk(aresta: ArestaDoGrafo): ElkExtendedEdge {
-  const texto = ROTULOS[aresta.tipo]
+function ligacaoDoElk(aresta: ArestaDoGrafo, volta: boolean): ElkExtendedEdge {
+  const texto = textoDoRotulo(aresta.tipo, volta)
   const ligacao: ElkExtendedEdge = { id: idDaAresta(aresta), sources: [aresta.de], targets: [aresta.para] }
+  if (aresta.tipo === 'http' || aresta.tipo === 'dinamico') ligacao.layoutOptions = OPCOES_DA_LIGACAO_LONGA
   if (texto) ligacao.labels = [{ text: texto, width: texto.length * LARGURA_DA_LETRA + 12, height: ALTURA_DO_ROTULO, layoutOptions: { 'elk.edgeLabels.inline': 'true' } }]
   return ligacao
 }

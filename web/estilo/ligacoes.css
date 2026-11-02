@@ -1,0 +1,34 @@
+/* As ligações do mapa. O traço diz o tipo (a legenda do cabeçalho usa as mesmas classes); a cor fica para o que tem significado:
+   azul é o que sai do bloco apontado, o texto é o que chega nele, e o roxo é a ligação que volta. */
+.mapa-do-fluxo .tipo-chamada { --traco: none; --espessura: 1.6px; }
+.mapa-do-fluxo .tipo-http { --traco: 8 5; --espessura: 1.6px; }
+.mapa-do-fluxo .tipo-dinamico { --traco: 9 3 2 3; --espessura: 1.6px; }
+.mapa-do-fluxo .tipo-tipo { --traco: 1.5 4.5; --espessura: 1.2px; }
+
+.mapa-do-fluxo .react-flow__edge { color: var(--suave); transition: var(--transicao-cores), opacity var(--duracao) var(--curva); }
+.mapa-do-fluxo .traco-da-aresta { fill: none; stroke: currentColor; stroke-width: var(--espessura); stroke-dasharray: var(--traco); stroke-linecap: round; transition: var(--transicao-cores), stroke-width var(--duracao) var(--curva); }
+.mapa-do-fluxo .origem-da-aresta, .mapa-do-fluxo .ponta-da-aresta { fill: currentColor; }
+.mapa-do-fluxo .ponta-da-aresta { stroke: currentColor; stroke-width: 1; stroke-linejoin: round; }
+/* Uso de tipo não executa nada: ponta só de contorno, para não parecer chamada. */
+.mapa-do-fluxo .tipo-tipo .ponta-da-aresta { fill: none; stroke-width: 1.3; }
+.mapa-do-fluxo .tipo-tipo .origem-da-aresta { fill: none; stroke: currentColor; stroke-width: 1.2; }
+.mapa-do-fluxo .react-flow__edge:focus-visible .traco-da-aresta { stroke-width: 3px; }
+.mapa-do-fluxo .react-flow__edge:focus { outline: none; }
+
+/* Destaque (foco.ts): a ligação do bloco apontado engrossa e sobe por cima, as outras esmaecem. */
+.mapa-do-fluxo .aresta-fora { opacity: .12; }
+.mapa-do-fluxo .aresta-sai, .mapa-do-fluxo .aresta-foco { color: var(--acento); }
+.mapa-do-fluxo .aresta-entra { color: var(--texto); }
+.mapa-do-fluxo .aresta-sai .traco-da-aresta, .mapa-do-fluxo .aresta-entra .traco-da-aresta { stroke-width: 2.6px; }
+.mapa-do-fluxo .aresta-foco .traco-da-aresta { stroke-width: 3px; }
+
+/* Retorno: roxo, mais grosso e com o rótulo "volta". Vem depois do destaque para manter a cor também quando está destacado. */
+.mapa-do-fluxo .aresta-retorno { color: var(--retorno); }
+.mapa-do-fluxo .aresta-retorno .traco-da-aresta { stroke-width: 2px; }
+.mapa-do-fluxo .aresta-retorno.aresta-sai .traco-da-aresta, .mapa-do-fluxo .aresta-retorno.aresta-entra .traco-da-aresta { stroke-width: 2.8px; }
+.mapa-do-fluxo .aresta-retorno .react-flow__edge-text { fill: var(--retorno); }
+
+.legenda-das-ligacoes { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; margin: 0; padding: 0; font-size: 12px; font-weight: var(--peso-rotulo); }
+.legenda-das-ligacoes li { display: flex; align-items: center; gap: 4px; color: var(--texto-miudo); cursor: help; }
+.legenda-das-ligacoes svg { overflow: visible; }
+.mapa-do-fluxo .legenda-das-ligacoes .aresta-retorno { color: var(--retorno); }

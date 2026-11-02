@@ -49,10 +49,11 @@ export function montarGrafo(alteradas: Map<Unidade, string[]>, trilhas: Trilha[]
   return { nos, arestas: [...pontas.values()].map(p => ({ de: p.de.chave, para: p.para.chave, tipo: p.tipo })) }
 }
 
-function ponta(de: Unidade, para: Unidade, { fronteira, dinamico }: { fronteira?: Fronteira; dinamico?: boolean }): Ponta {
+function ponta(de: Unidade, para: Unidade, { fronteira, dinamico, usoDeTipo }: Pick<Ligacao, 'fronteira' | 'dinamico' | 'usoDeTipo'>): Ponta {
   let tipo: Ponta['tipo'] = 'chamada'
   if (fronteira === 'http') tipo = 'http'
   else if (dinamico) tipo = 'dinamico'
+  else if (usoDeTipo) tipo = 'tipo'
   return { de, para, tipo, fronteira }
 }
 
@@ -60,12 +61,16 @@ function chaveDa(p: Ponta): string {
   return `${p.de.chave}>${p.para.chave}`
 }
 
+// Quando o mesmo par chega com tipos diferentes, fica o mais específico: um uso de tipo perde para uma chamada
+// (a classe que se instancia e também se anota é uma chamada), e a chamada comum perde para http e dinâmica.
+const ESPECIFICIDADE: Record<Ponta['tipo'], number> = { tipo: 0, chamada: 1, dinamico: 2, http: 2 }
+
 // A mesma ligação chega por vários caminhos (o que o chamador vê, o que o chamado vê, o fluxo). O fluxo só sabe "chamada":
 // quem diz que a ligação é http ou dinâmica é o analisador, e essa informação não pode se perder.
 function juntar(destino: Map<string, Ponta>, novas: Ponta[]): Map<string, Ponta> {
   for (const p of novas) {
     const existente = destino.get(chaveDa(p))
-    if (!existente || existente.tipo === 'chamada') destino.set(chaveDa(p), p)
+    if (!existente || ESPECIFICIDADE[p.tipo] > ESPECIFICIDADE[existente.tipo]) destino.set(chaveDa(p), p)
   }
   return destino
 }

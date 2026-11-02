@@ -90,11 +90,12 @@ export interface NoDoGrafo {
   mais?: number                    // vizinhos que o corte deixou de fora
 }
 
-// de chama para. "http" é o fetch para uma rota do próprio projeto; "dinamico" é o que o compilador não prova.
+// de chama para. "http" é o fetch para uma rota do próprio projeto; "dinamico" é o que o compilador não prova;
+// "tipo" é o uso de um tipo ou interface numa anotação: depende do formato, não executa nada.
 export interface ArestaDoGrafo {
   de: string
   para: string
-  tipo: 'chamada' | 'http' | 'dinamico'
+  tipo: 'chamada' | 'http' | 'dinamico' | 'tipo'
 }
 
 // O motor dá a cada função o id "arquivo:linha#símbolo"; o passo de um fluxo tem os mesmos três dados.

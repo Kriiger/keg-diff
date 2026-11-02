@@ -56,6 +56,11 @@ export function declaracoesDoModulo(instrucao: Node): Node[] {
   return ehDeclaracao && instrucao.getName() ? [instrucao] : []
 }
 
+// Dentro de uma anotação o nome só descreve a forma do dado; fora dela (new, chamada, extends de valor) é uso de verdade.
+export function emPosicaoDeTipo(referencia: Node): boolean {
+  return referencia.getFirstAncestor(Node.isTypeNode) !== undefined
+}
+
 export function nomeDe(no: Node): Node | undefined {
   let alvo = no
   if (Node.isArrowFunction(no) || Node.isFunctionExpression(no)) {

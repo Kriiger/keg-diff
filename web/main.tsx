@@ -9,6 +9,7 @@ import './estilo/lateral.css'
 import './estilo/telas.css'
 import './estilo/alertas.css'
 import './estilo/mapa.css'
+import './estilo/ligacoes.css'
 import './estilo/arvore.css'
 import { ModoArvore } from './arvore'
 import { useCronometro } from './cronometro'
@@ -192,7 +193,7 @@ const ATALHOS = [
   ['x', 'marca revisado (de novo desfaz); na árvore, o arquivo inteiro'],
   ['c', 'comenta'],
   ['d', 'código morto (órfãos)'],
-  ['f', 'falso positivo (órfãos)'],
+  ['f', 'falso positivo (órfãos); com o mapa aberto, ajusta a vista para ver tudo'],
   ['v', 'modo fluxo ou modo árvore (arquivos e pastas)'],
   ['l', 'diff lado a lado ou empilhado'],
   ['a', 'aparência: tema do sistema, claro ou escuro'],

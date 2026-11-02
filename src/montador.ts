@@ -11,7 +11,7 @@ import { idDoNo, type ArquivoAlterado, type Fluxo, type Orfao, type Passo, type 
 const SALTOS_MAXIMOS = 6
 const RISCOS = ['baixo', 'baixo', 'medio', 'alto', 'alto'] as const
 
-export interface Aresta { de: Unidade; para: Unidade; linha: number; fronteira?: Fronteira }
+export interface Aresta { de: Unidade; para: Unidade; linha: number; fronteira?: Fronteira; usoDeTipo?: boolean }
 // Trilha é o caminho de uma unidade alterada: da fonte até ela e dela (ou de quem a chamou) até a saída.
 export interface Trilha { fonte: Unidade; saida: Unidade; arestas: Aresta[]; unidades: Set<Unidade> }
 
@@ -128,7 +128,7 @@ function buscarFonte(alterada: Unidade, analisador: Analisador): Aresta[] | unde
     for (const chamador of chamadores) {
       if (vistas.has(chamador.unidade)) continue
       vistas.add(chamador.unidade)
-      const aresta = { de: chamador.unidade, para: atual.unidade, linha: chamador.linha, fronteira: chamador.fronteira }
+      const aresta = { de: chamador.unidade, para: atual.unidade, linha: chamador.linha, fronteira: chamador.fronteira, usoDeTipo: chamador.usoDeTipo }
       fila.push({ unidade: chamador.unidade, arestas: [aresta, ...atual.arestas] })
     }
   }
@@ -153,7 +153,7 @@ function buscarSaida(inicio: Unidade, analisador: Analisador, subindo: boolean, 
       if (vistas.has(vizinha.unidade)) continue
       vistas.add(vizinha.unidade)
       const aresta = subindo
-        ? { de: vizinha.unidade, para: unidade, linha: vizinha.linha }
+        ? { de: vizinha.unidade, para: unidade, linha: vizinha.linha, usoDeTipo: vizinha.usoDeTipo }
         : { de: unidade, para: vizinha.unidade, linha: vizinha.linha, fronteira: vizinha.fronteira }
       fila.push({ unidade: vizinha.unidade, arestas: [...arestas, aresta] })
     }

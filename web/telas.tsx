@@ -138,7 +138,8 @@ export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrad
       <header>
         <h1>{fluxo.titulo}</h1>
         <span className={`selo risco-${fluxo.risco}`}>risco {fluxo.risco}</span>
-        <button className="botao-do-mapa" onClick={mapa.alternar}>Mapa <kbd>m</kbd></button>
+        {/* O mapa (>1 MB) baixa e avalia ao apontar o botão: o primeiro clique, antes do prefetch ocioso, não deixa a tela vazia esperando o download. */}
+        <button className="botao-do-mapa" onClick={mapa.alternar} onPointerEnter={carregarMapa} onFocus={carregarMapa}>Mapa <kbd>m</kbd></button>
       </header>
       <div className="fluxo">
         <ol className="linha-do-tempo">

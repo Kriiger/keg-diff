@@ -8,7 +8,7 @@ import {
 } from './catalogo.js'
 import {
   EMBRULHO, atributoDeEvento, caminhoDaUrl, carregadoPorHtml, chamadaQueRecebe, cortar, declaracaoDe, declaracoesDoModulo, diretiva, diretivaDaFuncao,
-  ehFuncao, ehRedirecionamento, ehSetterDeEstado, lerEntradasDoPacote, propDoComponente, nomeDe, normalizar, semExtensao, usaRetorno,
+  ehFuncao, ehRedirecionamento, emPosicaoDeTipo, ehSetterDeEstado, lerEntradasDoPacote, propDoComponente, nomeDe, normalizar, semExtensao, usaRetorno,
 } from './sintaxe.js'
 
 export const ARQUIVO_DE_CODIGO = /\.(ts|tsx|js|jsx|mjs|cjs)$/
@@ -16,7 +16,8 @@ export const ARQUIVO_DE_CODIGO = /\.(ts|tsx|js|jsx|mjs|cjs)$/
 export type Fronteira = 'http' | 'cliente-servidor'
 // usaRetorno: quem chama usa o valor devolvido, como em "const total = await contar()".
 // dinamico: o compilador não prova a chamada (callback em prop, função num objeto): o mapa a desenha tracejada.
-export interface Ligacao { unidade: Unidade; linha: number; fronteira?: Fronteira; usaRetorno?: boolean; dinamico?: boolean }
+// usoDeTipo: a referência está numa anotação (`x as PgError`, `useState<Registro[]>`), não é chamada nem instanciação.
+export interface Ligacao { unidade: Unidade; linha: number; fronteira?: Fronteira; usaRetorno?: boolean; dinamico?: boolean; usoDeTipo?: boolean }
 
 // Unidade é a menor declaração que recebe um trecho: função, arrow em const, método ou declaração de módulo.
 export interface Unidade {
@@ -123,7 +124,7 @@ export class Analisador {
         continue
       }
       const chamador = this.unidadeQueContem(referencia)
-      if (chamador !== u) u.chamadores.push({ unidade: chamador, linha: referencia.getStartLineNumber() })
+      if (chamador !== u) u.chamadores.push({ unidade: chamador, linha: referencia.getStartLineNumber(), usoDeTipo: emPosicaoDeTipo(referencia) })
     }
     const recebedora = chamadaQueRecebe(u.no)
     if (recebedora) u.chamadores.push({ unidade: this.unidadeQueContem(recebedora), linha: recebedora.getStartLineNumber(), dinamico: true })
