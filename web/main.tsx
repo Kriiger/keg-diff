@@ -11,9 +11,11 @@ import './estilo/alertas.css'
 import './estilo/mapa.css'
 import './estilo/ligacoes.css'
 import './estilo/arvore.css'
+import './estilo/alternador.css'
+import { AlternadorDeModo } from './alternador'
 import { ModoArvore } from './arvore'
 import { useCronometro } from './cronometro'
-import { escutar, reconectar, useServidorDesligado } from './eventos'
+import { escutar, reconectar, tolerarQueda, useServidorDesligado } from './eventos'
 import { Fechamento } from './fechamento'
 import { alternarModo, useModo } from './modo'
 import { AvisoDoNarrador, useNarrador } from './narracao'
@@ -76,7 +78,7 @@ function App() {
   useEffect(() => {
     const carregar = () => {
       fetch('/api/revisao').then(r => r.json()).then(setRevisao).catch(() => setErro('Não consegui ler o review.json.'))
-      fetch('/api/estado').then(r => r.json()).then(setEstado)
+      fetch('/api/estado').then(r => r.json()).then(setEstado).catch(tolerarQueda)
     }
     // A conexão abre no início e de novo quando o servidor volta ou outro keg diff sobe na mesma porta: nos três casos, dados novos.
     const parar = [escutar('open', carregar), escutar('revisao', carregar)]
@@ -102,6 +104,7 @@ function App() {
     fetch('/api/estado', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hunkIds, decisao, comentario, segundos: segundos() }) })
       .then(r => r.json())
       .then(setEstado)
+      .catch(tolerarQueda)
   }
 
   if (erro) return <p className="aviso-central">{erro} Rode <code>keg diff</code> de novo.</p>
@@ -123,6 +126,7 @@ function App() {
             <TelaAtual rota={rota} fluxo={fluxoAberto} passoInicial={passoDoEndereco} checklist={checklist} segundos={segundos} contexto={contexto} />
           </main>
         </>}
+      <AlternadorDeModo />
       <div className="dicas">
         <button onClick={alternarVisao}>{ladoALado ? 'empilhado' : 'lado a lado'} <kbd>l</kbd></button>
         <BotaoDoTema />

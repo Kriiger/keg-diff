@@ -1,6 +1,7 @@
 /* O conteúdo: panorama, fluxo passo a passo, listas de trechos e fechamento. */
 a:focus-visible { border-radius: 10px; }
-.conteudo { padding: 28px 32px 96px; min-width: 0; }
+/* 60px no topo: o seletor de modo flutua no canto superior direito (alternador.css) e não pode cobrir o cabeçalho. */
+.conteudo { padding: 60px 32px 96px; min-width: 0; }
 /* Mudar o padding refaz o layout da página inteira (o diff é grande): com duração 0 e atraso, a troca só acontece depois da subida da gaveta. */
 .pagina.com-mapa .conteudo { padding-bottom: calc(var(--gaveta) + 40px); transition: var(--transicao-cores), padding-bottom 0s linear var(--duracao-longa); }
 .conteudo > section > header { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; margin-bottom: 20px; }

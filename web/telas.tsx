@@ -4,7 +4,9 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import type { Estado, Fluxo, Passo, Revisao } from '../src/contrato'
 import { Decisoes } from './decisoes'
 import { AlertasDoManifesto } from './divergencias'
+import { tolerarQueda } from './eventos'
 import type { Checklist, Decidir, Decisao, Item } from './main'
+import { useTrocando } from './modo'
 import { BotaoNarrarTodos, FrasesDoPasso, semNarracao, type Narrador } from './narracao'
 import { indiceInicial, useCursor, type Navegacao } from './proximo'
 import { MODOS, useTema } from './tema'
@@ -221,9 +223,12 @@ export function TelaDeTrechos(props: Contexto & { rota: string; titulo: string; 
 // "destaque" são as linhas da âncora da frase sob o mouse, no lado novo do arquivo.
 export function DiffDosTrechos({ revisao, arquivo, hunkIds, ladoALado, destaque }: { revisao: Revisao; arquivo: string; hunkIds: string[]; ladoALado: boolean; destaque?: [number, number] | null }) {
   const tema = useTema()
+  const trocando = useTrocando()
   const alterado = revisao.arquivos.find(a => a.caminho === arquivo)
   const hunks = alterado?.hunks.filter(h => hunkIds.includes(h.id)) ?? []
   if (!alterado || hunks.length === 0) return null
+  // Na troca de modo o diff espera a animação acabar: montá-lo dentro dela travava a transição.
+  if (trocando) return <div className="diff-adiado" aria-hidden="true" />
   const antes = alterado.status === 'novo' ? '/dev/null' : `a/${arquivo}`
   const depois = alterado.status === 'removido' ? '/dev/null' : `b/${arquivo}`
   const patch = [`diff --git a/${arquivo} b/${arquivo}`, `--- ${antes}`, `+++ ${depois}`, ...hunks.map(h => h.patch)].join('\n') + '\n'
@@ -237,7 +242,7 @@ function CodigoDoPasso({ passo }: { passo: Passo }) {
   useEffect(() => {
     const [de, ate] = passo.linhas
     const busca = new URLSearchParams({ arquivo: passo.arquivo, de: String(de), ate: String(Math.min(ate, de + 199)) })
-    fetch(`/api/codigo?${busca}`).then(r => (r.ok ? r.json() : undefined)).then(setCodigo)
+    fetch(`/api/codigo?${busca}`).then(r => (r.ok ? r.json() : undefined)).then(setCodigo).catch(tolerarQueda)
   }, [passo])
   if (!codigo) return null
   return (

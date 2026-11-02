@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import type { Estado, Nota, Revisao } from '../src/contrato'
 import { formatarTempo } from './cronometro'
+import { tolerarQueda } from './eventos'
 import type { Checklist } from './main'
 import { decididos, useAtalhos } from './telas'
 
@@ -16,16 +17,17 @@ export function Fechamento({ revisao, checklist, estado, secoes, segundos }: { r
 
   // O servidor gera o feedback.md de novo a cada decisão: refaz a leitura quando o estado ou a revisão mudam.
   useEffect(() => {
-    fetch('/api/feedback').then(r => r.text()).then(setFeedback)
+    fetch('/api/feedback').then(r => r.text()).then(setFeedback).catch(tolerarQueda)
   }, [revisao, estado])
   useEffect(() => {
-    fetch('/api/nota').then(r => r.json()).then(setNota)
+    fetch('/api/nota').then(r => r.json()).then(setNota).catch(tolerarQueda)
   }, [])
 
   const darNota = (valor: number) => {
     fetch('/api/nota', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nota: valor, segundos: segundos() }) })
       .then(r => r.json())
       .then(setNota)
+      .catch(tolerarQueda)
   }
   const copiar = async () => {
     try {

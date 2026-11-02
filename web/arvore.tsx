@@ -11,6 +11,9 @@ const STATUS: Record<StatusDoArquivo, { letra: string; nome: string }> = {
   removido: { letra: 'D', nome: 'removido' }, renomeado: { letra: 'R', nome: 'renomeado' },
 }
 
+// O arquivo escolhido sobrevive a sair do modo árvore e voltar (o componente desmonta); na primeira entrada, vale o primeiro.
+let ultimoEscolhido: string | undefined
+
 interface PropsDaLista {
   escolhido: string | undefined
   fechadas: Set<string>
@@ -23,7 +26,7 @@ interface PropsDaLista {
 export function ModoArvore({ revisao, estado, decidir, ladoALado, cabeca, children }: { revisao: Revisao; estado: Estado; decidir: Decidir; ladoALado: boolean; cabeca: ReactNode; children: ReactNode }) {
   const nos = useMemo(() => montarArvore(revisao.arquivos), [revisao])
   const ordem = useMemo(() => arquivosEmOrdem(nos), [nos])
-  const [escolhido, setEscolhido] = useState<string>()
+  const [escolhido, setEscolhido] = useState(ultimoEscolhido)
   const [fechadas, setFechadas] = useState(() => new Set<string>())
   const [comentando, setComentando] = useState(false)
   // Depois de uma revisão nova o arquivo escolhido pode ter sumido: volta para o primeiro da lista.
@@ -34,6 +37,7 @@ export function ModoArvore({ revisao, estado, decidir, ladoALado, cabeca, childr
   const selecionar = (caminho: string) => {
     setComentando(false)
     setEscolhido(caminho)
+    ultimoEscolhido = caminho
     setFechadas(antes => new Set([...antes].filter(pasta => !caminho.startsWith(`${pasta}/`))))
   }
   const andar = (passos: number) => {

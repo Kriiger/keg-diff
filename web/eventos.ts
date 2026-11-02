@@ -22,6 +22,11 @@ export function escutar(evento: string, acao: () => void): () => void {
   return () => void grupo.delete(acao)
 }
 
+// Para o fim de uma chamada à API (fetch): com o servidor fora ou reiniciando, o fetch rejeita com "Failed to fetch" e,
+// sem ninguém para pegar, vira erro solto no console. O aviso "Servidor desligado" e a volta já são daqui (o SSE), e a
+// conexão aberta de novo recarrega tudo; então o fetch que caiu só precisa não vazar a rejeição.
+export function tolerarQueda() {}
+
 export function useServidorDesligado(): boolean {
   return useSyncExternalStore(assinar, () => desligado)
 }

@@ -1,0 +1,30 @@
+/* O seletor de modo: pílula de vidro fixa no canto superior direito (o vidro vem da regra compartilhada em lateral.css).
+   O polegar é uma pílula sólida, a mesma da ação principal, que desliza por transform: só o compositor trabalha. */
+.alternador { position: fixed; z-index: 6; top: 12px; right: 16px; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 3px; border-radius: 999px; view-transition-name: alternador; }
+.polegar { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 2); border-radius: 999px; background: var(--primario); box-shadow: 0 1px 3px rgb(0 0 0 / .2); transition: transform var(--duracao-longa) var(--curva), var(--transicao-cores); }
+.alternador[data-modo='arvore'] .polegar { transform: translateX(100%); }
+.alternador button { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 14px; border: 0; border-radius: 999px; background: transparent; color: var(--texto); transition: color var(--duracao-longa) var(--curva), background-color var(--duracao) var(--curva); }
+.alternador button[aria-checked='true'] { color: var(--primario-texto); }
+.alternador button[aria-checked='false']:hover { background: var(--botao-hover); }
+.alternador svg { width: 15px; height: 15px; flex: none; }
+
+/* A troca de modo (alternarModo, em modo.ts) roda numa View Transition: a tela inteira é uma foto só, viewport e não a página,
+   então o custo não cresce com o tamanho do diff. A tela nova se mistura por cima da antiga subindo um pouco; as duas usam a
+   mesma duração e curva para a soma das opacidades fechar em 1 e não escurecer no meio. O seletor sai da foto (tem nome próprio)
+   e fica vivo: o polegar desliza de verdade, em vez de aparecer já no lugar. */
+::view-transition-old(root) { animation: sumir var(--duracao-longa) var(--curva) both; }
+::view-transition-new(root) { animation: entrar var(--duracao-longa) var(--curva) both; }
+::view-transition-group(alternador) { animation: none; }
+::view-transition-old(alternador) { display: none; }
+::view-transition-new(alternador) { animation: none; }
+@keyframes sumir { to { opacity: 0; } }
+@keyframes entrar { from { opacity: 0; transform: translateY(6px) scale(.995); } }
+
+/* Em telas estreitas a lateral vira o topo da página: desce para o seletor não cobrir a marca. */
+@media (max-width: 860px) {
+  .pagina { padding-top: 56px; }
+  .alternador { right: 12px; }
+}
+
+/* Lugar do diff enquanto a troca de modo anima (ver DiffDosTrechos): leve, com a altura de um diff pequeno para a página não encolher. */
+.diff-adiado { min-height: 40vh; border-radius: var(--painel-raio); background: var(--painel-fundo); }

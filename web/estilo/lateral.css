@@ -3,7 +3,7 @@
 .cartao, .passo, .item, .linha-do-tempo, .fluxos-do-panorama a, .faltas, .alerta, .sucesso {
   background: var(--painel-fundo); border: 1px solid var(--painel-borda); border-radius: var(--painel-raio);
 }
-.lateral, .dicas, .ajuda, .mapa-do-fluxo {
+.lateral, .dicas, .alternador, .ajuda, .mapa-do-fluxo {
   background: var(--vidro-fundo); border: 1px solid var(--vidro-borda); border-radius: 20px;
   box-shadow: var(--vidro-brilho), var(--vidro-sombra);
   -webkit-backdrop-filter: var(--vidro-filtro); backdrop-filter: var(--vidro-filtro);
@@ -34,8 +34,10 @@
 
 /* Barra de botões flutuantes. Com a gaveta do mapa aberta, ela sobe para ficar acima da gaveta. */
 .dicas { position: fixed; z-index: 6; right: 16px; bottom: 16px; display: flex; gap: 4px; padding: 6px; border-radius: 999px; transition: transform var(--duracao-longa) var(--curva), var(--transicao-cores); }
-/* Sobe por transform (compositor) e não por bottom, que refaria o layout a cada quadro da subida da gaveta. */
-.pagina.com-mapa .dicas { transform: translateY(calc(-1 * (var(--gaveta) + 12px))); }
+/* Sobe por transform (compositor) e não por bottom, que refaria o layout a cada quadro da subida da gaveta: 12px da gaveta até a borda
+   e os 16px de bottom da própria barra deixam 16px livres acima do topo dela. O z-index fica abaixo da gaveta (5): na subida a barra
+   atravessa a área da gaveta e passa por trás dela, em vez de cobrir o painel. */
+.pagina.com-mapa .dicas { transform: translateY(calc(-1 * (var(--gaveta) + 12px))); z-index: 4; }
 .dicas button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; border-radius: 999px; padding: 5px 12px; color: var(--texto); }
 .dicas button:hover { background: var(--botao-hover); }
 .dicas svg { width: 16px; height: 16px; flex: none; }
