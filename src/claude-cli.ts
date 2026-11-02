@@ -16,19 +16,20 @@ export interface Resposta {
   erro: boolean                    // is_error: limite de uso atingido, por exemplo
 }
 
-// Devolve o motivo de não poder narrar, ou undefined com o login da assinatura em ordem.
-export async function verificarLogin(): Promise<string | undefined> {
+// Devolve o motivo de não poder narrar (sem motivo, o login da assinatura está em ordem) e o método de login
+// que o claude declarou, que o historico.jsonl guarda para provar que nenhuma chamada usou chave de API.
+export async function verificarLogin(): Promise<{ motivo?: string; metodo?: string }> {
   const { saida, falha } = await executar(['auth', 'status', '--json'])
-  if (falha === 'ENOENT') return 'o comando claude não está instalado, ou não está no PATH'
+  if (falha === 'ENOENT') return { motivo: 'o comando claude não está instalado, ou não está no PATH' }
   const status = lerJson(saida)
-  if (!status) return 'não entendi a resposta de claude auth status'
+  if (!status) return { motivo: 'não entendi a resposta de claude auth status' }
   const metodo = String(status.authMethod)
-  if (metodo === 'none' || status.loggedIn === false) return 'sem login: rode claude e entre com a sua conta'
-  if (!LOGINS_DA_ASSINATURA.includes(metodo)) return `o login por ${metodo} cobraria a API; o keg só narra com o login da assinatura`
+  if (metodo === 'none' || status.loggedIn === false) return { metodo, motivo: 'sem login: rode claude e entre com a sua conta' }
+  if (!LOGINS_DA_ASSINATURA.includes(metodo)) return { metodo, motivo: `o login por ${metodo} cobraria a API; o keg só narra com o login da assinatura` }
   // Uma chave que o filho ainda enxerga (apiKeyHelper, por exemplo) venceria a assinatura no -p.
   const chave = status.apiKeySource
-  if (typeof chave === 'string' && chave !== 'none') return `uma chave de API (${chave}) vale mais que a assinatura; o keg só narra com o login da assinatura`
-  return undefined
+  if (typeof chave === 'string' && chave !== 'none') return { metodo, motivo: `uma chave de API (${chave}) vale mais que a assinatura; o keg só narra com o login da assinatura` }
+  return { metodo }
 }
 
 export async function chamarClaude(modelo: string, prompt: string): Promise<Resposta> {

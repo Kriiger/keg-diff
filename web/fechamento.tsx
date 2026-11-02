@@ -1,12 +1,13 @@
 // Fechamento: responde "Terminei?". Cobertura, nota de controle e o feedback pronto para o agente.
 import { useEffect, useState } from 'react'
 import type { Estado, Nota, Revisao } from '../src/contrato'
+import { formatarTempo } from './cronometro'
 import type { Checklist } from './main'
-import { decididos } from './telas'
+import { decididos, useAtalhos } from './telas'
 
 type Secoes = Record<string, { titulo: string }>
 
-export function Fechamento({ revisao, checklist, estado, secoes }: { revisao: Revisao; checklist: Checklist; estado: Estado; secoes: Secoes }) {
+export function Fechamento({ revisao, checklist, estado, secoes, segundos }: { revisao: Revisao; checklist: Checklist; estado: Estado; secoes: Secoes; segundos: () => number }) {
   const total = checklist.todos.length
   const feitos = decididos(checklist.todos, estado)
   const [feedback, setFeedback] = useState('')
@@ -22,7 +23,7 @@ export function Fechamento({ revisao, checklist, estado, secoes }: { revisao: Re
   }, [])
 
   const darNota = (valor: number) => {
-    fetch('/api/nota', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nota: valor }) })
+    fetch('/api/nota', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nota: valor, segundos: segundos() }) })
       .then(r => r.json())
       .then(setNota)
   }
@@ -35,6 +36,9 @@ export function Fechamento({ revisao, checklist, estado, secoes }: { revisao: Re
     }
     setTimeout(() => setCopia(undefined), 2500)
   }
+
+  // Tudo pelo teclado: 1 a 5 dão a nota e y copia o feedback.
+  useAtalhos({ ...Object.fromEntries([1, 2, 3, 4, 5].map(valor => [String(valor), () => darNota(valor)])), y: copiar })
 
   const faltas = [
     ...checklist.fluxos.map(({ fluxo, hunkIds }) => ({ rota: `fluxo/${fluxo.id}`, titulo: fluxo.titulo, faltam: hunkIds.length - decididos(hunkIds, estado) })),
@@ -61,8 +65,10 @@ export function Fechamento({ revisao, checklist, estado, secoes }: { revisao: Re
       )}
       {divergencias > 0 && <p className="alerta grave">O manifesto do agente diverge do código em {divergencias} {divergencias === 1 ? 'ponto' : 'pontos'}: veja o <a href="#">Panorama</a>.</p>}
 
+      <p className="detalhe">Tempo ativo desta revisão: {formatarTempo(segundos())}. Ao chegar a 100%, o resumo vai para .revisao/historico.jsonl (veja com <code>keg historico</code>).</p>
+
       <h2>Sensação de controle</h2>
-      <p className="detalhe">De 1 a 5, o quanto você sabe o que o agente fez? Fica em .revisao/nota.json.</p>
+      <p className="detalhe">De 1 a 5, o quanto você sabe o que o agente fez? Fica em .revisao/nota.json. Pelo teclado: <kbd>1</kbd> a <kbd>5</kbd>.</p>
       <div className="botoes notas">
         {[1, 2, 3, 4, 5].map(valor => <button key={valor} className={nota?.nota === valor ? 'ativa' : ''} onClick={() => darNota(valor)}>{valor}</button>)}
       </div>
@@ -70,7 +76,7 @@ export function Fechamento({ revisao, checklist, estado, secoes }: { revisao: Re
       <h2>Feedback para o agente</h2>
       <pre className="feedback">{feedback}</pre>
       <div className="botoes">
-        <button className="ativa" onClick={copiar}>copiar como prompt</button>
+        <button className="ativa" onClick={copiar}>copiar como prompt <kbd>y</kbd></button>
         {copia === 'copiado' && <span className="detalhe">Copiado.</span>}
         {copia === 'falhou' && <span className="detalhe">O navegador não deixou copiar: selecione o texto acima.</span>}
       </div>

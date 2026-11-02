@@ -5,6 +5,7 @@ import path from 'node:path'
 import { verificarLogin } from './claude-cli.js'
 import type { EstadoDoNarrador, Revisao } from './contrato.js'
 import { narrarFluxo, PausaDaNarracao, preencherDoCache, type OpcoesDoNarrador } from './narrador.js'
+import type { Sessao } from './sessao.js'
 
 export class FilaDoNarrador {
   private motivo?: string
@@ -15,7 +16,7 @@ export class FilaDoNarrador {
   private rodando = false
   private arquivoDaRevisao: string
 
-  constructor(private raiz: string, private opcoes: OpcoesDoNarrador, private avisar: () => void) {
+  constructor(private raiz: string, private opcoes: OpcoesDoNarrador, private sessao: Sessao, private avisar: () => void) {
     this.arquivoDaRevisao = path.join(raiz, '.revisao', 'review.json')
     this.motivo = opcoes.semIa ? 'você rodou o keg diff com --sem-ia' : undefined
     // A trava de login roda antes da primeira chamada, e já na abertura da página, para o aviso aparecer logo.
@@ -42,7 +43,9 @@ export class FilaDoNarrador {
 
   private async conferirLogin() {
     if (this.opcoes.semIa) return
-    this.motivo = await verificarLogin()
+    const { motivo, metodo } = await verificarLogin()
+    this.motivo = motivo
+    this.sessao.definirLogin(metodo)
     this.avisar()
   }
 
@@ -69,11 +72,15 @@ export class FilaDoNarrador {
       return
     }
     try {
-      await narrarFluxo(fluxo, revisao, this.raiz, this.opcoes.modelo)
+      await narrarFluxo(fluxo, revisao, this.raiz, { modelo: this.opcoes.modelo, aoChamar: () => this.sessao.contarChamada() })
       this.gravarRevisao()
     } catch (erro) {
-      if (erro instanceof PausaDaNarracao) this.pausa = erro.message || 'o claude devolveu um erro'
-      else this.falhas[id] = erro instanceof Error ? erro.message : String(erro)
+      if (erro instanceof PausaDaNarracao) {
+        this.pausa = erro.message || 'o claude devolveu um erro'
+        this.sessao.contarLimite()
+      } else {
+        this.falhas[id] = erro instanceof Error ? erro.message : String(erro)
+      }
     }
   }
 

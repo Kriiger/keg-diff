@@ -1,29 +1,10 @@
 // Como ler o código do projeto: abrir com o tsconfig, reconhecer funções, nomes, diretivas e props.
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { Node, Project, SyntaxKind, ts } from 'ts-morph'
-import { caminhosDosPacotes } from './monorepo.js'
+import { Node, SyntaxKind } from 'ts-morph'
 
 // memo, forwardRef e useCallback embrulham a função, mas o nome continua sendo o da const.
 export const EMBRULHO = /^(React\.)?(memo|forwardRef|useCallback|useMemo|cache)$/
-
-export function abrirProjeto(raiz: string): Project {
-  const pacotes = caminhosDosPacotes(raiz)
-  const config = ['tsconfig.json', 'jsconfig.json'].map(nome => path.join(raiz, nome)).find(existsSync)
-  if (config) {
-    // Os paths do próprio tsconfig ganham dos pacotes do workspace.
-    const paths = { ...pacotes, ...ts.readConfigFile(config, ts.sys.readFile).config?.compilerOptions?.paths }
-    return new Project({ tsConfigFilePath: config, compilerOptions: { allowJs: true, paths } })
-  }
-  const projeto = new Project({
-    compilerOptions: {
-      allowJs: true, jsx: ts.JsxEmit.Preserve, module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.Bundler, baseUrl: raiz, paths: pacotes,
-    },
-  })
-  projeto.addSourceFilesAtPaths([`${raiz}/**/*.{ts,tsx,js,jsx,mjs,cjs}`, `!${raiz}/**/{node_modules,dist,build,.next}/**`])
-  return projeto
-}
 
 // main, module, bin e exports do package.json apontam para o build; o fonte costuma estar em src/.
 export function lerEntradasDoPacote(raiz: string): Set<string> {
@@ -166,12 +147,28 @@ export function semExtensao(caminho: string): string {
 export function tiposDe(no: Node): { entrada?: string; saida?: string } {
   if (Node.isSourceFile(no)) return {}
   if (!Node.isFunctionDeclaration(no) && !Node.isArrowFunction(no) && !Node.isFunctionExpression(no) && !Node.isMethodDeclaration(no)) {
-    return { saida: cortar(no.getType().getText(no)) }
+    return { saida: abreviarTipo(no.getType().getText(no)) }
   }
   const parametros = no.getParameters().map(p => p.getType().getText(p))
-  return { entrada: cortar(parametros.join(', ')), saida: cortar(no.getReturnType().getText(no)) }
+  return { entrada: abreviarTipo(parametros.join(', ')), saida: abreviarTipo(no.getReturnType().getText(no)) }
 }
 
-export function cortar(tipo: string): string {
-  return tipo.length > 60 ? tipo.slice(0, 59) + '…' : tipo
+const LIMITE_DA_ETIQUETA = 60
+
+// O compilador escreve o tipo de outro arquivo como import("/caminho/do/projeto/x").Nome. O caminho some,
+// e o nome fica. Um tipo ainda grande perde primeiro o miolo dos objetos ({ a: string; b: number } vira {…}),
+// porque o nome do alias e dos genéricos é o que o revisor reconhece; só depois disso corta o texto.
+export function abreviarTipo(tipo: string): string {
+  let texto = tipo.replace(/import\((["'])[^"']*\1\)\./g, '')
+  while (texto.length > LIMITE_DA_ETIQUETA) {
+    const objetos = texto.match(/\{(?:[^{}]|\{…\})+\}/g)
+    const maior = objetos?.reduce((a, b) => (b.length > a.length ? b : a))
+    if (!maior || maior === '{…}') break
+    texto = texto.replace(maior, '{…}')
+  }
+  return cortar(texto)
+}
+
+export function cortar(texto: string): string {
+  return texto.length > LIMITE_DA_ETIQUETA ? texto.slice(0, LIMITE_DA_ETIQUETA - 1) + '…' : texto
 }

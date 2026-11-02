@@ -1,6 +1,7 @@
 // O narrador na página: frases presas a linhas do diff, a frase mecânica quando não há IA e os avisos do topo.
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import type { EstadoDoNarrador, Fluxo, Passo } from '../src/contrato'
+import { escutar } from './eventos'
 
 export interface Narrador {
   estado?: EstadoDoNarrador
@@ -15,10 +16,10 @@ export function useNarrador(): Narrador {
   const [estado, setEstado] = useState<EstadoDoNarrador>()
   useEffect(() => {
     const ler = () => fetch('/api/narrador').then(r => r.json()).then(setEstado)
-    const eventos = new EventSource('/api/eventos')
-    eventos.addEventListener('open', ler)
-    eventos.addEventListener('narrador', ler)
-    return () => eventos.close()
+    const parar = [escutar('open', ler), escutar('narrador', ler)]
+    return () => {
+      for (const desfazer of parar) desfazer()
+    }
   }, [])
   const pedir = (fluxos: string[], retomar: boolean) => {
     fetch('/api/narrar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fluxos, retomar }) })

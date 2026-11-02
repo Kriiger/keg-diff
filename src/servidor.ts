@@ -9,7 +9,9 @@ import type { Estado, Revisao } from './contrato.js'
 import { gravarNota, lerEstado, lerNota } from './estado.js'
 import { gravarFeedback } from './feedback.js'
 import { FilaDoNarrador } from './fila-do-narrador.js'
+import { registrarRevisao } from './historico.js'
 import type { OpcoesDoNarrador } from './narrador.js'
+import { Sessao } from './sessao.js'
 
 const PASTA_DA_PAGINA = path.join(import.meta.dirname, 'web')
 const PORTA_PREFERIDA = 4747
@@ -25,11 +27,11 @@ interface Decisao {
   hunkIds: string[]
   decisao: Estado[string]['decisao'] | null    // null desfaz a decisão
   comentario?: string
+  segundos?: number                            // o cronômetro da página no momento da decisão
 }
 
 export async function abrirTela(raiz: string, opcoesDoNarrador: OpcoesDoNarrador): Promise<string> {
   const pastaDaRevisao = path.join(raiz, '.revisao')
-  const arquivoDeEstado = path.join(pastaDaRevisao, 'estado.json')
   const ouvintes = new Set<ServerResponse>()
   const avisar = (evento: string) => {
     for (const ouvinte of ouvintes) ouvinte.write(`event: ${evento}\ndata: {}\n\n`)
@@ -38,37 +40,39 @@ export async function abrirTela(raiz: string, opcoesDoNarrador: OpcoesDoNarrador
   watch(pastaDaRevisao, (_, nome) => {
     if (nome === 'review.json') avisar('revisao')
   })
-  const narrador = new FilaDoNarrador(raiz, opcoesDoNarrador, () => avisar('narrador'))
+  // A revisão que está aberta: o tempo e o consumo do narrador são dela, e ela vira uma linha do historico.jsonl.
+  const sessao = Sessao.abrir(pastaDaRevisao, (JSON.parse(readFileSync(path.join(pastaDaRevisao, 'review.json'), 'utf8')) as Revisao).base)
+  const narrador = new FilaDoNarrador(raiz, opcoesDoNarrador, sessao, () => avisar('narrador'))
 
-  const servidor = createServer(async (pedido, resposta) => {
-    const url = new URL(pedido.url ?? '/', 'http://127.0.0.1')
-    // Outro site no navegador não lê o seu código: só atende quem chama pelo endereço local.
-    if (!/^(127\.0\.0\.1|localhost):\d+$/.test(pedido.headers.host ?? '')) return responder(resposta, 403, 'endereço não permitido')
-    if (url.pathname === '/api/revisao') return enviarArquivo(resposta, path.join(pastaDaRevisao, 'review.json'))
-    if (url.pathname === '/api/estado' && pedido.method === 'POST') {
-      // JSON obrigatório: um formulário de outro site não consegue mandar esse tipo sem pedir licença ao navegador.
-      if (pedido.headers['content-type'] !== 'application/json') return responder(resposta, 415, 'envie JSON')
-      const estado = decidir(lerEstado(pastaDaRevisao), JSON.parse(await lerCorpo(pedido)))
-      writeFileSync(arquivoDeEstado, JSON.stringify(estado, null, 2) + '\n')
-      // O feedback.md acompanha cada decisão: quem lê o arquivo (o agente, por exemplo) nunca vê uma versão velha.
-      gravarFeedback(pastaDaRevisao)
-      return responderJson(resposta, estado)
-    }
-    if (url.pathname === '/api/estado') return responderJson(resposta, lerEstado(pastaDaRevisao))
-    if (url.pathname === '/api/feedback') return responder(resposta, 200, gravarFeedback(pastaDaRevisao))
-    if (url.pathname === '/api/nota' && pedido.method === 'POST') return receberNota(pedido, resposta, pastaDaRevisao)
-    if (url.pathname === '/api/nota') return responderJson(resposta, lerNota(pastaDaRevisao))
-    if (url.pathname === '/api/narrador') return responderJson(resposta, narrador.estado())
-    if (url.pathname === '/api/narrar' && pedido.method === 'POST') return pedirNarracao(pedido, resposta, narrador)
-    if (url.pathname === '/api/codigo') return enviarCodigo(resposta, raiz, url.searchParams)
-    if (url.pathname === '/api/eventos') {
+  type Rota = (pedido: IncomingMessage, resposta: ServerResponse, url: URL) => unknown
+  const rotas: Record<string, Rota> = {
+    'GET /api/revisao': (_, resposta) => enviarArquivo(resposta, path.join(pastaDaRevisao, 'review.json')),
+    'POST /api/estado': (pedido, resposta) => receberDecisao(pedido, resposta, pastaDaRevisao, sessao),
+    'GET /api/estado': (_, resposta) => responderJson(resposta, lerEstado(pastaDaRevisao)),
+    'GET /api/sessao': (pedido, resposta) => receberTempo(pedido, resposta, sessao),
+    'POST /api/sessao': (pedido, resposta) => receberTempo(pedido, resposta, sessao),
+    'GET /api/feedback': (_, resposta) => responder(resposta, 200, gravarFeedback(pastaDaRevisao)),
+    'POST /api/nota': (pedido, resposta) => receberNota(pedido, resposta, pastaDaRevisao, sessao),
+    'GET /api/nota': (_, resposta) => responderJson(resposta, lerNota(pastaDaRevisao)),
+    'GET /api/narrador': (_, resposta) => responderJson(resposta, narrador.estado()),
+    'POST /api/narrar': (pedido, resposta) => pedirNarracao(pedido, resposta, narrador),
+    'GET /api/codigo': (_, resposta, url) => enviarCodigo(resposta, raiz, url.searchParams),
+    'GET /api/eventos': (pedido, resposta) => {
       resposta.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
       // O comentário manda os cabeçalhos já: é o que dispara o "open" na página.
       resposta.write(': conectado\n\n')
       ouvintes.add(resposta)
       pedido.on('close', () => ouvintes.delete(resposta))
-      return
-    }
+    },
+  }
+
+  const servidor = createServer((pedido, resposta) => {
+    const url = new URL(pedido.url ?? '/', 'http://127.0.0.1')
+    // Outro site no navegador não lê o seu código: só atende quem chama pelo endereço local.
+    if (!/^(127\.0\.0\.1|localhost):\d+$/.test(pedido.headers.host ?? '')) return responder(resposta, 403, 'endereço não permitido')
+    const rota = rotas[`${pedido.method === 'POST' ? 'POST' : 'GET'} ${url.pathname}`]
+    // Corpo que não é JSON ou arquivo ilegível vira resposta de erro: a rejeição solta derrubaria o servidor no meio da revisão.
+    if (rota) return Promise.resolve().then(() => rota(pedido, resposta, url)).catch(() => responder(resposta, 400, 'pedido inválido'))
     enviarPagina(resposta, url.pathname)
   })
 
@@ -100,15 +104,56 @@ async function pedirNarracao(pedido: IncomingMessage, resposta: ServerResponse, 
   responderJson(resposta, narrador.estado())
 }
 
+// JSON obrigatório: um formulário de outro site não consegue mandar esse tipo sem pedir licença ao navegador.
+async function receberDecisao(pedido: IncomingMessage, resposta: ServerResponse, pastaDaRevisao: string, sessao: Sessao) {
+  if (pedido.headers['content-type'] !== 'application/json') return responder(resposta, 415, 'envie JSON')
+  const corpo: Decisao = JSON.parse(await lerCorpo(pedido))
+  const estado = decidir(lerEstado(pastaDaRevisao), corpo)
+  writeFileSync(path.join(pastaDaRevisao, 'estado.json'), JSON.stringify(estado, null, 2) + '\n')
+  // O feedback.md acompanha cada decisão: quem lê o arquivo (o agente, por exemplo) nunca vê uma versão velha.
+  gravarFeedback(pastaDaRevisao)
+  sessao.somarTempo(corpo.segundos)
+  registrar(pastaDaRevisao, sessao)
+  responderJson(resposta, estado)
+}
+
+// O cronômetro da página: GET devolve o que o servidor guardou (a página recarregada continua dali),
+// POST manda o que ela contou. O id muda quando uma sessão nova começa, e a página então recomeça do número do servidor.
+async function receberTempo(pedido: IncomingMessage, resposta: ServerResponse, sessao: Sessao) {
+  if (pedido.method === 'POST') {
+    if (pedido.headers['content-type'] !== 'application/json') return responder(resposta, 415, 'envie JSON')
+    try {
+      sessao.somarTempo(JSON.parse(await lerCorpo(pedido)).segundos)
+    } catch {
+      return responder(resposta, 400, 'JSON inválido')
+    }
+  }
+  responderJson(resposta, { id: sessao.iniciadoEm, segundos: sessao.segundos })
+}
+
 // A nota avalia a revisão que está aberta: a base vem do review.json, não da página.
-async function receberNota(pedido: IncomingMessage, resposta: ServerResponse, pastaDaRevisao: string) {
+async function receberNota(pedido: IncomingMessage, resposta: ServerResponse, pastaDaRevisao: string, sessao: Sessao) {
   if (pedido.headers['content-type'] !== 'application/json') return responder(resposta, 415, 'envie JSON')
   try {
     const revisao: Revisao = JSON.parse(readFileSync(path.join(pastaDaRevisao, 'review.json'), 'utf8'))
-    const nota = gravarNota(pastaDaRevisao, JSON.parse(await lerCorpo(pedido)).nota, revisao.base)
-    if (nota) return responderJson(resposta, nota)
+    const corpo = JSON.parse(await lerCorpo(pedido))
+    const nota = gravarNota(pastaDaRevisao, corpo.nota, revisao.base)
+    if (nota) {
+      sessao.somarTempo(corpo.segundos)
+      registrar(pastaDaRevisao, sessao)
+      return responderJson(resposta, nota)
+    }
   } catch {}
   responder(resposta, 400, 'a nota é um inteiro de 1 a 5')
+}
+
+// O histórico é um registro à parte: se a gravação falhar, a revisão segue e o terminal avisa.
+function registrar(pastaDaRevisao: string, sessao: Sessao) {
+  try {
+    registrarRevisao(pastaDaRevisao, sessao)
+  } catch (erro) {
+    console.error(`não consegui gravar o historico.jsonl: ${erro instanceof Error ? erro.message : erro}`)
+  }
 }
 
 function decidir(estado: Estado, { hunkIds, decisao, comentario }: Decisao): Estado {
@@ -138,7 +183,10 @@ function enviarPagina(resposta: ServerResponse, caminho: string) {
 
 function enviarArquivo(resposta: ServerResponse, arquivo: string) {
   if (!existsSync(arquivo)) return responder(resposta, 404, `não achei ${path.basename(arquivo)}`)
-  resposta.writeHead(200, { 'content-type': TIPOS[path.extname(arquivo)] ?? 'application/json; charset=utf-8' })
+  // O html aponta para os arquivos de assets/ pelo hash: sem no-cache, o navegador segue com o html velho e o bundle velho
+  // depois de uma versão nova. Os assets mudam de nome a cada build e podem ficar no cache.
+  const semCache = path.extname(arquivo) === '.html' ? { 'cache-control': 'no-cache' } : {}
+  resposta.writeHead(200, { 'content-type': TIPOS[path.extname(arquivo)] ?? 'application/json; charset=utf-8', ...semCache })
   resposta.end(readFileSync(arquivo))
 }
 

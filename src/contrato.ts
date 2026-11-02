@@ -149,3 +149,21 @@ export interface EstadoDoNarrador {
   falhas: Record<string, string>   // id do fluxo -> o que deu errado nele
   modelo: string
 }
+
+// .revisao/historico.jsonl — uma linha por revisão que chegou a 100%, com os números da tabela "Como medir" do Roteiro 1.
+// iniciadoEm identifica a revisão: gravar de novo a mesma revisão (nota dada depois, um trecho refeito no --watch)
+// substitui a linha, nunca acrescenta outra.
+export interface LinhaDoHistorico {
+  iniciadoEm: string               // ISO
+  registradoEm: string             // ISO, da última gravação desta linha
+  base: string
+  tempoSegundos: number            // tempo ativo da página (aba visível), da abertura aos 100%
+  achados: { comentarios: number; codigoMorto: number }
+  passos: { total: number; falsosPositivos: number }  // total: passos alterados dos fluxos mais os órfãos
+  divergenciasDoManifesto: number
+  arquivosNovos: number
+  arquivosAlterados: number
+  trechos: number
+  nota: number | null              // do Fechamento; null enquanto a pessoa não deu
+  narrador: { chamadas: number; avisosDeLimite: number; login: string | null }  // login: authMethod do claude; null sem narrador
+}

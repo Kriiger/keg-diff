@@ -5,6 +5,7 @@ import type { Estado, Fluxo, Passo, Revisao } from '../src/contrato'
 import { AlertasDoManifesto } from './divergencias'
 import type { Checklist, Decidir, Decisao, Item } from './main'
 import { BotaoNarrarTodos, FrasesDoPasso, semNarracao, type Narrador } from './narracao'
+import { indiceInicial, useCursor, type Navegacao } from './proximo'
 
 // O mesmo limite do cli.ts: acima disso a revisão não fecha.
 const TRECHOS_DEMAIS = 40
@@ -14,13 +15,14 @@ const TECLAS: Record<Decisao, string> = { revisado: 'x', 'codigo-morto': 'd', 'f
 // O mapa leva o React Flow e o ELK (mais de 1 MB): só baixa quando alguém aperta m.
 const Mapa = lazy(() => import('./mapa'))
 
-interface Contexto {
+export interface Contexto {
   revisao: Revisao
   estado: Estado
   decidir: Decidir
   ladoALado: boolean
   narrador: Narrador
   mapa: { aberto: boolean; alternar: () => void }
+  navegacao: Navegacao
 }
 
 // "e89d090ae0d6...bf157df72e51" vira "e89d090...bf157df", como o git log --oneline mostra.
@@ -92,11 +94,12 @@ export function Panorama({ revisao, checklist, estado, narrador }: { revisao: Re
   )
 }
 
-export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrador, mapa, passoInicial }: Contexto & { fluxo: Fluxo; passoInicial?: string }) {
-  // Abre no passo que o mapa pediu ou, sem pedido, no primeiro passo alterado que ainda espera decisão.
+export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrador, mapa, navegacao, passoInicial }: Contexto & { fluxo: Fluxo; passoInicial?: string }) {
+  // Abre no passo que o n ou o mapa pediu ou, sem pedido, no primeiro passo alterado que ainda espera decisão.
   const [indice, setIndice] = useState(() => {
     const pedido = fluxo.passos.findIndex(p => p.id === passoInicial)
-    return pedido >= 0 ? pedido : Math.max(0, fluxo.passos.findIndex(p => decididos(p.hunkIds, estado) < p.hunkIds.length))
+    if (pedido >= 0) return pedido
+    return indiceInicial(navegacao, `fluxo/${fluxo.id}`) ?? Math.max(0, fluxo.passos.findIndex(p => decididos(p.hunkIds, estado) < p.hunkIds.length))
   })
   const [comentando, setComentando] = useState(false)
   const [destaque, setDestaque] = useState<[number, number] | null>(null)
@@ -113,6 +116,7 @@ export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrad
     setDestaque(null)
     setIndice(atual => Math.min(Math.max(atual + passos, 0), fluxo.passos.length - 1))
   }
+  useCursor(navegacao, `fluxo/${fluxo.id}`, indice, destino => andar(destino - indice))
   const marcar = () => {
     if (passo.hunkIds.length === 0) return andar(1)
     const pronto = passo.hunkIds.every(id => estado[id]?.decisao === 'revisado')
@@ -161,9 +165,9 @@ export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrad
   )
 }
 
-export function TelaDeTrechos(props: Contexto & { titulo: string; explicacao: string; itens: Item[]; opcoes: readonly Decisao[] }) {
-  const { titulo, explicacao, itens, opcoes, revisao, estado, decidir, ladoALado } = props
-  const [indice, setIndice] = useState(0)
+export function TelaDeTrechos(props: Contexto & { rota: string; titulo: string; explicacao: string; itens: Item[]; opcoes: readonly Decisao[] }) {
+  const { rota, titulo, explicacao, itens, opcoes, revisao, estado, decidir, ladoALado, navegacao } = props
+  const [indice, setIndice] = useState(() => indiceInicial(navegacao, rota) ?? 0)
   const [comentando, setComentando] = useState(false)
   useEffect(() => {
     document.getElementById(`item-${indice}`)?.scrollIntoView({ block: 'nearest' })
@@ -172,6 +176,7 @@ export function TelaDeTrechos(props: Contexto & { titulo: string; explicacao: st
     setComentando(false)
     setIndice(atual => Math.min(Math.max(atual + passos, 0), itens.length - 1))
   }
+  useCursor(navegacao, rota, indice, destino => andar(destino - indice))
   const alternar = (decisao: Decisao) => {
     const item = itens[indice]
     if (!item || !opcoes.includes(decisao)) return

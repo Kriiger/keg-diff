@@ -2,16 +2,17 @@
 // keg diff [argumentos do git diff]: analisa o diff, grava .revisao/review.json e mostra os fluxos em texto.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { isMainThread, parentPort, Worker, workerData } from 'node:worker_threads'
-import { Analisador, type Config } from './analisador.js'
-import { coletarDiff, git } from './coletor.js'
+import type { Config } from './analisador.js'
+import { git } from './coletor.js'
 import type { Revisao } from './contrato.js'
 import { gravarFeedback } from './feedback.js'
+import { lerHistorico } from './historico.js'
 import { aplicarManifesto } from './manifesto.js'
-import { montarRevisao } from './montador.js'
 import { lerModelo, preencherDoCache, type OpcoesDoNarrador } from './narrador.js'
 import { observarProjeto } from './observador.js'
+import { resumirHistorico } from './resumo-do-historico.js'
 import { abrirTela } from './servidor.js'
+import { Motor, type Analise, type Tempos } from './trabalhador.js'
 
 const AJUDA = `uso: keg diff [--sem-tela] [--sem-ia] [--watch] [argumentos do git diff]
 
@@ -22,20 +23,22 @@ const AJUDA = `uso: keg diff [--sem-tela] [--sem-ia] [--watch] [argumentos do gi
   keg diff --sem-tela      só grava o review.json, sem abrir a página
   keg diff --sem-ia        sem o narrador: os passos mostram só a frase mecânica
   keg diff --watch         observa os arquivos e analisa de novo quando o agente corrige
+  keg historico [n]        resumo das últimas n revisões (10 por padrão), com as medianas
 
 Rode dentro do pacote que mudou. O resultado vai para .revisao/review.json
 e a página de revisão abre no navegador até você apertar Ctrl+C.
 Se o agente gravou .revisao/manifesto.json, o Panorama mostra onde ele e o código discordam.
-As suas decisões viram .revisao/feedback.md, o texto para devolver ao agente.`
+As suas decisões viram .revisao/feedback.md, o texto para devolver ao agente.
+Cada revisão que chega a 100% vira uma linha em .revisao/historico.jsonl.`
 
 // Acima disso a revisão não fecha: melhor pedir ao agente que fatie a tarefa.
 const TRECHOS_DEMAIS = 40
 
-if (isMainThread) await rodar()
-else analisarNaThread()
+await rodar()
 
 async function rodar() {
   const [comando, ...argumentos] = process.argv.slice(2)
+  if (comando === 'historico') return console.log(resumirHistorico(lerHistorico(path.join(process.cwd(), '.revisao')), Number(argumentos[0]) || undefined))
   const argsDoGit = argumentos.filter(arg => !['--sem-tela', '--sem-ia', '--watch'].includes(arg))
   const semIa = argumentos.includes('--sem-ia')
   const observar = argumentos.includes('--watch')
@@ -52,35 +55,42 @@ async function rodar() {
     process.exit(1)
   }
 
+  exigirRepositorio()
+  const raiz = process.cwd()
+  const inicio = performance.now()
+  const narrador = { semIa, modelo: lerModelo(raiz) }
+  const motor = new Motor(raiz, lerConfig(raiz))
+  // Antes da análise: o manifesto que o agente gravou em .revisao/ não pode entrar no diff como arquivo novo.
+  esconderDoGit()
+  const { revisao, tempos } = await gerarRevisao(motor, argsDoGit, raiz, narrador)
+  imprimir(revisao, descreverTempos(performance.now() - inicio, tempos))
+  // Só o --watch precisa da thread de análise viva depois da primeira vez.
+  if (!observar) motor.encerrar()
+  if (!comTela) return
+  console.log(`\nPágina de revisão em ${await abrirTela(raiz, narrador)} · Ctrl+C para sair`)
+  if (observar) {
+    console.log('Observando os arquivos do projeto: a página atualiza quando algo mudar.')
+    observarProjeto(raiz, () => reanalisar(motor, argsDoGit, raiz, narrador))
+  }
+}
+
+function exigirRepositorio() {
   try {
     git(['rev-parse', '--show-toplevel'])
   } catch {
     console.error('keg diff precisa rodar dentro de um repositório git.')
     process.exit(1)
   }
+}
 
-  const raiz = process.cwd()
-  const pastaDaRevisao = path.join(raiz, '.revisao')
-  const arquivoDeConfig = path.join(pastaDaRevisao, 'keg.config.json')
-  const config: Config = existsSync(arquivoDeConfig) ? JSON.parse(readFileSync(arquivoDeConfig, 'utf8')) : {}
-
-  const inicio = performance.now()
-  const narrador = { semIa, modelo: lerModelo(raiz) }
-  // Antes da análise: o manifesto que o agente gravou em .revisao/ não pode entrar no diff como arquivo novo.
-  esconderDoGit()
-  const revisao = await gerarRevisao(argsDoGit, raiz, config, narrador)
-  imprimir(revisao, performance.now() - inicio)
-  if (!comTela) return
-  console.log(`\nPágina de revisão em ${await abrirTela(raiz, narrador)} · Ctrl+C para sair`)
-  if (observar) {
-    console.log('Observando os arquivos do projeto: a página atualiza quando algo mudar.')
-    observarProjeto(raiz, () => reanalisar(argsDoGit, raiz, config, narrador))
-  }
+function lerConfig(raiz: string): Config {
+  const arquivo = path.join(raiz, '.revisao', 'keg.config.json')
+  return existsSync(arquivo) ? JSON.parse(readFileSync(arquivo, 'utf8')) : {}
 }
 
 // Analisa e grava o review.json. O que já foi narrado fica no cache; com --sem-ia, nenhuma frase da IA aparece.
-async function gerarRevisao(argsDoGit: string[], raiz: string, config: Config, narrador: OpcoesDoNarrador): Promise<Revisao> {
-  const revisao = await analisar(argsDoGit, raiz, config)
+async function gerarRevisao(motor: Motor, argsDoGit: string[], raiz: string, narrador: OpcoesDoNarrador): Promise<Analise> {
+  const { revisao, tempos } = await motor.analisar(argsDoGit)
   aplicarManifesto(revisao, raiz)
   if (!narrador.semIa) preencherDoCache(revisao, raiz, narrador.modelo)
   const pastaDaRevisao = path.join(raiz, '.revisao')
@@ -89,38 +99,33 @@ async function gerarRevisao(argsDoGit: string[], raiz: string, config: Config, n
   const provisorio = path.join(pastaDaRevisao, 'review.json.tmp')
   writeFileSync(provisorio, JSON.stringify(revisao, null, 2) + '\n')
   renameSync(provisorio, path.join(pastaDaRevisao, 'review.json'))
-  return revisao
+  return { revisao, tempos }
 }
 
 // Uma análise do --watch. A decisão de cada trecho está presa ao hash dele, então o que o agente mudou volta
 // para "não revisado" e o resto mantém a decisão; só o feedback.md precisa ser regerado. Análise que falha
 // (arquivo no meio de uma edição, por exemplo) deixa o review.json anterior e tenta de novo na próxima mudança.
-async function reanalisar(argsDoGit: string[], raiz: string, config: Config, narrador: OpcoesDoNarrador) {
+async function reanalisar(motor: Motor, argsDoGit: string[], raiz: string, narrador: OpcoesDoNarrador) {
   const inicio = performance.now()
   const hora = new Date().toLocaleTimeString()
   try {
-    const revisao = await gerarRevisao(argsDoGit, raiz, config, narrador)
+    const { revisao, tempos } = await gerarRevisao(motor, argsDoGit, raiz, narrador)
     gravarFeedback(path.join(raiz, '.revisao'))
     const trechos = revisao.arquivos.reduce((total, a) => total + a.hunks.length, 0)
-    console.log(`${hora} · analisado de novo: ${revisao.fluxos.length} fluxos · ${revisao.orfaos.length} órfãos · ${trechos} trechos · ${((performance.now() - inicio) / 1000).toFixed(1)}s`)
+    console.log(`${hora} · analisado de novo: ${revisao.fluxos.length} fluxos · ${revisao.orfaos.length} órfãos · ${trechos} trechos · ${descreverTempos(performance.now() - inicio, tempos)}`)
   } catch (erro) {
     console.error(`${hora} · a análise falhou, a página segue com a anterior: ${erro instanceof Error ? erro.message : erro}`)
   }
 }
 
-// O compilador desce recursivo pelos imports, e a cadeia de tipos de uma biblioteca grande, como o Shiki,
-// estoura a pilha padrão do Node. A análise roda numa thread com pilha folgada.
-function analisar(argsDoGit: string[], raiz: string, config: Config): Promise<Revisao> {
-  const thread = new Worker(new URL(import.meta.url), { workerData: { argsDoGit, raiz, config }, resourceLimits: { stackSizeMb: 64 } })
-  return new Promise((resolver, rejeitar) => {
-    thread.once('message', resolver)
-    thread.once('error', rejeitar)
-  })
+// O tempo de cada análise, com o que foi para o Project do ts-morph e o que foi para montar os fluxos.
+function descreverTempos(milissegundos: number, tempos: Tempos): string {
+  const projeto = tempos.projetoEmMemoria ? 'projeto em memória' : 'projeto aberto'
+  return `${duracao(milissegundos)} (${projeto} ${duracao(tempos.projetoMs)}, fluxos ${duracao(tempos.fluxosMs)})`
 }
 
-function analisarNaThread() {
-  const { argsDoGit, raiz, config } = workerData
-  parentPort!.postMessage(montarRevisao(coletarDiff(argsDoGit), new Analisador(raiz, config), argsDoGit.join(' ') || 'HEAD'))
+function duracao(milissegundos: number): string {
+  return milissegundos < 1000 ? `${Math.round(milissegundos)} ms` : `${(milissegundos / 1000).toFixed(1)}s`
 }
 
 // .revisao/ é da máquina de quem revisa: vai para o .git/info/exclude, sem mexer no .gitignore do projeto.
@@ -132,12 +137,12 @@ function esconderDoGit() {
   appendFileSync(exclude, `${atual === '' || atual.endsWith('\n') ? '' : '\n'}.revisao/\n`)
 }
 
-function imprimir(revisao: Revisao, milissegundos: number) {
+function imprimir(revisao: Revisao, tempo: string) {
   const { metricas, fluxos, orfaos, testes, arquivos } = revisao
   const trechos = arquivos.flatMap(a => a.hunks.map(h => h.id))
   const emFluxo = new Set(fluxos.flatMap(f => f.passos.flatMap(p => p.hunkIds)))
   const linhas = [
-    `keg diff · ${revisao.base} · ${arquivos.length} arquivos (${metricas.arquivosNovos} novos) · ${trechos.length} trechos · ${(milissegundos / 1000).toFixed(1)}s`,
+    `keg diff · ${revisao.base} · ${arquivos.length} arquivos (${metricas.arquivosNovos} novos) · ${trechos.length} trechos · ${tempo}`,
     '',
   ]
   if (trechos.length > TRECHOS_DEMAIS) linhas.push(`atenção: ${trechos.length} trechos é muito para uma revisão; peça ao agente para fatiar a tarefa`, '')

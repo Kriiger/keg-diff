@@ -26,7 +26,10 @@ keg diff main...HEAD     # o branch inteiro
 keg diff --sem-tela      # só grava o review.json, sem abrir a página
 keg diff --sem-ia        # sem o narrador: cada passo mostra só a frase mecânica
 keg diff --watch         # fica observando os arquivos e analisa de novo quando o agente corrige
+keg historico            # resumo das últimas revisões e as medianas (keg historico 20 mostra 20)
 ```
+
+O terminal mostra o tempo de cada análise, dividido em abrir o projeto no ts-morph e montar os fluxos (por exemplo, `9.8s (projeto aberto 2.4s, fluxos 6.9s)`). Num projeto grande a primeira análise demora, e o `--watch` cuida do resto: o ts-morph e a thread de análise ficam vivos entre uma análise e outra, e só os arquivos que mudaram são lidos de novo (`projeto em memória`). Num monorepo de 1.700 arquivos, cada análise nova cai de uns 9,5 s para uns 3 s; mudar o `tsconfig`, o `package.json` ou o lockfile reabre o projeto inteiro.
 
 A saída mostra cada fluxo do nasce ao termina, com os passos alterados (●) e os de contexto (○), e os órfãos: trechos alterados que não estão em nenhum caminho entre uma fonte e uma saída. Arquivos de teste ficam numa lista à parte.
 
@@ -38,9 +41,38 @@ Em seguida a página de revisão abre no navegador, servida em `http://127.0.0.1
 - **Fechamento:** responde "terminei?". Mostra a cobertura (com destaque em 100%), o que ainda falta, uma nota de 1 a 5 para a sensação de controle e o feedback pronto para o agente, com o botão "copiar como prompt".
 - **Órfãos, testes e outros trechos:** o que não entrou em fluxo, cada um com o seu diff. Órfão recebe revisado, código morto ou falso positivo.
 
-Atalhos: `j` e `k` passam de passo, `x` marca revisado, `c` comenta, `d` e `f` marcam código morto e falso positivo nos órfãos, `m` abre e fecha o mapa do fluxo, `v` alterna o diff entre lado a lado e empilhado, `p` volta ao panorama, `t` abre o fechamento, `?` mostra a ajuda. Rodar o `keg diff` de novo em outro terminal atualiza a página aberta.
+Atalhos (a mesma lista aparece na ajuda, tecla `?`), todos fora das caixas de texto:
+
+| Tecla | O que faz |
+| --- | --- |
+| `j` `k` | próximo e anterior: passo no fluxo, item nas listas |
+| `n` | vai ao próximo trecho ainda não revisado, em qualquer tela, depois do ponto onde você está e dando a volta; sem nenhum, abre o fechamento |
+| `[` `]` | fluxo anterior e próximo; depois do último fluxo vêm órfãos, testes e outros trechos |
+| `x` | marca revisado (de novo desfaz) |
+| `c` | comenta; `esc` cancela e `⌘↵` salva |
+| `d` `f` | código morto e falso positivo, nos órfãos |
+| `v` | diff lado a lado ou empilhado |
+| `m` | abre e fecha o mapa do fluxo |
+| `p` `t` | volta ao panorama; abre o fechamento |
+| `1` a `5` `y` | no fechamento: dá a nota; copia o feedback como prompt |
+| `esc` `?` | fecha a ajuda, o mapa ou o comentário; abre e fecha a ajuda |
+
+Rodar o `keg diff` de novo em outro terminal atualiza a página aberta. Se o `keg diff` for interrompido (Ctrl+C), a página mostra "Servidor desligado" e tenta reconectar com esperas cada vez maiores (2 s até 30 s), sem tentar com a aba escondida; o botão "Tentar agora" força uma tentativa.
 
 Cada decisão fica presa ao hash do trecho: se o agente mudar o trecho depois, ele volta para "não revisado". Sem terminal (num script ou num agente), o keg não abre a página.
+
+## Histórico
+
+Cada revisão que chega a 100% (todos os trechos com decisão) vira uma linha em `.revisao/historico.jsonl`, com os números da tabela "Como medir" do Roteiro 1. `keg historico` imprime as últimas e as medianas de tempo, achados, nota e taxa de falso positivo; se essa taxa passar de 1 em cada 10 passos, avisa que o motor precisa de ajuste.
+
+```json
+{"iniciadoEm":"2026-11-02T03:14:44.270Z","registradoEm":"2026-11-02T03:15:16.861Z","base":"HEAD","tempoSegundos":312,"achados":{"comentarios":2,"codigoMorto":1},"passos":{"total":14,"falsosPositivos":1},"divergenciasDoManifesto":1,"arquivosNovos":2,"arquivosAlterados":3,"trechos":9,"nota":4,"narrador":{"chamadas":3,"avisosDeLimite":0,"login":"claude.ai"}}
+```
+
+- **Tempo:** segundos com a aba à vista, da abertura da página até os 100%. O servidor guarda o total em `.revisao/sessao.json`, então recarregar a página ou reiniciar o `keg diff` no meio (mesma base, menos de 12 horas) não zera o relógio. Parou nos 100% e voltou a cair (o agente corrigiu algo no `--watch`)? O relógio volta a correr até os 100% de novo.
+- **Quando grava:** o servidor confere a cobertura a cada decisão e a cada nota, e grava quando chega a 100%. Revisão abandonada antes disso não deixa linha, para não enviesar as medianas. A nota dada depois dos 100% atualiza a mesma linha; uma nota de revisão anterior não vale. Cada revisão tem uma linha só (a chave é `iniciadoEm`): gravar de novo troca a linha em vez de acrescentar.
+- **Passos:** `passos.total` soma os passos alterados dos fluxos e os órfãos; `falsosPositivos` conta os órfãos marcados assim.
+- **Narrador:** `chamadas` conta cada execução do `claude -p` (a repetição por JSON inválido inclusive), `avisosDeLimite` as pausas por limite de uso e `login` o método que o `claude auth status` declarou.
 
 ## Agentes
 
@@ -83,7 +115,7 @@ Cada passo alterado ganha até três frases curtas, cada uma presa a linhas do p
 - **Sob demanda:** uma chamada por fluxo, quando você o abre; o Panorama tem o botão "Narrar todos". O resultado fica em `.revisao/cache/`, e fluxo sem trecho novo não é narrado de novo.
 - **Trava de login:** antes da primeira chamada, o keg roda `claude auth status`. Só narra com `claude.ai` ou `oauth_token`; com chave de API ou provedor de terceiros não narra e mostra o motivo no topo da página, e sem login pede para você entrar com `claude` (depois, rode o `keg diff` de novo). O processo do narrador nasce sem `ANTHROPIC_API_KEY` e as outras variáveis de chave, numa pasta temporária vazia.
 - **Pausa:** uma resposta com erro, como o limite de uso, pausa a narração e mostra um aviso com o botão "Tentar de novo". Nada se repete sozinho.
-- **Sem narrador:** com `--sem-ia`, sem login ou em pausa, o passo mostra uma frase mecânica montada do grafo ("recebe X de Y, chama Z e entrega W a Y"), e a página diz o motivo.
+- **Sem narrador:** com `--sem-ia`, sem login ou em pausa, o passo mostra uma frase mecânica montada do grafo ("recebe X de Y, chama Z e entrega W a Y"), e a página diz o motivo. Os tipos dessa frase e das etiquetas saem sem o `import("...")` do compilador e, acima de 60 caracteres, perdem primeiro o miolo dos objetos (`{ a: string; b: number }` vira `{…}`), para o nome do tipo e dos genéricos continuar legível.
 - **Modelo:** `sonnet`. Para trocar, crie `keg.config.json` na raiz do projeto: `{ "narrador": { "modelo": "opus" } }`.
 
 ## O que fica no seu projeto
@@ -95,6 +127,8 @@ Cada passo alterado ganha até três frases curtas, cada uma presa a linhas do p
 | `.revisao/manifesto.json` | Escrito pelo agente executor: o fluxo que ele diz ter feito |
 | `.revisao/feedback.md` | Comentários e código morto, prontos para colar no agente |
 | `.revisao/nota.json` | A nota de 1 a 5 do Fechamento |
+| `.revisao/historico.jsonl` | Uma linha por revisão fechada em 100%: tempo, achados, falso positivo, nota e consumo do narrador |
+| `.revisao/sessao.json` | A revisão em andamento: o tempo contado pela página e as chamadas do narrador |
 | `.revisao/cache/` | As frases do narrador, uma por fluxo narrado |
 | `.revisao/keg.config.json` | Opcional: chamadas próprias da equipe, como `{ "nasce": ["api.get"], "termina": ["api.post", "api.*"] }` |
 

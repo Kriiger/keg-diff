@@ -36,12 +36,14 @@ export function lerModelo(raiz: string): string {
 }
 
 // Deixa a narração do fluxo no cache; quem chama a aplica ao review.json com preencherDoCache.
-export async function narrarFluxo(fluxo: Fluxo, revisao: Revisao, raiz: string, modelo: string) {
+// aoChamar avisa de cada chamada ao claude, antes dela, para a conta do consumo não depender de a chamada dar certo.
+export async function narrarFluxo(fluxo: Fluxo, revisao: Revisao, raiz: string, { modelo, aoChamar }: { modelo: string; aoChamar: () => void }) {
   const prompt = montarPrompt(fluxo, revisao, raiz)
   const arquivo = arquivoDoCache(raiz, prompt, modelo)
   if (existsSync(arquivo)) return
   // JSON fora do formato ganha uma nova tentativa, uma só.
   for (let tentativa = 0; tentativa < 2; tentativa++) {
+    aoChamar()
     const resposta = await chamarClaude(modelo, prompt)
     if (resposta.erro) throw new PausaDaNarracao(resposta.texto)
     const narracao = validar(resposta.texto, fluxo, modelo)

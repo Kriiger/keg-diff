@@ -7,7 +7,7 @@ import {
   METODO_HTTP, PAGINA_DO_APP, PAGINA_DO_PAGES, ROTA_DO_APP, ROTA_DO_PAGES, metodoDaChamada, padraoDaRota, pesoDaRota, regraDaConfig, tipoDoSql,
 } from './catalogo.js'
 import {
-  EMBRULHO, abrirProjeto, atributoDeEvento, caminhoDaUrl, carregadoPorHtml, chamadaQueRecebe, cortar, declaracaoDe, declaracoesDoModulo, diretiva, diretivaDaFuncao,
+  EMBRULHO, atributoDeEvento, caminhoDaUrl, carregadoPorHtml, chamadaQueRecebe, cortar, declaracaoDe, declaracoesDoModulo, diretiva, diretivaDaFuncao,
   ehFuncao, ehRedirecionamento, ehSetterDeEstado, lerEntradasDoPacote, propDoComponente, nomeDe, normalizar, semExtensao, usaRetorno,
 } from './sintaxe.js'
 
@@ -37,15 +37,13 @@ export interface Unidade {
 export interface Config { nasce?: string[]; termina?: string[] }
 
 export class Analisador {
-  private projeto: Project
   private unidades = new Map<Node, Unidade>()
   private exportsPorArquivo = new Map<SourceFile, ReturnType<SourceFile['getExportedDeclarations']>>()
   private rotas?: { padrao: RegExp; arquivo: SourceFile; app: boolean; dinamicos: number }[]
   private entradasDoPacote: Set<string>
   private regrasDaConfig: [RegExp, string][]
 
-  constructor(private raiz: string, config: Config) {
-    this.projeto = abrirProjeto(raiz)
+  constructor(private raiz: string, config: Config, private projeto: Project) {
     this.entradasDoPacote = lerEntradasDoPacote(raiz)
     this.regrasDaConfig = [
       ...(config.nasce ?? []).map(padrao => regraDaConfig(padrao, 'config')),
