@@ -19,6 +19,7 @@ import { recarregarSeChunkSumiu } from './chunks'
 import { ModoArvore } from './arvore'
 import { useCronometro } from './cronometro'
 import { escutar, reconectar, tolerarQueda, useServidorDesligado } from './eventos'
+import type { ComentarLinha } from './comentarios-de-linha'
 import { Fechamento } from './fechamento'
 import { atenderJanelaExterna, ehJanelaExterna } from './janela-do-mapa'
 import { MapaExterno } from './mapa-externo'
@@ -123,6 +124,13 @@ function App() {
       .catch(tolerarQueda)
   }
 
+  // O comentário de uma linha do diff: o trecho, a posição da linha nele e o texto (vazio apaga).
+  const comentarLinha: ComentarLinha = (hunkId, linha, comentario, tipoDoComentario) =>
+    fetch('/api/comentario-de-linha', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hunkId, linha, comentario, tipoDoComentario, segundos: segundos() }) })
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then(novo => { setEstado(novo); return true })
+      .catch(() => false)
+
   const escolherAchados: EscolherAchados = (chaves, incluir) => {
     fetch('/api/achados', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chaves, incluir }) })
       .then(r => r.json())
@@ -134,13 +142,13 @@ function App() {
   if (!revisao || !checklist) return <p className="aviso-central">Carregando…</p>
   const fluxoAberto = checklist.fluxos.find(f => `fluxo/${f.fluxo.id}` === rota)?.fluxo
   const mapa = { aberto: mapaAberto, alternar: () => setMapaAberto(aberto => !aberto) }
-  const contexto = { revisao, estado, decidir, achados, escolherAchados, ladoALado, narrador, mapa, navegacao }
+  const contexto = { revisao, estado, decidir, comentarLinha, achados, escolherAchados, ladoALado, narrador, mapa, navegacao }
   const avisoDeServidor = desligado && <p className="alerta grave servidor-desligado" role="alert">Servidor desligado. Rode <code>keg diff</code> de novo: a página reconecta sozinha. <button onClick={reconectar}>Tentar agora</button></p>
 
   return (
     <div className={modo === 'fluxo' && mapaAberto && fluxoAberto ? 'pagina com-mapa' : 'pagina'}>
       {modo === 'arvore'
-        ? <ModoArvore revisao={revisao} estado={estado} decidir={decidir} ladoALado={ladoALado} cabeca={<CabecaDaLateral revisao={revisao} checklist={checklist} estado={estado} />}>{avisoDeServidor}</ModoArvore>
+        ? <ModoArvore revisao={revisao} estado={estado} decidir={decidir} comentarLinha={comentarLinha} ladoALado={ladoALado} cabeca={<CabecaDaLateral revisao={revisao} checklist={checklist} estado={estado} />}>{avisoDeServidor}</ModoArvore>
         : <>
           <LateralDoFluxo revisao={revisao} checklist={checklist} estado={estado} endereco={rota} secoes={SECOES} />
           <main className="conteudo">

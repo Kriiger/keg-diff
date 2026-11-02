@@ -69,7 +69,7 @@ export function TelaDoFluxo(props: PropsDaTela) {
   )
 }
 
-function PassoAPasso({ fluxo, revisao, estado, decidir, achados, escolherAchados, ladoALado, narrador, mapa, navegacao, indice, setIndice }: PropsDaTela & { indice: number; setIndice: (indice: number | ((atual: number) => number)) => void }) {
+function PassoAPasso({ fluxo, revisao, estado, decidir, comentarLinha, achados, escolherAchados, ladoALado, narrador, mapa, navegacao, indice, setIndice }: PropsDaTela & { indice: number; setIndice: (indice: number | ((atual: number) => number)) => void }) {
   const [comentando, setComentando] = useState(false)
   const [destaque, setDestaque] = useState<[number, number] | null>(null)
   const passo = fluxo.passos[indice] ?? fluxo.passos[0]!
@@ -148,7 +148,7 @@ function PassoAPasso({ fluxo, revisao, estado, decidir, achados, escolherAchados
             {(passo.avisos ?? []).map(aviso => <p key={aviso} className="alerta">{aviso}</p>)}
             <Decisoes hunkIds={passo.hunkIds} opcoes={['revisado']} estado={estado} decidir={decidir} comentando={comentando} setComentando={setComentando} />
             {passo.hunkIds.length > 0
-              ? <DiffDosTrechos revisao={revisao} arquivo={passo.arquivo} hunkIds={passo.hunkIds} ladoALado={ladoALado} destaque={destaque} />
+              ? <DiffDosTrechos revisao={revisao} arquivo={passo.arquivo} hunkIds={passo.hunkIds} estado={estado} comentarLinha={comentarLinha} ladoALado={ladoALado} destaque={destaque} />
               : <CodigoDoPasso key={passo.id} passo={passo} />}
           </>}
         </article>

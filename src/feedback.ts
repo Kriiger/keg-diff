@@ -1,10 +1,11 @@
-// Feedback para o agente: os comentários, as frases do narrador que a pessoa escolheu e os órfãos marcados como código morto
+// Feedback para o agente: os comentários (do trecho ou de uma linha, de correção ou dúvida), as frases do narrador que a pessoa escolheu e os órfãos marcados como código morto
 // viram .revisao/feedback.md. O arquivo é gerado do review.json, do estado.json e do achados.json, então um trecho que o agente
 // mudou depois (hash novo) perde o comentário e a frase sozinho: o que já foi corrigido não volta no prompt.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { chaveDaFrase, type AchadosEscolhidos, type Estado, type Frase, type Revisao } from './contrato.js'
 import { lerAchados, lerEstado } from './estado.js'
+import { linhasDoTrecho, nomeDaLinha } from './linhas.js'
 
 // Um lugar do diff onde uma decisão pode estar: passo de fluxo, órfão, teste ou trecho solto.
 interface Lugar { arquivo: string; linha?: number; simbolo?: string; hunkIds: string[]; orfao: boolean; frases?: Frase[] }
@@ -61,17 +62,37 @@ export function gravarFeedback(pastaDaRevisao: string): string {
 }
 
 function ajustesDaRevisao(revisao: Revisao, estado: Estado, achados: AchadosEscolhidos): Ajuste[] {
-  return lugares(revisao).flatMap(lugar => ajustesDe(lugar, estado, achados))
+  // O comentário de linha guarda a posição da linha no corpo do trecho; o número de verdade vem do patch de agora.
+  const patches = new Map(revisao.arquivos.flatMap(a => a.hunks.map(h => [h.id, h.patch] as const)))
+  return lugares(revisao).flatMap(lugar => ajustesDe(lugar, estado, achados, patches))
 }
 
-function ajustesDe(lugar: Lugar, estado: Estado, achados: AchadosEscolhidos): Ajuste[] {
+function ajustesDe(lugar: Lugar, estado: Estado, achados: AchadosEscolhidos, patches: Map<string, string>): Ajuste[] {
   const decisoes = lugar.hunkIds.map(id => estado[id]).filter(d => d !== undefined)
   const onde = `${lugar.arquivo}${lugar.linha ? `:${lugar.linha}` : ''}${lugar.simbolo ? ` (${lugar.simbolo})` : ''}`
   // O comentário vale com qualquer marca: revisado e comentado convivem.
   const comentarios = decisoes.filter(d => d.comentario).map(d => ({ tipo: d.tipoDoComentario === 'duvida' ? 'duvida' as const : 'comentario' as const, texto: `${onde}: ${d.comentario!.trim()}` }))
+  const deLinha = lugar.hunkIds.flatMap(id => comentariosDeLinha(lugar, estado[id]?.linhas, patches.get(id)))
   const narrador = (lugar.frases ?? []).filter(f => achados[chaveDaFrase(lugar.hunkIds, f.texto)]).map(f => ({ tipo: 'narrador' as const, texto: `${ondeDaFrase(lugar, f)}: ${fraseDoNarrador(f.texto)} ${SUFIXO_DO_NARRADOR}` }))
   const morto = lugar.orfao && decisoes.some(d => d.decisao === 'codigo-morto') ? [{ tipo: 'codigo-morto' as const, texto: `${onde}: código morto, apague.` }] : []
-  return [...comentarios, ...narrador, ...morto]
+  return [...comentarios, ...deLinha, ...narrador, ...morto]
+}
+
+// Um item por comentário de linha, com a linha exata: "arquivo:42 (símbolo): texto". A linha removida não existe no código de agora,
+// então o item diz que é uma linha removida do código de antes e mostra o que ela tinha. Posição que o patch não tem mais é ignorada.
+function comentariosDeLinha({ arquivo, simbolo }: Lugar, comentarios: NonNullable<Estado[string]['linhas']> | undefined, patch: string | undefined): Ajuste[] {
+  if (!comentarios || !patch) return []
+  const linhas = linhasDoTrecho(patch)
+  const nomeDoSimbolo = simbolo ? ` (${simbolo})` : ''
+  return Object.entries(comentarios).sort(([a], [b]) => Number(a) - Number(b)).flatMap(([posicao, comentario]) => {
+    const linha = linhas.find(l => l.indice === Number(posicao))
+    if (!linha || !comentario.texto.trim()) return []
+    const tipo = comentario.tipo === 'duvida' ? 'duvida' as const : 'comentario' as const
+    const texto = comentario.texto.trim()
+    if (linha.lado === 'novo') return [{ tipo, texto: `${arquivo}:${nomeDaLinha(linha)}${nomeDoSimbolo}: ${texto}` }]
+    const conteudo = linha.conteudo.trim().slice(0, 80)
+    return [{ tipo, texto: `${arquivo}${nomeDoSimbolo}, ${nomeDaLinha(linha)} do código antigo${conteudo ? ` (\`${conteudo}\`)` : ''}: ${texto}` }]
+  })
 }
 
 // A frase aponta para linhas do passo; sem âncora, vale a linha de início do passo, como nos outros itens.

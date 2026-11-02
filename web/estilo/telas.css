@@ -92,6 +92,12 @@ a:focus-visible { border-radius: 10px; }
 .tipo-do-comentario { display: block; margin-bottom: 2px; font-size: 12px; color: var(--suave); text-transform: uppercase; letter-spacing: 0.04em; }
 .comentario textarea { width: 100%; min-height: 84px; font: inherit; padding: 10px 12px; border-radius: var(--painel-raio); border: 1px solid var(--painel-borda); background: var(--botao-fundo); color: inherit; margin-bottom: 8px; resize: vertical; }
 .comentario textarea:focus { border-color: var(--acento); outline: none; }
+/* O comentário de linha mora dentro do diff, embaixo da linha. Ele herda a fonte e a cor do diff (a monoespaçada, no escuro e no claro),
+   então tudo é dito de novo aqui. Sem blur nem altura animada: o diff é a parte cara da página. */
+.comentario-de-linha { margin: 6px 12px 8px 56px; padding: 8px 12px; border-radius: 8px; background: var(--painel-solido); box-shadow: inset 3px 0 0 var(--acento); color: var(--texto); font: var(--peso-texto) 13px/1.5 var(--fonte); text-align: left; white-space: normal; }
+.comentario-de-linha .comentario { margin-top: 0; }
+.comentario-de-linha.salvo p { margin: 0 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comentario-de-linha .botoes button { font-size: 12px; }
 blockquote { margin: 12px 0 0; padding: 8px 14px; border-radius: 8px; background: var(--botao-fundo); box-shadow: inset 3px 0 0 var(--suave); white-space: pre-wrap; }
 
 /* O código e o diff ficam numa superfície opaca: a translucidez só emoldura, nunca atrapalha a leitura. */

@@ -1,7 +1,9 @@
 // As telas da revisão fora do fluxo (a do fluxo é tela-do-fluxo.tsx): as listas de trechos, o diff dos trechos e os atalhos de uma letra.
-import { PatchDiff } from '@pierre/diffs/react'
-import { useEffect, useRef, useState } from 'react'
+import { PatchDiff, type FileDiffOptions } from '@pierre/diffs/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AchadosEscolhidos, Estado, Revisao } from '../src/contrato'
+import { temComentario } from '../src/linhas'
+import { useComentariosDeLinha, type Anotacao, type ComentarLinha } from './comentarios-de-linha'
 import { Decisoes } from './decisoes'
 import type { Decidir, Decisao, EscolherAchados, Item } from './main'
 import { useTrocando } from './modo'
@@ -16,6 +18,7 @@ export interface Contexto {
   revisao: Revisao
   estado: Estado
   decidir: Decidir
+  comentarLinha: ComentarLinha
   achados: AchadosEscolhidos
   escolherAchados: EscolherAchados
   ladoALado: boolean
@@ -52,7 +55,7 @@ export function useAtalhos(atalhos: Record<string, () => void>) {
 }
 
 export function TelaDeTrechos(props: Contexto & { rota: string; titulo: string; explicacao: string; itens: Item[]; opcoes: readonly Decisao[] }) {
-  const { rota, titulo, explicacao, itens, opcoes, revisao, estado, decidir, ladoALado, navegacao } = props
+  const { rota, titulo, explicacao, itens, opcoes, revisao, estado, decidir, comentarLinha, ladoALado, navegacao } = props
   const [indice, setIndice] = useState(() => indiceInicial(navegacao, rota) ?? 0)
   const [comentando, setComentando] = useState(false)
   useEffect(() => {
@@ -86,7 +89,7 @@ export function TelaDeTrechos(props: Contexto & { rota: string; titulo: string; 
           <h2><span className="marcador">{marcador(item.hunkIds, estado)}</span> {item.titulo}</h2>
           {item.detalhe && <p className="detalhe">{item.detalhe}</p>}
           <Decisoes hunkIds={item.hunkIds} opcoes={opcoes} estado={estado} decidir={decidir} comentando={comentando && i === indice} setComentando={setComentando} />
-          <DiffDosTrechos revisao={revisao} arquivo={item.arquivo} hunkIds={item.hunkIds} ladoALado={ladoALado} />
+          <DiffDosTrechos revisao={revisao} arquivo={item.arquivo} hunkIds={item.hunkIds} estado={estado} comentarLinha={comentarLinha} ladoALado={ladoALado} />
         </article>
       ))}
     </section>
@@ -96,22 +99,31 @@ export function TelaDeTrechos(props: Contexto & { rota: string; titulo: string; 
 // Os trechos do review.json vêm sem linhas de contexto: o patch mostra só o que mudou.
 // O diff mostra exatamente os trechos que a decisão marca, nem mais nem menos.
 // "destaque" são as linhas da âncora da frase sob o mouse, no lado novo do arquivo.
-export function DiffDosTrechos({ revisao, arquivo, hunkIds, ladoALado, destaque }: { revisao: Revisao; arquivo: string; hunkIds: string[]; ladoALado: boolean; destaque?: [number, number] | null }) {
+// O "+" ao lado do número de cada linha abre o comentário daquela linha (comentarios-de-linha.tsx).
+export function DiffDosTrechos({ revisao, arquivo, hunkIds, estado, comentarLinha, ladoALado, destaque }: { revisao: Revisao; arquivo: string; hunkIds: string[]; estado: Estado; comentarLinha: ComentarLinha; ladoALado: boolean; destaque?: [number, number] | null }) {
   const tema = useTema()
   const trocando = useTrocando()
   const alterado = revisao.arquivos.find(a => a.caminho === arquivo)
-  const hunks = alterado?.hunks.filter(h => hunkIds.includes(h.id)) ?? []
+  // Os trechos só mudam com a revisão ou com a escolha do passo: a identidade estável poupa o trabalho dos comentários de linha.
+  const chaveDosTrechos = hunkIds.join()
+  const hunks = useMemo(() => alterado?.hunks.filter(h => hunkIds.includes(h.id)) ?? [], [alterado, chaveDosTrechos])
+  const { lineAnnotations, renderAnnotation, emEdicao, aoClicarNoMais } = useComentariosDeLinha(hunks, estado, comentarLinha)
+  // As opções são comparadas campo a campo, e um valor novo desenha o diff inteiro de novo: só mudam com o tema e a visão.
+  const opcoes = useMemo<FileDiffOptions<Anotacao, undefined>>(
+    () => ({ diffStyle: ladoALado ? 'split' : 'unified', theme: TEMAS, themeType: MODOS[tema], overflow: 'wrap', enableGutterUtility: true, onGutterUtilityClick: aoClicarNoMais }),
+    [ladoALado, tema, aoClicarNoMais],
+  )
   if (!alterado || hunks.length === 0) return null
   // Na troca de modo o diff espera a animação acabar: montá-lo dentro dela travava a transição.
   if (trocando) return <div className="diff-adiado" aria-hidden="true" />
   const antes = alterado.status === 'novo' ? '/dev/null' : `a/${arquivo}`
   const depois = alterado.status === 'removido' ? '/dev/null' : `b/${arquivo}`
   const patch = [`diff --git a/${arquivo} b/${arquivo}`, `--- ${antes}`, `+++ ${depois}`, ...hunks.map(h => h.patch)].join('\n') + '\n'
-  const selecionadas = destaque ? { start: destaque[0], end: destaque[1], side: 'additions' as const, endSide: 'additions' as const } : null
-  return <PatchDiff patch={patch} selectedLines={selecionadas} options={{ diffStyle: ladoALado ? 'split' : 'unified', theme: TEMAS, themeType: MODOS[tema], overflow: 'wrap' }} />
+  const selecionadas = destaque ? { start: destaque[0], end: destaque[1], side: 'additions' as const, endSide: 'additions' as const } : emEdicao
+  return <PatchDiff patch={patch} selectedLines={selecionadas} lineAnnotations={lineAnnotations} renderAnnotation={renderAnnotation} options={opcoes} />
 }
 
 export function marcador(hunkIds: string[], estado: Estado): string {
   if (decididos(hunkIds, estado) < hunkIds.length) return '●'
-  return hunkIds.some(id => estado[id]?.comentario) ? '✎' : '✓'
+  return hunkIds.some(id => temComentario(estado[id])) ? '✎' : '✓'
 }

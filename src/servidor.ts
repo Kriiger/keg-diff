@@ -6,7 +6,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net'
 import path from 'node:path'
 import type { Revisao } from './contrato.js'
-import { aplicarAchados, aplicarDecisao, gravarAchados, gravarNota, lerAchados, lerEstado, lerNota, TIPOS_DE_COMENTARIO, type PedidoDeDecisao } from './estado.js'
+import { aplicarAchados, aplicarComentarioDeLinha, aplicarDecisao, chaveDeLinhaValida, gravarAchados, gravarNota, lerAchados, lerEstado, lerNota, TIPOS_DE_COMENTARIO, type PedidoDeComentarioDeLinha, type PedidoDeDecisao } from './estado.js'
 import { gravarFeedback } from './feedback.js'
 import { FilaDoNarrador } from './fila-do-narrador.js'
 import { registrarRevisao } from './historico.js'
@@ -42,6 +42,7 @@ export async function abrirTela(raiz: string, opcoesDoNarrador: OpcoesDoNarrador
     'GET /api/revisao': (_, resposta) => enviarArquivo(resposta, path.join(pastaDaRevisao, 'review.json')),
     'POST /api/estado': (pedido, resposta) => receberDecisao(pedido, resposta, pastaDaRevisao, sessao),
     'GET /api/estado': (_, resposta) => responderJson(resposta, lerEstado(pastaDaRevisao)),
+    'POST /api/comentario-de-linha': (pedido, resposta) => receberComentarioDeLinha(pedido, resposta, pastaDaRevisao, sessao),
     'POST /api/achados': (pedido, resposta) => receberAchados(pedido, resposta, pastaDaRevisao, sessao),
     'GET /api/achados': (_, resposta) => responderJson(resposta, lerAchados(pastaDaRevisao)),
     'GET /api/sessao': (pedido, resposta) => receberTempo(pedido, resposta, sessao),
@@ -107,6 +108,22 @@ async function receberDecisao(pedido: IncomingMessage, resposta: ServerResponse,
   const estado = aplicarDecisao(lerEstado(pastaDaRevisao), corpo)
   writeFileSync(path.join(pastaDaRevisao, 'estado.json'), JSON.stringify(estado, null, 2) + '\n')
   // O feedback.md acompanha cada decisão: quem lê o arquivo (o agente, por exemplo) nunca vê uma versão velha.
+  gravarFeedback(pastaDaRevisao)
+  sessao.somarTempo(corpo.segundos)
+  registrar(pastaDaRevisao, sessao)
+  responderJson(resposta, estado)
+}
+
+// O comentário de uma linha do trecho: o corpo diz o trecho, a posição da linha no corpo dele e o texto (vazio apaga).
+async function receberComentarioDeLinha(pedido: IncomingMessage, resposta: ServerResponse, pastaDaRevisao: string, sessao: Sessao) {
+  if (pedido.headers['content-type'] !== 'application/json') return responder(resposta, 415, 'envie JSON')
+  const corpo: PedidoDeComentarioDeLinha = JSON.parse(await lerCorpo(pedido))
+  if (typeof corpo.hunkId !== 'string' || corpo.hunkId === '' || !chaveDeLinhaValida(corpo.linha) || typeof corpo.comentario !== 'string') {
+    return responder(resposta, 400, 'envie { hunkId: string, linha: "posição da linha no trecho", comentario: string }')
+  }
+  if (corpo.tipoDoComentario !== undefined && !TIPOS_DE_COMENTARIO.includes(corpo.tipoDoComentario)) return responder(resposta, 400, 'tipoDoComentario deve ser "corrija" ou "duvida"')
+  const estado = aplicarComentarioDeLinha(lerEstado(pastaDaRevisao), corpo)
+  writeFileSync(path.join(pastaDaRevisao, 'estado.json'), JSON.stringify(estado, null, 2) + '\n')
   gravarFeedback(pastaDaRevisao)
   sessao.somarTempo(corpo.segundos)
   registrar(pastaDaRevisao, sessao)

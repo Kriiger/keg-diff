@@ -1,6 +1,7 @@
 // O modo árvore: a lateral mostra as pastas com os arquivos alterados e a área principal mostra o diff do arquivo escolhido.
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import type { ArquivoAlterado, Estado, Revisao } from '../src/contrato'
+import type { ComentarLinha } from './comentarios-de-linha'
 import { Decisoes } from './decisoes'
 import { Icone } from './icones'
 import { MoldeDaLateral, SecaoRecolhivel } from './lateral'
@@ -32,7 +33,7 @@ interface PropsDaLista {
 }
 
 // "cabeca" é o topo da lateral (marca e progresso), igual ao do modo fluxo; "children" são os avisos do topo da página.
-export function ModoArvore({ revisao, estado, decidir, ladoALado, cabeca, children }: { revisao: Revisao; estado: Estado; decidir: Decidir; ladoALado: boolean; cabeca: ReactNode; children: ReactNode }) {
+export function ModoArvore({ revisao, estado, decidir, comentarLinha, ladoALado, cabeca, children }: { revisao: Revisao; estado: Estado; decidir: Decidir; comentarLinha: ComentarLinha; ladoALado: boolean; cabeca: ReactNode; children: ReactNode }) {
   const nos = useMemo(() => montarArvore(revisao.arquivos), [revisao])
   const ordem = useMemo(() => arquivosEmOrdem(nos), [nos])
   const [escolhido, setEscolhido] = useState(ultimoEscolhido)
@@ -82,7 +83,7 @@ export function ModoArvore({ revisao, estado, decidir, ladoALado, cabeca, childr
       <main className="conteudo">
         {children}
         {atual
-          ? <ArquivoEscolhido revisao={revisao} arquivo={atual} estado={estado} decidir={decidir} ladoALado={ladoALado} comentando={comentando} setComentando={setComentando} />
+          ? <ArquivoEscolhido revisao={revisao} arquivo={atual} estado={estado} decidir={decidir} comentarLinha={comentarLinha} ladoALado={ladoALado} comentando={comentando} setComentando={setComentando} />
           : <p className="detalhe">Nenhum arquivo alterado.</p>}
       </main>
     </>
@@ -140,12 +141,13 @@ interface PropsDoArquivo {
   arquivo: ArquivoAlterado
   estado: Estado
   decidir: Decidir
+  comentarLinha: ComentarLinha
   ladoALado: boolean
   comentando: boolean
   setComentando: (comentando: boolean) => void
 }
 
-function ArquivoEscolhido({ revisao, arquivo, estado, decidir, ladoALado, comentando, setComentando }: PropsDoArquivo) {
+function ArquivoEscolhido({ revisao, arquivo, estado, decidir, comentarLinha, ladoALado, comentando, setComentando }: PropsDoArquivo) {
   const hunkIds = arquivo.hunks.map(h => h.id)
   return (
     <section className="tela-do-arquivo" key={arquivo.caminho}>
@@ -157,7 +159,7 @@ function ArquivoEscolhido({ revisao, arquivo, estado, decidir, ladoALado, coment
       {arquivo.renomeadoDe && <p className="detalhe">Renomeado de {arquivo.renomeadoDe}.</p>}
       <Decisoes hunkIds={hunkIds} opcoes={['revisado']} estado={estado} decidir={decidir} comentando={comentando} setComentando={setComentando} />
       {hunkIds.length > 0
-        ? <DiffDosTrechos revisao={revisao} arquivo={arquivo.caminho} hunkIds={hunkIds} ladoALado={ladoALado} />
+        ? <DiffDosTrechos revisao={revisao} arquivo={arquivo.caminho} hunkIds={hunkIds} estado={estado} comentarLinha={comentarLinha} ladoALado={ladoALado} />
         : <p className="detalhe">Sem mudança de conteúdo: o arquivo só mudou de lugar.</p>}
     </section>
   )

@@ -1,11 +1,11 @@
 // Os botões de decisão de um passo ou item, e a caixa de comentário.
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Estado, TipoDoComentario } from '../src/contrato'
 import type { Decidir, Decisao } from './main'
 
 const NOMES: Record<Decisao, string> = { revisado: 'Revisado', 'codigo-morto': 'Código morto', 'falso-positivo': 'Falso positivo', comentado: 'Comentado' }
 const TECLAS: Record<Decisao, string> = { revisado: 'x', 'codigo-morto': 'd', 'falso-positivo': 'f', comentado: 'c' }
-const TIPOS: Record<TipoDoComentario, string> = { corrija: 'Corrija', duvida: 'Dúvida' }
+export const TIPOS: Record<TipoDoComentario, string> = { corrija: 'Corrija', duvida: 'Dúvida' }
 
 interface PropsDasDecisoes {
   hunkIds: string[]
@@ -49,9 +49,23 @@ export function Decisoes({ hunkIds, opcoes, estado, decidir, comentando, setCome
   )
 }
 
-function CaixaDeComentario({ inicial, tipoInicial, salvar, cancelar }: { inicial: string; tipoInicial: TipoDoComentario; salvar: (texto: string, tipo: TipoDoComentario) => void; cancelar: () => void }) {
+// Também é a caixa do comentário de linha, que mora dentro do diff (comentarios-de-linha.tsx).
+export function CaixaDeComentario({ inicial, tipoInicial, salvar, cancelar }: { inicial: string; tipoInicial: TipoDoComentario; salvar: (texto: string, tipo: TipoDoComentario) => void; cancelar: () => void }) {
   const [texto, setTexto] = useState(inicial)
   const [tipo, setTipo] = useState(tipoInicial)
+  // Dentro do diff a caixa nasce antes da linha dela existir (o diff desenha depois do React): um autoFocus só falharia, então
+  // tenta de novo a cada quadro até pegar (no máximo 40, uns 0,6 s).
+  const campo = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    let quadro = 0
+    let tentativas = 0
+    const focar = () => {
+      campo.current?.focus()
+      if (campo.current && document.activeElement !== campo.current && ++tentativas < 40) quadro = requestAnimationFrame(focar)
+    }
+    focar()
+    return () => cancelAnimationFrame(quadro)
+  }, [])
   const alternar = () => setTipo(atual => (atual === 'corrija' ? 'duvida' : 'corrija'))
   return (
     <div className="comentario">
@@ -62,7 +76,7 @@ function CaixaDeComentario({ inicial, tipoInicial, salvar, cancelar }: { inicial
         <span className="detalhe"><kbd>⌥D</kbd> alterna</span>
       </div>
       <textarea
-        autoFocus value={texto} placeholder={tipo === 'duvida' ? 'O que o agente precisa responder aqui?' : 'O que o agente precisa ajustar aqui?'} onChange={e => setTexto(e.target.value)}
+        ref={campo} value={texto} placeholder={tipo === 'duvida' ? 'O que o agente precisa responder aqui?' : 'O que o agente precisa ajustar aqui?'} onChange={e => setTexto(e.target.value)}
         onKeyDown={e => {
           if (e.key === 'Escape') cancelar()
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) salvar(texto, tipo)

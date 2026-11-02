@@ -194,16 +194,27 @@ export interface Metricas {
 // .revisao/estado.json — a tela escreve; a chave é o hash do hunk,
 // então um trecho que o agente mudar depois volta sozinho para "não revisado".
 // "decisao" é a marca do trecho; "comentario" é um anexo independente dela: o trecho pode estar revisado e comentado.
-// 'comentado' só aparece quando há comentário e nenhuma outra marca.
+// 'comentado' só aparece quando há comentário (o geral ou o de uma linha) e nenhuma outra marca.
 // "tipoDoComentario" diz o que o comentário pede ao agente: 'corrija' é uma ordem (vira item do "Corrija cada item no código") e 'duvida'
 // é uma pergunta (vira item de "Responda cada pergunta", sem mudar o código). Ausente = 'corrija': estado.json antigo continua valendo.
 // O tipo é do comentário: sem comentário, não existe.
+// "linhas" são os comentários de uma linha do trecho (o "+" ao lado do número, no diff). A chave é a posição da linha no corpo do
+// trecho (0 = a primeira depois do "@@"), não o número dela no arquivo: o id do trecho é o hash do corpo e sobrevive a uma edição
+// acima dele, que muda os números mas não as posições. O número de verdade sai do cabeçalho atual (ver linhas.ts).
+// O comentário de linha também conta como comentário: uma entrada só com "linhas" (sem marca nem comentário geral) tem decisao 'comentado'.
 export type TipoDoComentario = 'corrija' | 'duvida'
+
+export interface ComentarioDeLinha {
+  texto: string
+  tipo?: TipoDoComentario          // ausente = 'corrija'
+  em: string
+}
 
 export type Estado = Record<string, {
   decisao: 'revisado' | 'codigo-morto' | 'falso-positivo' | 'comentado'
   comentario?: string
   tipoDoComentario?: TipoDoComentario
+  linhas?: Record<string, ComentarioDeLinha>
   em: string
 }>
 
