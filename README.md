@@ -47,7 +47,7 @@ Em seguida a página de revisão abre no navegador, servida em `http://127.0.0.1
 - **Fluxo:** a linha do tempo nasce → processa → termina à esquerda e o diff do passo à direita. Passo de contexto mostra o código atual.
 - **Mapa:** responde "quem chama isso?" sem sair do fluxo. Abre num painel embaixo da tela (tecla `m` ou o botão Mapa), com o diff do passo ainda em cima. O React Flow desenha e o ELK organiza em camadas, da fonte à esquerda até a saída à direita. Nó alterado é cheio; vizinho sem alteração é tracejado; o passo atual mostra quem o chama, e clicar num nó mostra os vizinhos dele e, se ele é um passo ou um trecho alterado, leva até ele (também em outro fluxo). A fronteira cliente/servidor aparece como uma faixa. As ligações têm traço próprio, com legenda no cabeçalho: chamada (contínua), `http` (o `fetch` para uma rota do projeto, tracejada), `dinâmico` (o callback passado em prop, que o compilador não prova, traço e ponto), `usa tipo` (o tipo ou a interface numa anotação, pontilhada fina com ponta só de contorno) e `volta` (a ligação que anda para trás num ciclo, em roxo e com o rótulo). Apontar um bloco ou uma ligação (mouse ou Tab) isola o que importa e esmaece o resto: as ligações que saem do bloco ficam em azul e as que chegam, na cor do texto, e cada bloco ligado ganha uma etiqueta (`chama`, `chamado`, `ida e volta`), então o destaque não depende só da cor. Clicar num bloco ou numa ligação mantém o destaque (o bloco leva a etiqueta `fixado`), e clicar no fundo solta. O passo atual leva uma barra à esquerda. O mapa abre inteiro quando cabe num zoom legível; quando não cabe, abre no passo atual com quem se liga a ele e o cabeçalho avisa "+N fora da vista" (`f` ou o botão mostra tudo). O Tab percorre os blocos, o Enter age como o clique. O grafo vem do `review.json` (campo `grafo`): as funções alteradas, os passos dos fluxos e os vizinhos até 2 saltos, com no máximo 5 vizinhos por lado e o aviso "+N" do que ficou de fora.
 - **Modo árvore:** o jeito tradicional de ler um diff, ao lado do modo fluxo. Um seletor em pílula (Fluxo | Árvore) fica no canto superior direito e a tecla `v` faz o mesmo; as setas movem entre as duas opções e a troca é uma transição suave (View Transitions, sem animação com movimento reduzido); a escolha fica neste navegador, em `keg-modo`. A lateral vira a árvore de pastas com os arquivos alterados: pastas recolhíveis, pasta com uma única subpasta compactada (`src/web/estilo`), pastas antes de arquivos em ordem alfabética, a letra do status (A adicionado, M modificado, D removido, R renomeado), `+N −M` por arquivo e o total em cada pasta. A área principal mostra o diff inteiro do arquivo escolhido, com o mesmo componente do modo fluxo. `j` `k` andam pelos arquivos na ordem da lateral, `x` marca o arquivo inteiro como revisado e `c` comenta. `n`, `[`, `]`, `p` e `t` só valem no modo fluxo. O renome vem do git (`-M`) no campo `renomeadoDe` do `review.json`; um renome sem mudança de conteúdo aparece sem diff.
-- **Fechamento:** responde "terminei?". Mostra a cobertura (com destaque em 100%), o que ainda falta, uma nota de 1 a 5 para a sensação de controle e o feedback pronto para o agente, com o botão "copiar como prompt".
+- **Fechamento:** responde "terminei?". Mostra a cobertura (com destaque em 100%), o que ainda falta, uma nota de 1 a 5 para a sensação de controle, os **achados do Claude** e o feedback pronto para o agente, com o botão "copiar como prompt". Em "Achados do Claude" ficam as frases com `atenção:` que o narrador escreveu em todos os passos alterados, cada uma com uma caixa de seleção e o link para o passo: marcada, a frase entra no feedback ("incluir todos" e "tirar todos" mexem em todas de uma vez). As outras frases do narrador também podem ir, pelo botão "+ correção" no fim da linha delas, no próprio passo. Comentar e marcar como revisado convivem: o comentário é um anexo do trecho, e marcar, desmarcar ou trocar a marca não o apaga (o botão vira "Editar comentário"; salvar o texto vazio é o que o remove).
 - **Órfãos, testes e outros trechos:** o que não entrou em fluxo, cada um com o seu diff. Órfão recebe revisado, código morto ou falso positivo.
 
 Atalhos (a mesma lista aparece na ajuda, tecla `?`), todos fora das caixas de texto:
@@ -79,9 +79,10 @@ Cada decisão fica presa ao hash do trecho: se o agente mudar o trecho depois, e
 Cada revisão que chega a 100% (todos os trechos com decisão) vira uma linha em `.revisao/historico.jsonl`, com os números da tabela "Como medir" do Roteiro 1. `keg historico` imprime as últimas e as medianas de tempo, achados, nota e taxa de falso positivo; se essa taxa passar de 1 em cada 10 passos, avisa que o motor precisa de ajuste.
 
 ```json
-{"iniciadoEm":"2026-11-02T03:14:44.270Z","registradoEm":"2026-11-02T03:15:16.861Z","base":"HEAD","tempoSegundos":312,"achados":{"comentarios":2,"codigoMorto":1},"passos":{"total":14,"falsosPositivos":1},"divergenciasDoManifesto":1,"arquivosNovos":2,"arquivosAlterados":3,"trechos":9,"nota":4,"narrador":{"chamadas":3,"avisosDeLimite":0,"login":"claude.ai"}}
+{"iniciadoEm":"2026-11-02T03:14:44.270Z","registradoEm":"2026-11-02T03:15:16.861Z","base":"HEAD","tempoSegundos":312,"achados":{"comentarios":2,"codigoMorto":1,"narrador":1},"passos":{"total":14,"falsosPositivos":1},"divergenciasDoManifesto":1,"arquivosNovos":2,"arquivosAlterados":3,"trechos":9,"nota":4,"narrador":{"chamadas":3,"avisosDeLimite":0,"login":"claude.ai"}}
 ```
 
+- **Achados:** `achados` soma os comentários, os órfãos de código morto e as frases do narrador levadas para a correção (`narrador`; linhas antigas não têm o campo).
 - **Tempo:** segundos com a aba à vista, da abertura da página até os 100%. O servidor guarda o total em `.revisao/sessao.json`, então recarregar a página ou reiniciar o `keg diff` no meio (mesma base, menos de 12 horas) não zera o relógio. Parou nos 100% e voltou a cair (o agente corrigiu algo no `--watch`)? O relógio volta a correr até os 100% de novo.
 - **Quando grava:** o servidor confere a cobertura a cada decisão e a cada nota, e grava quando chega a 100%. Revisão abandonada antes disso não deixa linha, para não enviesar as medianas. A nota dada depois dos 100% atualiza a mesma linha; uma nota de revisão anterior não vale. Cada revisão tem uma linha só (a chave é `iniciadoEm`): gravar de novo troca a linha em vez de acrescentar.
 - **Passos:** `passos.total` soma os passos alterados dos fluxos e os órfãos; `falsosPositivos` conta os órfãos marcados assim.
@@ -107,13 +108,17 @@ O keg compara o manifesto com os fluxos que calculou e mostra no Panorama duas d
 - Um passo declarado existe se casa com um passo dos fluxos, com uma função alterada ou com um trecho alterado do arquivo.
 - Um fluxo do código está declarado se alguma referência do manifesto (nasce, termina ou passo) casa com um passo dele que foi alterado ou que é ponta. Passo de contexto do meio não conta.
 
-**Feedback.** Os seus comentários e os órfãos marcados como código morto viram `.revisao/feedback.md`, regerado a cada decisão e ao abrir o Fechamento:
+**Feedback.** Os seus comentários, as frases do narrador que você levou para a correção e os órfãos marcados como código morto viram `.revisao/feedback.md`, regerado a cada decisão, a cada frase escolhida e ao abrir o Fechamento. O comentário entra qualquer que seja a marca do trecho (revisado, por exemplo). Com ajustes, a segunda linha é a instrução para o agente (só cita o narrador quando há item dele):
 
 ```markdown
-Revisão de HEAD: 2 ajustes
+Revisão de HEAD: 3 ajustes
+Corrija cada item no código. Os itens "(apontado pelo narrador)" vieram da IA na revisão e eu confirmei.
 1. lib/transacao.ts:21 (salvarTransacao): o saldo não é recalculado quando a transação é excluída.
-2. lib/utils/formatarMoeda.ts: código morto, apague.
+2. lib/transacao.ts:24-26 (salvarTransacao): Valor negativo passa pela validação. (apontado pelo narrador)
+3. lib/utils/formatarMoeda.ts: código morto, apague.
 ```
+
+As frases escolhidas ficam em `.revisao/achados.json`, com a chave feita dos hashes dos trechos do passo e do texto da frase: se o agente corrigir o trecho, ou a narração mudar, a frase deixa de casar e sai do feedback sozinha, como o comentário.
 
 O botão "copiar como prompt" do Fechamento copia esse texto para colar no agente. A nota do Fechamento fica em `.revisao/nota.json` (`{ "nota": 4, "em": "...", "base": "HEAD" }`).
 
@@ -138,7 +143,8 @@ Cada passo alterado ganha até três frases curtas, cada uma presa a linhas do p
 | `.revisao/review.json` | Fluxos, órfãos, métricas e o grafo de chamadas do mapa (o contrato está em `src/contrato.ts`) |
 | `.revisao/estado.json` | As suas decisões na página, uma por trecho |
 | `.revisao/manifesto.json` | Escrito pelo agente executor: o fluxo que ele diz ter feito |
-| `.revisao/feedback.md` | Comentários e código morto, prontos para colar no agente |
+| `.revisao/feedback.md` | Comentários, frases do narrador escolhidas e código morto, prontos para colar no agente |
+| `.revisao/achados.json` | As frases do narrador que você levou para a correção (a chave prende a frase ao hash dos trechos do passo) |
 | `.revisao/nota.json` | A nota de 1 a 5 do Fechamento |
 | `.revisao/historico.jsonl` | Uma linha por revisão fechada em 100%: tempo, achados, falso positivo, nota e consumo do narrador |
 | `.revisao/sessao.json` | A revisão em andamento: o tempo contado pela página e as chamadas do narrador |

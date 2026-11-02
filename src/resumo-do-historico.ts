@@ -8,7 +8,7 @@ const LIMITE_DE_FALSO_POSITIVO = 0.1
 export function resumirHistorico(todas: LinhaDoHistorico[], quantas = QUANTAS_PADRAO): string {
   if (todas.length === 0) return 'Nenhuma revisão registrada ainda: o keg grava uma linha em .revisao/historico.jsonl quando todos os trechos de uma revisão têm decisão.'
   const linhas = todas.slice(-quantas)
-  const achados = (l: LinhaDoHistorico) => l.achados.comentarios + l.achados.codigoMorto
+  const achados = (l: LinhaDoHistorico) => l.achados.comentarios + l.achados.codigoMorto + (l.achados.narrador ?? 0)
   const taxas = linhas.filter(l => l.passos.total > 0).map(l => l.passos.falsosPositivos / l.passos.total)
   const falsos = soma(linhas.map(l => l.passos.falsosPositivos))
   const passos = soma(linhas.map(l => l.passos.total))

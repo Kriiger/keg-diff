@@ -2,8 +2,9 @@
 a:focus-visible { border-radius: 10px; }
 /* 60px no topo: o seletor de modo flutua no canto superior direito (alternador.css) e não pode cobrir o cabeçalho. */
 .conteudo { padding: 60px 32px 96px; min-width: 0; }
-/* Mudar o padding refaz o layout da página inteira (o diff é grande): com duração 0 e atraso, a troca só acontece depois da subida da gaveta. */
-.pagina.com-mapa .conteudo { padding-bottom: calc(var(--gaveta) + 40px); transition: var(--transicao-cores), padding-bottom 0s linear var(--duracao-longa); }
+/* Mudar o padding refaz o layout da página inteira (o diff é grande): com duração 0 e atraso, a troca só acontece depois da subida da gaveta.
+   --gaveta só muda quando a altura se decide (soltar a alça, maximizar, setas); durante o arrasto o padding não se mexe (gaveta.ts). */
+.pagina.com-mapa .conteudo { padding-bottom: calc(var(--gaveta) + 40px); transition: padding-bottom 0s linear var(--duracao-longa); }
 .conteudo > section > header { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; margin-bottom: 20px; }
 .conteudo h2 { margin-top: 22px; }
 .conteudo > section > h2 { margin-bottom: 8px; }
@@ -65,6 +66,8 @@ a:focus-visible { border-radius: 10px; }
 .frases { list-style: none; padding: 0; margin: 10px 0 12px; display: grid; gap: 4px; }
 .frases li { padding: 6px 12px; border-radius: 8px; }
 .frases li:hover, .frases li:focus { background: var(--selecionado); }
+.frases .na-correcao { margin-left: 8px; padding: 1px 9px; font: inherit; font-size: 12px; border-radius: 999px; border: 1px solid var(--painel-borda); background: var(--botao-fundo); color: inherit; cursor: pointer; }
+.frases .na-correcao.ativa { background: var(--primario); color: var(--primario-texto); border-color: transparent; }
 .narrar-todos { margin: 8px 0 12px; }
 .item { margin-bottom: 16px; }
 /* Cada grupo de trechos é um bloco grande e independente: fora da tela o navegador pula o layout e a pintura dele (o diff dentro é

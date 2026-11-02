@@ -1,8 +1,9 @@
 // Página de revisão: lê o review.json pelo servidor local e grava cada decisão no estado.json.
 // A cobertura é a fração de trechos com decisão; a chave é o hash do trecho, como no contrato.
 import { StrictMode, useEffect, useMemo, useState } from 'react'
+import { WorkerPoolContextProvider } from '@pierre/diffs/react'
 import { createRoot } from 'react-dom/client'
-import type { Estado, Fluxo, Revisao } from '../src/contrato'
+import type { AchadosEscolhidos, Estado, Fluxo, Revisao } from '../src/contrato'
 import './estilo/tema.css'
 import './estilo/base.css'
 import './estilo/lateral.css'
@@ -29,10 +30,12 @@ import { useNavegacao } from './proximo'
 import { alternarLateral, fecharGaveta } from './recolher'
 import { BotaoDoTema, ciclarTema } from './tema'
 import { TelaDoFluxo } from './tela-do-fluxo'
-import { TelaDeTrechos, decididos, useAtalhos, type Contexto } from './telas'
+import { TEMAS, TelaDeTrechos, decididos, useAtalhos, type Contexto } from './telas'
 
 export type Decisao = Estado[string]['decisao']
 export type Decidir = (hunkIds: string[], decisao: Decisao | null, comentario?: string) => void
+// Põe (incluir) ou tira as frases do narrador, pelas chaves de chaveDaFrase, do que vai para a correção.
+export type EscolherAchados = (chaves: string[], incluir: boolean) => void
 
 export interface Item {
   chave: string
@@ -67,6 +70,7 @@ type Secao = keyof typeof SECOES
 function App() {
   const [revisao, setRevisao] = useState<Revisao>()
   const [estado, setEstado] = useState<Estado>({})
+  const [achados, setAchados] = useState<AchadosEscolhidos>({})
   const [erro, setErro] = useState<string>()
   const [endereco, setEndereco] = useState(location.hash.slice(1))
   const [ajuda, setAjuda] = useState(false)
@@ -90,6 +94,7 @@ function App() {
     const carregar = () => {
       fetch('/api/revisao').then(r => r.json()).then(setRevisao).catch(() => setErro('Não consegui ler o review.json.'))
       fetch('/api/estado').then(r => r.json()).then(setEstado).catch(tolerarQueda)
+      fetch('/api/achados').then(r => r.json()).then(setAchados).catch(tolerarQueda)
     }
     // A conexão abre no início e de novo quando o servidor volta ou outro keg diff sobe na mesma porta: nos três casos, dados novos.
     const parar = [escutar('open', carregar), escutar('revisao', carregar)]
@@ -118,11 +123,18 @@ function App() {
       .catch(tolerarQueda)
   }
 
+  const escolherAchados: EscolherAchados = (chaves, incluir) => {
+    fetch('/api/achados', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chaves, incluir }) })
+      .then(r => r.json())
+      .then(setAchados)
+      .catch(tolerarQueda)
+  }
+
   if (erro) return <p className="aviso-central">{erro} Rode <code>keg diff</code> de novo.</p>
   if (!revisao || !checklist) return <p className="aviso-central">Carregando…</p>
   const fluxoAberto = checklist.fluxos.find(f => `fluxo/${f.fluxo.id}` === rota)?.fluxo
   const mapa = { aberto: mapaAberto, alternar: () => setMapaAberto(aberto => !aberto) }
-  const contexto = { revisao, estado, decidir, ladoALado, narrador, mapa, navegacao }
+  const contexto = { revisao, estado, decidir, achados, escolherAchados, ladoALado, narrador, mapa, navegacao }
   const avisoDeServidor = desligado && <p className="alerta grave servidor-desligado" role="alert">Servidor desligado. Rode <code>keg diff</code> de novo: a página reconecta sozinha. <button onClick={reconectar}>Tentar agora</button></p>
 
   return (
@@ -150,10 +162,10 @@ function App() {
 
 // A tela do endereço: um fluxo, um grupo de trechos, o fechamento ou, se nenhum casa, o panorama.
 function TelaAtual({ rota, fluxo, passoInicial, checklist, segundos, contexto }: { rota: string; fluxo?: Fluxo; passoInicial?: string; checklist: Checklist; segundos: () => number; contexto: Contexto }) {
-  const { revisao, estado, narrador } = contexto
+  const { revisao, estado, narrador, achados, escolherAchados } = contexto
   if (fluxo) return <TelaDoFluxo fluxo={fluxo} passoInicial={passoInicial} {...contexto} />
   if (rota in SECOES) return <TelaDeTrechos key={rota} rota={rota} {...SECOES[rota as Secao]} itens={checklist[rota as Secao]} {...contexto} />
-  if (rota === 'fechamento') return <Fechamento revisao={revisao} checklist={checklist} estado={estado} secoes={SECOES} segundos={segundos} />
+  if (rota === 'fechamento') return <Fechamento revisao={revisao} checklist={checklist} estado={estado} achados={achados} escolherAchados={escolherAchados} secoes={SECOES} segundos={segundos} />
   return <Panorama revisao={revisao} checklist={checklist} estado={estado} narrador={narrador} segundos={segundos} />
 }
 
@@ -223,4 +235,15 @@ function montarChecklist(revisao: Revisao): Checklist {
 recarregarSeChunkSumiu()
 // A janela externa do mapa é a mesma página com o endereço #mapa-externo: o mesmo bundle, outra raiz.
 const Raiz = ehJanelaExterna() ? MapaExterno : App
-createRoot(document.getElementById('raiz')!).render(<StrictMode><Raiz /></StrictMode>)
+// O realce do diff (Shiki) roda em workers: na thread principal ele era o maior tranco da página (a cada passo e a cada troca de modo).
+// Poucos workers bastam (cada um carrega o Shiki). O que cabe em poucos caracteres continua na thread principal, onde sai pronto e
+// colorido de uma vez, sem o quadro em texto puro que a viagem ao worker deixaria. Se os workers não nascerem, o diff volta a realçar
+// na thread principal sozinho. O provedor fica fora do StrictMode: o par montar/desmontar de desenvolvimento encerraria o pool.
+const WORKERS_DO_DIFF = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 4) - 1))
+createRoot(document.getElementById('raiz')!).render(
+  <WorkerPoolContextProvider
+    poolOptions={{ workerFactory: () => new Worker(new URL('@pierre/diffs/worker/worker.js', import.meta.url), { type: 'module' }), poolSize: WORKERS_DO_DIFF, mainThreadMaxCharacters: 1200 }}
+    highlighterOptions={{ theme: TEMAS }}>
+    <StrictMode><Raiz /></StrictMode>
+  </WorkerPoolContextProvider>,
+)

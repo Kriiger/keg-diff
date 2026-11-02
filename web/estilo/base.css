@@ -9,9 +9,10 @@
   --peso-texto: 400; --peso-rotulo: 500; --peso-destaque: 600; --peso-titulo: 700;
 
   --painel-raio: 12px;
-  /* Toda mudança visível usa a mesma duração e curva; as cores têm transição em qualquer elemento (ver abaixo; outline-color fica de
-     fora: o anel de foco nasce em currentColor e animá-lo até o azul mostrava um anel preto ou cinza no meio do caminho),
-     o movimento (opacidade e posição) só onde se pede, para não arrastar o desenho do mapa. */
+  /* Toda mudança visível usa a mesma duração e curva. A transição de cor é por peça (a regra logo abaixo dos botões lista quem a leva;
+     outline-color fica de fora: o anel de foco nasce em currentColor e animá-lo até o azul mostrava um anel preto ou cinza no meio do
+     caminho), e o movimento (opacidade e posição) só onde se pede, para não arrastar o desenho do mapa. Nunca em "*": qualquer troca de
+     classe ou de tema animaria milhares de elementos, e box-shadow animado repinta a cada quadro. A troca de tema é uma View Transition (tema.tsx). */
   --duracao: 180ms; --duracao-longa: 280ms; --curva: cubic-bezier(.2, .8, .2, 1);
   --transicao-cores: background-color var(--duracao) var(--curva), color var(--duracao) var(--curva), border-color var(--duracao) var(--curva),
     box-shadow var(--duracao) var(--curva), fill var(--duracao) var(--curva), stroke var(--duracao) var(--curva);
@@ -23,7 +24,6 @@
 }
 
 * { box-sizing: border-box; }
-*, *::before, *::after { transition: var(--transicao-cores); }
 body { margin: 0; background: var(--fundo); color: var(--texto); font: var(--peso-texto) 14px/1.5 var(--fonte); -webkit-font-smoothing: antialiased; }
 a { color: inherit; text-decoration: none; }
 strong { font-weight: var(--peso-destaque); }
@@ -58,3 +58,6 @@ button, .selo, .sem-ancora { -webkit-tap-highlight-color: transparent; }
 .botoes button.ativa:hover { background: var(--primario-hover); }
 .botoes button.ativa kbd { color: inherit; background: color-mix(in srgb, var(--primario-texto) 16%, transparent); }
 .notas button { min-width: 44px; justify-content: center; }
+/* As demais peças que mudam de cor com hover ou estado (as que já têm transição própria, como os itens da lateral e os nós do mapa, não entram aqui). */
+.dicas button, .secao-titulo, .passo-da-linha, .faltas li, .frases li, .frases .na-correcao, .pontos-de-risco a, .lista-de-fluxos a, .item,
+.contagem, .anel .icone, .comentario textarea, button kbd, .arvore ul::before, .no-do-mapa .relacao, .mapa-do-fluxo .react-flow__controls-button { transition: var(--transicao-cores); }

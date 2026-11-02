@@ -14,9 +14,14 @@
   --vidro-fundo: rgb(255 255 255 / .74); --vidro-solido: #ffffff;
   --vidro-borda: rgb(0 0 0 / .1); --vidro-brilho: inset 0 1px 0 rgb(255 255 255 / .7);
   --vidro-sombra: 0 6px 24px rgb(0 0 0 / .13), 0 1px 3px rgb(0 0 0 / .08);
-  --vidro-filtro: blur(18px) saturate(140%);
-  /* A lateral é o vidro maior da página: um cinza um pouco mais denso que o vidro das pílulas e um realce de borda (topo claro, fundo escuro). */
-  --lateral-fundo: rgb(244 244 246 / .78);
+  /* O desfoque custa a cada quadro de rolagem e de animação: as pílulas pequenas ficam com 12px, a gaveta da lateral no celular (onde há
+     conteúdo atrás) com 18px, e o que cobre muita tela sem conteúdo desfocável atrás (a lateral no desktop e a gaveta do mapa) não leva filtro. */
+  --vidro-filtro: blur(12px) saturate(140%); --vidro-filtro-lateral: blur(18px) saturate(140%);
+  /* A lateral é o vidro maior da página: um cinza um pouco mais denso que o vidro das pílulas e um realce de borda (topo claro, fundo escuro).
+     No desktop atrás dela só há o fundo liso da página, então o fundo sem filtro (--lateral-liso) é o translúcido já composto sobre --fundo. */
+  --lateral-fundo: rgb(244 244 246 / .78); --lateral-liso: #f6f6f8;
+  /* A gaveta do mapa cobre o diff que rola: quase opaca, no lugar do vidro desfocado. */
+  --vidro-denso: rgb(255 255 255 / .95);
   --lateral-realce: inset 0 1px 0 rgb(255 255 255 / .85), inset 0 0 0 1px rgb(255 255 255 / .35), inset 0 -1px 0 rgb(0 0 0 / .04);
 
   --escurecer: rgb(0 0 0 / .4);
@@ -39,7 +44,7 @@
     --vidro-fundo: rgb(33 33 33 / .72); --vidro-solido: #212121;
     --vidro-borda: rgb(255 255 255 / .12); --vidro-brilho: inset 0 1px 0 rgb(255 255 255 / .07);
     --vidro-sombra: 0 8px 30px rgb(0 0 0 / .5), 0 1px 3px rgb(0 0 0 / .4);
-    --lateral-fundo: rgb(30 30 32 / .7);
+    --lateral-fundo: rgb(30 30 32 / .7); --lateral-liso: #1a1a1b; --vidro-denso: rgb(33 33 33 / .95);
     --lateral-realce: inset 0 1px 0 rgb(255 255 255 / .1), inset 0 0 0 1px rgb(255 255 255 / .03), inset 0 -1px 0 rgb(0 0 0 / .3);
 
     --escurecer: rgb(0 0 0 / .62);
@@ -60,7 +65,7 @@
   --vidro-fundo: rgb(33 33 33 / .72); --vidro-solido: #212121;
   --vidro-borda: rgb(255 255 255 / .12); --vidro-brilho: inset 0 1px 0 rgb(255 255 255 / .07);
   --vidro-sombra: 0 8px 30px rgb(0 0 0 / .5), 0 1px 3px rgb(0 0 0 / .4);
-  --lateral-fundo: rgb(30 30 32 / .7);
+  --lateral-fundo: rgb(30 30 32 / .7); --lateral-liso: #1a1a1b; --vidro-denso: rgb(33 33 33 / .95);
   --lateral-realce: inset 0 1px 0 rgb(255 255 255 / .1), inset 0 0 0 1px rgb(255 255 255 / .03), inset 0 -1px 0 rgb(0 0 0 / .3);
 
   --escurecer: rgb(0 0 0 / .62);
@@ -72,8 +77,15 @@
 /* Sem transparência, o vidro e os painéis viram fundo sólido; sem backdrop-filter no navegador, idem.
    ":root:root" empata a especificidade dos temas acima, e a ordem faz esta regra vencer. */
 @media (prefers-reduced-transparency: reduce) {
-  :root:root { --vidro-fundo: var(--vidro-solido); --lateral-fundo: var(--vidro-solido); --painel-fundo: var(--painel-solido); --vidro-filtro: none; }
+  :root:root { --vidro-fundo: var(--vidro-solido); --vidro-denso: var(--vidro-solido); --lateral-fundo: var(--vidro-solido); --lateral-liso: var(--vidro-solido); --painel-fundo: var(--painel-solido); --vidro-filtro: none; --vidro-filtro-lateral: none; }
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root:root { --vidro-fundo: var(--vidro-solido); --lateral-fundo: var(--vidro-solido); }
+  :root:root { --vidro-fundo: var(--vidro-solido); --vidro-denso: var(--vidro-solido); --lateral-fundo: var(--vidro-solido); --lateral-liso: var(--vidro-solido); --vidro-filtro-lateral: none; }
 }
+
+/* A troca de tema (ciclarTema, em tema.tsx) roda numa View Transition: a foto antiga some e a nova aparece por cima, as duas no mesmo
+   tempo e curva para a soma das opacidades fechar em 1. Dentro dela as transições do CSS comum ficam desligadas: a foto nova tem de
+   nascer já no tema final, e não com as cores a meio caminho. O seletor de modo (tem nome próprio, alternador.css) fica vivo no lugar. */
+:root[data-transicao='tema'] *, :root[data-transicao='tema'] *::before, :root[data-transicao='tema'] *::after { transition: none !important; }
+:root[data-transicao='tema']::view-transition-old(root) { animation: sumir var(--duracao-longa) var(--curva) both; }
+:root[data-transicao='tema']::view-transition-new(root) { animation: aparecer var(--duracao-longa) var(--curva) both; }

@@ -56,20 +56,47 @@ function useTamanhoVisivel(): Tamanho {
   const [tamanho, setTamanho] = useState<Tamanho>({ largura: 0, altura: 0 })
   useEffect(() => {
     if (!area) return
+    // Um por quadro: a gaveta que arrasta ou anima e a janela redimensionam em rajada, e cada setTamanho renderiza o mapa de novo.
+    let quadro = 0
     const medir = () => {
+      quadro = 0
       const caixa = area.getBoundingClientRect()
       const moldura = area.closest('.mapa-do-fluxo')?.getBoundingClientRect()
       const direita = Math.min(caixa.right, moldura?.right ?? Infinity, innerWidth)
       const novo = { largura: Math.floor(direita - caixa.left), altura: Math.floor(caixa.height) }
       setTamanho(antes => (antes.largura === novo.largura && antes.altura === novo.altura ? antes : novo))
     }
+    const agendar = () => { quadro ||= requestAnimationFrame(medir) }
     medir()
-    const observador = new ResizeObserver(medir)
+    const observador = new ResizeObserver(agendar)
     observador.observe(area)
-    addEventListener('resize', medir)
-    return () => { observador.disconnect(); removeEventListener('resize', medir) }
+    addEventListener('resize', agendar)
+    return () => { cancelAnimationFrame(quadro); observador.disconnect(); removeEventListener('resize', agendar) }
   }, [area])
   return tamanho
+}
+
+// A mesma curva de saída do resto da página (--curva: cubic-bezier(.2, .8, .2, 1)) como função do tempo, para o setViewport: o x da curva é
+// o tempo, então acha-se o parâmetro da curva em que x vale t (Newton, com bisseção de reserva) e devolve-se o y dele.
+const [X1, Y1, X2, Y2] = [0.2, 0.8, 0.2, 1]
+const bezier = (s: number, a: number, b: number) => 3 * (1 - s) ** 2 * s * a + 3 * (1 - s) * s ** 2 * b + s ** 3
+const derivada = (s: number, a: number, b: number) => 3 * (1 - s) ** 2 * a + 6 * (1 - s) * s * (b - a) + 3 * s ** 2 * (1 - b)
+function curvaDeSaida(t: number): number {
+  if (t <= 0 || t >= 1) return Math.min(Math.max(t, 0), 1)
+  let s = t
+  for (let i = 0; i < 6; i++) {
+    const erro = bezier(s, X1, X2) - t
+    const inclinacao = derivada(s, X1, X2)
+    if (Math.abs(erro) < 1e-5 || inclinacao < 1e-6) break
+    s -= erro / inclinacao
+  }
+  let [baixo, alto] = [0, 1]
+  for (let i = 0; i < 20 && Math.abs(bezier(s, X1, X2) - t) > 1e-5; i++) {
+    if (bezier(s, X1, X2) < t) baixo = s
+    else alto = s
+    s = (baixo + alto) / 2
+  }
+  return bezier(s, Y1, Y2)
 }
 
 // Depois que a pessoa mexe na vista (arrasta, dá zoom, clica), ela é dela: o enquadramento automático para.
@@ -110,8 +137,9 @@ export function Enquadramento({ nos, emTorno, atual, clicado, aoEnquadrar }: Pro
 
   // O painel pode ainda não estar pronto para receber o viewport (o zoom do React Flow nasce junto): tenta de novo nos próximos quadros.
   // A interpolação é linear: a padrão do d3 "voa" (afasta e reaproxima) em deslocamentos longos, e o zoom parecia mudar no meio do caminho.
+  // O tempo anda pela curva de saída do resto da página (ease): começa rápido e assenta, em vez de seguir a velocidade constante.
   const aplicar = async (vista: Viewport, duracao = 0, tentativas = TENTATIVAS): Promise<void> => {
-    if (!(await setViewport(vista, { duration: duracao, interpolate: 'linear' })) && tentativas > 0) requestAnimationFrame(() => aplicar(vista, duracao, tentativas - 1))
+    if (!(await setViewport(vista, { duration: duracao, interpolate: 'linear', ease: curvaDeSaida })) && tentativas > 0) requestAnimationFrame(() => aplicar(vista, duracao, tentativas - 1))
   }
   const ajustar = () => {
     interagiu.current = true

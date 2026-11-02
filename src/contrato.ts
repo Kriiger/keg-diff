@@ -193,11 +193,22 @@ export interface Metricas {
 
 // .revisao/estado.json — a tela escreve; a chave é o hash do hunk,
 // então um trecho que o agente mudar depois volta sozinho para "não revisado".
+// "decisao" é a marca do trecho; "comentario" é um anexo independente dela: o trecho pode estar revisado e comentado.
+// 'comentado' só aparece quando há comentário e nenhuma outra marca.
 export type Estado = Record<string, {
   decisao: 'revisado' | 'codigo-morto' | 'falso-positivo' | 'comentado'
   comentario?: string
   em: string
 }>
+
+// .revisao/achados.json — as frases do narrador que a pessoa escolheu levar para a correção (feedback.md).
+// A chave junta os hashes dos trechos do passo com o texto da frase: quando o agente corrige o trecho (hash novo)
+// ou a narração muda, a chave deixa de casar e a frase sai do feedback sozinha, como o comentário de um trecho refeito.
+export type AchadosEscolhidos = Record<string, { em: string }>
+
+export function chaveDaFrase(hunkIds: string[], texto: string): string {
+  return `${[...hunkIds].sort().join('+')}|${texto}`
+}
 
 // .revisao/nota.json — a sensação de controle de 1 a 5 ao fechar a revisão. Fica fora do estado.json,
 // cujas chaves são todas hashes de trecho. A Fase 6 lê este arquivo para montar o historico.jsonl.
@@ -226,7 +237,7 @@ export interface LinhaDoHistorico {
   registradoEm: string             // ISO, da última gravação desta linha
   base: string
   tempoSegundos: number            // tempo ativo da página (aba visível), da abertura aos 100%
-  achados: { comentarios: number; codigoMorto: number }
+  achados: { comentarios: number; codigoMorto: number; narrador?: number }  // narrador: frases do Claude levadas para a correção; linhas antigas não têm
   passos: { total: number; falsosPositivos: number }  // total: passos alterados dos fluxos mais os órfãos
   divergenciasDoManifesto: number
   arquivosNovos: number

@@ -18,25 +18,29 @@ interface PropsDasDecisoes {
 export function Decisoes({ hunkIds, opcoes, estado, decidir, comentando, setComentando }: PropsDasDecisoes) {
   if (hunkIds.length === 0) return null
   const decisoes = hunkIds.map(id => estado[id])
-  const comum = decisoes.every(d => d?.decisao === decisoes[0]?.decisao) ? decisoes[0] : undefined
+  // A marca (revisado, código morto, falso positivo) e o comentário são independentes: 'comentado' sozinho não é marca.
+  const marcas = decisoes.map(d => (d?.decisao === 'comentado' ? undefined : d?.decisao))
+  const marca = marcas.every(m => m === marcas[0]) ? marcas[0] : undefined
+  const comentario = decisoes.find(d => d?.comentario)?.comentario
   const salvar = (texto: string) => {
-    if (texto.trim() !== '') decidir(hunkIds, 'comentado', texto.trim())
+    // Texto vazio apaga o comentário que havia; sem comentário anterior, só fecha a caixa.
+    if (texto.trim() !== '' || comentario) decidir(hunkIds, 'comentado', texto.trim())
     setComentando(false)
   }
   return (
     <div className="decisoes">
       <div className="botoes">
         {opcoes.map(opcao => (
-          <button key={opcao} className={comum?.decisao === opcao ? 'ativa' : ''} onClick={() => decidir(hunkIds, comum?.decisao === opcao ? null : opcao)}>
+          <button key={opcao} className={marca === opcao ? 'ativa' : ''} onClick={() => decidir(hunkIds, marca === opcao ? null : opcao)}>
             {NOMES[opcao]} <kbd>{TECLAS[opcao]}</kbd>
           </button>
         ))}
-        <button className={comum?.decisao === 'comentado' ? 'ativa' : ''} onClick={() => setComentando(true)}>
-          {comum?.decisao === 'comentado' ? 'Editar comentário' : 'Comentar'} <kbd>c</kbd>
+        <button className={comentario ? 'ativa' : ''} onClick={() => setComentando(true)}>
+          {comentario ? 'Editar comentário' : 'Comentar'} <kbd>c</kbd>
         </button>
       </div>
-      {comentando && <CaixaDeComentario inicial={comum?.comentario ?? ''} salvar={salvar} cancelar={() => setComentando(false)} />}
-      {!comentando && comum?.comentario && <blockquote>{comum.comentario}</blockquote>}
+      {comentando && <CaixaDeComentario inicial={comentario ?? ''} salvar={salvar} cancelar={() => setComentando(false)} />}
+      {!comentando && comentario && <blockquote>{comentario}</blockquote>}
     </div>
   )
 }

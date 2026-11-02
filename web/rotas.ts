@@ -49,7 +49,7 @@ const OPCOES_DA_LIGACAO_LONGA = { 'elk.layered.priority.straightness': '10' }
 
 export const idDaAresta = ({ de, para }: Pick<ArestaDoGrafo, 'de' | 'para'>) => `${de}>${para}`
 
-export async function calcularLayout(elk: ELK, nos: NoDoGrafo[], arestas: ArestaDoGrafo[]): Promise<Layout> {
+export async function calcularLayout(elk: Pick<ELK, 'layout'>, nos: NoDoGrafo[], arestas: ArestaDoGrafo[]): Promise<Layout> {
   const layout = await rodarElk(elk, nos, arestas, new Set())
   const voltas = new Set([...layout.rotas].filter(([, rota]) => rota.retorno).map(([id]) => id))
   // O ELK só diz quem volta depois de rodar: havendo ciclo, uma segunda rodada reserva o vão do rótulo "volta" nessas ligações.
@@ -58,7 +58,7 @@ export async function calcularLayout(elk: ELK, nos: NoDoGrafo[], arestas: Aresta
 
 // Os blocos de um mesmo arquivo viram os filhos de um nó composto; a ordem de chegada (passos do fluxo primeiro) se mantém de uma rodada para a outra.
 // O topo do contêiner reserva a linha com o nome do arquivo.
-async function rodarElk(elk: ELK, nos: NoDoGrafo[], arestas: ArestaDoGrafo[], voltas: Set<string>): Promise<Layout> {
+async function rodarElk(elk: Pick<ELK, 'layout'>, nos: NoDoGrafo[], arestas: ArestaDoGrafo[], voltas: Set<string>): Promise<Layout> {
   const porArquivo = new Map<string, NoDoGrafo[]>()
   for (const no of nos) porArquivo.set(no.arquivo, [...(porArquivo.get(no.arquivo) ?? []), no])
   const resultado = await elk.layout({

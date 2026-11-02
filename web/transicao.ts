@@ -1,7 +1,7 @@
-// A porta única das View Transitions da página (a troca de modo, em modo.ts, e o recolher da lateral, em recolher.ts).
+// A porta única das View Transitions da página (a troca de modo, em modo.ts, o recolher da lateral, em recolher.ts, e a troca de tema, em tema.tsx).
 // O navegador só aguenta uma por vez; com duas, a que chega depois pula a que estava andando, em vez de empilhar animações.
-// O tipo vai para o <html> (data-transicao) antes da foto: é por ele que o CSS dá nome às peças de cada uma (ver alternador.css e lateral.css).
-export type TipoDeTransicao = 'modo' | 'lateral'
+// O tipo vai para o <html> (data-transicao) antes da foto: é por ele que o CSS dá nome às peças de cada uma (ver alternador.css, lateral.css e tema.css).
+export type TipoDeTransicao = 'modo' | 'lateral' | 'tema'
 
 let corrente: ViewTransition | undefined
 

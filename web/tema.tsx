@@ -2,6 +2,8 @@
 // data-tema no <html>; sem atributo, vale o que o sistema pede. O script do index.html aplica o mesmo atributo
 // antes da primeira pintura, para a página não piscar clara antes de ficar escura.
 import { useSyncExternalStore } from 'react'
+import { flushSync } from 'react-dom'
+import { iniciarTransicao, podeAnimar } from './transicao'
 
 export type Tema = 'sistema' | 'claro' | 'escuro'
 
@@ -37,13 +39,20 @@ addEventListener('storage', e => {
   for (const observador of observadores) observador()
 })
 
+// A troca de tema é um crossfade da tela inteira (View Transition, composto pela GPU): sem ela, cada elemento animaria a própria cor.
+// O tema novo é calculado dentro da troca, como em modo.ts: duas teclas seguidas avançam duas vezes. O flushSync faz o diff e o mapa
+// (que leem useTema) já estarem no tema novo na segunda foto.
 export function ciclarTema() {
-  atual = ORDEM[(ORDEM.indexOf(atual) + 1) % ORDEM.length]!
-  aplicar(atual)
-  try {
-    localStorage.setItem(CHAVE, atual)
-  } catch {}
-  for (const observador of observadores) observador()
+  const trocar = () => {
+    atual = ORDEM[(ORDEM.indexOf(atual) + 1) % ORDEM.length]!
+    aplicar(atual)
+    try {
+      localStorage.setItem(CHAVE, atual)
+    } catch {}
+    for (const observador of observadores) observador()
+  }
+  if (!podeAnimar()) return trocar()
+  iniciarTransicao('tema', () => flushSync(trocar))
 }
 
 export function useTema(): Tema {

@@ -5,8 +5,8 @@ import { existsSync, readFileSync, watch, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import path from 'node:path'
-import type { Estado, Revisao } from './contrato.js'
-import { gravarNota, lerEstado, lerNota } from './estado.js'
+import type { Revisao } from './contrato.js'
+import { aplicarAchados, aplicarDecisao, gravarAchados, gravarNota, lerAchados, lerEstado, lerNota, type PedidoDeDecisao } from './estado.js'
 import { gravarFeedback } from './feedback.js'
 import { FilaDoNarrador } from './fila-do-narrador.js'
 import { registrarRevisao } from './historico.js'
@@ -21,13 +21,6 @@ const TIPOS: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.wasm': 'application/wasm',
-}
-
-interface Decisao {
-  hunkIds: string[]
-  decisao: Estado[string]['decisao'] | null    // null desfaz a decisão
-  comentario?: string
-  segundos?: number                            // o cronômetro da página no momento da decisão
 }
 
 export async function abrirTela(raiz: string, opcoesDoNarrador: OpcoesDoNarrador): Promise<string> {
@@ -49,6 +42,8 @@ export async function abrirTela(raiz: string, opcoesDoNarrador: OpcoesDoNarrador
     'GET /api/revisao': (_, resposta) => enviarArquivo(resposta, path.join(pastaDaRevisao, 'review.json')),
     'POST /api/estado': (pedido, resposta) => receberDecisao(pedido, resposta, pastaDaRevisao, sessao),
     'GET /api/estado': (_, resposta) => responderJson(resposta, lerEstado(pastaDaRevisao)),
+    'POST /api/achados': (pedido, resposta) => receberAchados(pedido, resposta, pastaDaRevisao, sessao),
+    'GET /api/achados': (_, resposta) => responderJson(resposta, lerAchados(pastaDaRevisao)),
     'GET /api/sessao': (pedido, resposta) => receberTempo(pedido, resposta, sessao),
     'POST /api/sessao': (pedido, resposta) => receberTempo(pedido, resposta, sessao),
     'GET /api/feedback': (_, resposta) => responder(resposta, 200, gravarFeedback(pastaDaRevisao)),
@@ -107,14 +102,30 @@ async function pedirNarracao(pedido: IncomingMessage, resposta: ServerResponse, 
 // JSON obrigatório: um formulário de outro site não consegue mandar esse tipo sem pedir licença ao navegador.
 async function receberDecisao(pedido: IncomingMessage, resposta: ServerResponse, pastaDaRevisao: string, sessao: Sessao) {
   if (pedido.headers['content-type'] !== 'application/json') return responder(resposta, 415, 'envie JSON')
-  const corpo: Decisao = JSON.parse(await lerCorpo(pedido))
-  const estado = decidir(lerEstado(pastaDaRevisao), corpo)
+  const corpo: PedidoDeDecisao = JSON.parse(await lerCorpo(pedido))
+  const estado = aplicarDecisao(lerEstado(pastaDaRevisao), corpo)
   writeFileSync(path.join(pastaDaRevisao, 'estado.json'), JSON.stringify(estado, null, 2) + '\n')
   // O feedback.md acompanha cada decisão: quem lê o arquivo (o agente, por exemplo) nunca vê uma versão velha.
   gravarFeedback(pastaDaRevisao)
   sessao.somarTempo(corpo.segundos)
   registrar(pastaDaRevisao, sessao)
   responderJson(resposta, estado)
+}
+
+// As frases do narrador que a pessoa leva para a correção: o corpo diz quais chaves entram ou saem e o feedback.md acompanha.
+async function receberAchados(pedido: IncomingMessage, resposta: ServerResponse, pastaDaRevisao: string, sessao: Sessao) {
+  if (pedido.headers['content-type'] !== 'application/json') return responder(resposta, 415, 'envie JSON')
+  try {
+    const { chaves, incluir } = JSON.parse(await lerCorpo(pedido))
+    if (!Array.isArray(chaves) || !chaves.every(chave => typeof chave === 'string') || typeof incluir !== 'boolean') throw new Error('corpo inválido')
+    const achados = aplicarAchados(lerAchados(pastaDaRevisao), chaves, incluir)
+    gravarAchados(pastaDaRevisao, achados)
+    gravarFeedback(pastaDaRevisao)
+    registrar(pastaDaRevisao, sessao)
+    return responderJson(resposta, achados)
+  } catch {
+    responder(resposta, 400, 'envie { chaves: string[], incluir: boolean }')
+  }
 }
 
 // O cronômetro da página: GET devolve o que o servidor guardou (a página recarregada continua dali),
@@ -154,15 +165,6 @@ function registrar(pastaDaRevisao: string, sessao: Sessao) {
   } catch (erro) {
     console.error(`não consegui gravar o historico.jsonl: ${erro instanceof Error ? erro.message : erro}`)
   }
-}
-
-function decidir(estado: Estado, { hunkIds, decisao, comentario }: Decisao): Estado {
-  const em = new Date().toISOString()
-  for (const id of hunkIds) {
-    if (decisao === null) delete estado[id]
-    else estado[id] = comentario ? { decisao, comentario, em } : { decisao, em }
-  }
-  return estado
 }
 
 // O passo de contexto não tem diff: a página mostra o código atual dele.

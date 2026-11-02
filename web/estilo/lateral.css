@@ -3,7 +3,7 @@
 .cartao, .passo, .item, .linha-do-tempo, .faltas, .alerta, .sucesso {
   background: var(--painel-fundo); border: 1px solid var(--painel-borda); border-radius: var(--painel-raio);
 }
-.dicas, .alternador, .ajuda, .mapa-do-fluxo, .botao-da-lateral {
+.dicas, .alternador, .ajuda, .botao-da-lateral {
   background: var(--vidro-fundo); border: 1px solid var(--vidro-borda); border-radius: 20px;
   box-shadow: var(--vidro-brilho), var(--vidro-sombra);
   -webkit-backdrop-filter: var(--vidro-filtro); backdrop-filter: var(--vidro-filtro);
@@ -22,23 +22,30 @@
 /* O painel de vidro. A largura é fixa (o painel não encolhe com a coluna) e quem rola é o miolo, entre o topo e o rodapé. */
 .lateral {
   position: sticky; top: 12px; align-self: start; width: var(--largura); height: calc(100vh - 24px); margin: 12px 0 12px 12px;
-  display: flex; flex-direction: column; overflow: hidden; will-change: transform, opacity;
-  background: var(--lateral-fundo); border: 1px solid var(--vidro-borda); border-radius: 26px;
+  display: flex; flex-direction: column; overflow: hidden;
+  /* A seção que abre e fecha anima o layout de dentro da lateral: a contenção impede que isso invalide o conteúdo principal (o diff). */
+  contain: layout paint;
+  /* Sem desfoque no desktop: atrás dela só há o fundo liso da página, então o fundo já composto (--lateral-liso) fica igual ao vidro e
+     poupa um backdrop-filter de tela inteira a cada quadro de rolagem. A gaveta do celular, com conteúdo atrás, desfoca (no fim do arquivo). */
+  background: var(--lateral-liso); border: 1px solid var(--vidro-borda); border-radius: 26px;
   box-shadow: var(--lateral-realce), var(--vidro-sombra);
-  -webkit-backdrop-filter: var(--vidro-filtro); backdrop-filter: var(--vidro-filtro);
-  transition: var(--transicao-cores), transform var(--duracao-longa) var(--curva), opacity var(--duracao-longa) var(--curva), visibility 0s;
+  transition: transform var(--duracao-longa) var(--curva), opacity var(--duracao-longa) var(--curva), visibility 0s;
 }
 /* Recolhida, sai pela esquerda e some; "visibility" só vira depois da saída, para o painel não sumir antes de deslizar. */
-:root[data-lateral='recolhida'] .lateral { transform: translateX(calc(-100% - 24px)); opacity: 0; visibility: hidden; transition: var(--transicao-cores), transform var(--duracao-longa) var(--curva), opacity var(--duracao-longa) var(--curva), visibility 0s linear var(--duracao-longa); }
+:root[data-lateral='recolhida'] .lateral { transform: translateX(calc(-100% - 24px)); opacity: 0; visibility: hidden; transition: transform var(--duracao-longa) var(--curva), opacity var(--duracao-longa) var(--curva), visibility 0s linear var(--duracao-longa); }
 /* O foco da lateral tem sempre o mesmo anel (2px de --acento). Dentro do painel ele fica por dentro da linha, porque o miolo rola
-   e corta o que passa da borda; no botão solto, por fora. A cor não anima (ver --transicao-cores): sem isso o anel nascia na cor do texto. */
+   e corta o que passa da borda; no botão solto, por fora. A cor do anel não anima (ver --transicao-cores em base.css): sem isso o anel nascia na cor do texto. */
 .lateral :focus-visible { outline: 2px solid var(--acento); outline-offset: -2px; box-shadow: none; }
 .botao-da-lateral:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
 
 /* O botão de recolher é um só e anda: aberto, fica no canto do painel, sem fundo; recolhido, vira uma pílula de vidro no canto da página. */
-.botao-da-lateral { position: fixed; z-index: 9; top: 33px; left: calc(var(--largura) - 37px); width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border-radius: 10px; color: var(--suave); background: transparent; border-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; transition: var(--transicao-cores), top var(--duracao-longa) var(--curva), left var(--duracao-longa) var(--curva), border-radius var(--duracao-longa) var(--curva); }
+.botao-da-lateral { position: fixed; z-index: 9; top: 14px; left: 16px; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border-radius: 10px; color: var(--suave); background: transparent; border-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+  /* Aberto, o botão fica no canto do painel (19px abaixo e --largura - 53px à direita do canto da página); recolhido, volta para 14px/16px. O deslocamento é
+     transform e não top/left, para a troca rodar no compositor sem refazer o layout a cada quadro. */
+  transform: translate(calc(var(--largura) - 53px), 19px);
+  transition: var(--transicao-cores), transform var(--duracao-longa) var(--curva), border-radius var(--duracao-longa) var(--curva); }
 .botao-da-lateral:hover { background: var(--botao-hover); color: var(--texto); }
-:root[data-lateral='recolhida'] .botao-da-lateral { top: 14px; left: 16px; border-radius: 16px; color: var(--texto); background: var(--vidro-fundo); border-color: var(--vidro-borda); box-shadow: var(--vidro-brilho), var(--vidro-sombra); -webkit-backdrop-filter: var(--vidro-filtro); backdrop-filter: var(--vidro-filtro); }
+:root[data-lateral='recolhida'] .botao-da-lateral { transform: none; border-radius: 16px; color: var(--texto); background: var(--vidro-fundo); border-color: var(--vidro-borda); box-shadow: var(--vidro-brilho), var(--vidro-sombra); -webkit-backdrop-filter: var(--vidro-filtro); backdrop-filter: var(--vidro-filtro); }
 :root[data-lateral='recolhida'] .botao-da-lateral:hover { background: var(--vidro-solido); }
 .cortina { display: none; }
 
@@ -106,7 +113,7 @@
 .progresso-arquivos { display: block; }
 
 /* O miolo rola; o rodapé fica preso embaixo, separado por um fio. */
-.lateral-rolagem { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 10px; padding: 4px 8px 12px; scrollbar-width: thin; scrollbar-color: rgb(128 128 128 / .45) transparent; }
+.lateral-rolagem { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 10px; padding: 4px 8px 12px; contain: layout paint; scrollbar-width: thin; scrollbar-color: rgb(128 128 128 / .45) transparent; }
 .lateral-rolagem > * { flex: none; }
 .lateral-rodape { flex: none; padding: 8px; border-top: 1px solid var(--painel-borda); }
 
@@ -170,7 +177,7 @@
 .contagem .icone { width: 12px; height: 12px; }
 
 /* Barra de botões flutuantes. Com a gaveta do mapa aberta, ela sobe para ficar acima da gaveta. */
-.dicas { position: fixed; z-index: 6; right: 16px; bottom: 16px; display: flex; gap: 4px; padding: 6px; border-radius: 999px; transition: transform var(--duracao-longa) var(--curva), var(--transicao-cores); }
+.dicas { position: fixed; z-index: 6; right: 16px; bottom: 16px; display: flex; gap: 4px; padding: 6px; border-radius: 999px; contain: layout paint; transition: transform var(--duracao-longa) var(--curva); }
 /* Sobe por transform (compositor) e não por bottom, que refaria o layout a cada quadro da subida da gaveta: 12px da gaveta até a borda
    e os 16px de bottom da própria barra deixam 16px livres acima do topo dela. O z-index fica abaixo da gaveta (5): na subida a barra
    atravessa a área da gaveta e passa por trás dela, em vez de cobrir o painel. */
@@ -181,19 +188,19 @@
 
 .fundo-da-ajuda { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: var(--escurecer); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: aparecer var(--duracao) var(--curva); }
 @media (prefers-reduced-transparency: reduce) { .fundo-da-ajuda { -webkit-backdrop-filter: none; backdrop-filter: none; } }
-.ajuda { max-height: 88vh; overflow-y: auto; border-radius: 16px; padding: 24px 28px; display: grid; grid-template-columns: auto 1fr; gap: 12px 18px; margin: 0; animation: surgir var(--duracao-longa) var(--curva); }
+.ajuda { max-height: 88vh; overflow-y: auto; border-radius: 16px; padding: 24px 28px; display: grid; grid-template-columns: auto 1fr; gap: 12px 18px; margin: 0; animation: surgir-da-ajuda var(--duracao-longa) var(--curva); }
 .ajuda dt { text-align: right; }
 .ajuda dd { margin: 0; align-self: center; }
 @keyframes aparecer { from { opacity: 0; } }
-@keyframes surgir { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+@keyframes surgir-da-ajuda { from { opacity: 0; transform: translateY(8px) scale(.98); } }
 
 @media (max-width: 860px) {
   /* No celular a lateral é uma gaveta sobre o conteúdo, com uma cortina atrás; nasce fechada (recolher.ts). */
   .pagina { --largura: min(320px, calc(100vw - 24px)); grid-template-columns: 1fr; }
-  .lateral { position: fixed; z-index: 8; top: 12px; bottom: 12px; left: 12px; height: auto; margin: 0; }
+  .lateral { position: fixed; z-index: 8; top: 12px; bottom: 12px; left: 12px; height: auto; margin: 0; background: var(--lateral-fundo); -webkit-backdrop-filter: var(--vidro-filtro-lateral); backdrop-filter: var(--vidro-filtro-lateral); }
   .cortina { display: block; position: fixed; inset: 0; z-index: 7; background: var(--escurecer); transition: opacity var(--duracao-longa) var(--curva), visibility 0s; }
   :root[data-lateral='recolhida'] .cortina { opacity: 0; visibility: hidden; transition: opacity var(--duracao-longa) var(--curva), visibility 0s linear var(--duracao-longa); }
-  :root[data-lateral='recolhida'] .botao-da-lateral { left: 12px; }
+  :root[data-lateral='recolhida'] .botao-da-lateral { transform: translateX(-4px); }
   /* Sem teclado no celular, as dicas de tecla só ocupam lugar: a barra fica curta e cabe na largura. */
   .dicas { left: 12px; right: 12px; bottom: 12px; justify-content: center; }
   .dicas kbd, .dicas .prefixo { display: none; }

@@ -1,7 +1,7 @@
 /* O seletor de modo: pílula de vidro fixa no canto superior direito (o vidro vem da regra compartilhada em lateral.css).
    O polegar é uma pílula sólida, a mesma da ação principal, que desliza por transform: só o compositor trabalha. */
 .alternador { position: fixed; z-index: 6; top: 12px; right: 16px; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 3px; border-radius: 999px; view-transition-name: alternador; }
-.polegar { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 2); border-radius: 999px; background: var(--primario); box-shadow: 0 1px 3px rgb(0 0 0 / .2); transition: transform var(--duracao-longa) var(--curva), var(--transicao-cores); }
+.polegar { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 2); border-radius: 999px; background: var(--primario); box-shadow: 0 1px 3px rgb(0 0 0 / .2); transition: transform var(--duracao-longa) var(--curva); }
 .alternador[data-modo='arvore'] .polegar { transform: translateX(100%); }
 .alternador button { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 14px; border: 0; border-radius: 999px; background: transparent; color: var(--texto); transition: color var(--duracao-longa) var(--curva), background-color var(--duracao) var(--curva); }
 .alternador button[aria-checked='true'] { color: var(--primario-texto); }

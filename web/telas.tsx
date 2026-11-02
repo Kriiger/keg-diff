@@ -1,21 +1,23 @@
 // As telas da revisão fora do fluxo (a do fluxo é tela-do-fluxo.tsx): as listas de trechos, o diff dos trechos e os atalhos de uma letra.
 import { PatchDiff } from '@pierre/diffs/react'
 import { useEffect, useRef, useState } from 'react'
-import type { Estado, Revisao } from '../src/contrato'
+import type { AchadosEscolhidos, Estado, Revisao } from '../src/contrato'
 import { Decisoes } from './decisoes'
-import type { Decidir, Decisao, Item } from './main'
+import type { Decidir, Decisao, EscolherAchados, Item } from './main'
 import { useTrocando } from './modo'
 import type { Narrador } from './narracao'
 import { indiceInicial, useCursor, type Navegacao } from './proximo'
 import { MODOS, useTema } from './tema'
 
 // Um tema claro e um escuro; qual vale vem da escolha da pessoa (tema.tsx) ou, em "Sistema", do prefers-color-scheme. O fundo do diff vem de estilo/telas.css.
-const TEMAS = { light: 'github-light', dark: 'github-dark' } as const
+export const TEMAS = { light: 'github-light', dark: 'github-dark' } as const
 
 export interface Contexto {
   revisao: Revisao
   estado: Estado
   decidir: Decidir
+  achados: AchadosEscolhidos
+  escolherAchados: EscolherAchados
   ladoALado: boolean
   narrador: Narrador
   mapa: { aberto: boolean; alternar: () => void }

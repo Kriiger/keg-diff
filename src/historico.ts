@@ -3,7 +3,7 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { LinhaDoHistorico, Revisao } from './contrato.js'
-import { lerEstado, lerNota } from './estado.js'
+import { lerAchados, lerEstado, lerNota } from './estado.js'
 import { contarAchados } from './feedback.js'
 import type { Sessao } from './sessao.js'
 
@@ -33,7 +33,7 @@ export function registrarRevisao(pastaDaRevisao: string, sessao: Sessao): boolea
     registradoEm: new Date().toISOString(),
     base: revisao.base,
     tempoSegundos: sessao.segundos,
-    achados: contarAchados(revisao, estado),
+    achados: contarAchados(revisao, estado, lerAchados(pastaDaRevisao)),
     passos: {
       total: passosAlterados + revisao.orfaos.length,
       falsosPositivos: revisao.orfaos.filter(o => o.hunkIds.some(id => estado[id]?.decisao === 'falso-positivo')).length,

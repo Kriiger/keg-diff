@@ -1,5 +1,12 @@
-/* A gaveta do mapa: painel de vidro que sobe de baixo, ao lado da lateral (12px de vão dela e das bordas; recolhida ou gaveta, ele começa na borda). */
-.mapa-do-fluxo { position: fixed; left: calc(var(--largura) + 24px); right: 12px; bottom: 12px; height: var(--gaveta); z-index: 5; display: flex; flex-direction: column; overflow: hidden; border-radius: 16px; opacity: 0; will-change: transform, opacity; transition: var(--transicao-cores), height var(--duracao-longa) var(--curva); }
+/* A gaveta do mapa: painel que sobe de baixo, ao lado da lateral (12px de vão dela e das bordas; recolhida ou gaveta, ele começa na borda).
+   Ela cobre metade da tela sobre o diff que rola e anima, então não leva backdrop-filter: o fundo é quase opaco (--vidro-denso).
+   A altura nunca anima (isso refaria o layout e redimensionaria o mapa a cada quadro): maximizar e restaurar aplicam a altura de uma vez
+   e animam um clip-path por cima (gaveta.ts); a contenção mantém o layout de dentro dela longe do resto da página. */
+.mapa-do-fluxo {
+  position: fixed; left: calc(var(--largura) + 24px); right: 12px; bottom: 12px; height: var(--gaveta); z-index: 5; display: flex; flex-direction: column; overflow: hidden; contain: layout paint;
+  border-radius: 16px; opacity: 0;
+  background: var(--vidro-denso); border: 1px solid var(--vidro-borda); box-shadow: var(--vidro-brilho), var(--vidro-sombra);
+}
 :root[data-lateral='recolhida'] .mapa-do-fluxo { left: 12px; }
 /* Invisível até o mapa.tsx liberar a subida (um quadro depois da montagem); sem transição de opacidade aqui, a troca é seca. */
 .mapa-do-fluxo[data-subindo="true"] { opacity: 1; animation: subir var(--duracao-longa) var(--curva); }
@@ -108,12 +115,12 @@
 .mapa-do-fluxo > header .situacao-do-mapa { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; font-size: 12px; color: var(--texto-miudo); }
 .mapa-do-fluxo > header .resumo-do-mapa { font-weight: var(--peso-destaque); color: var(--texto); }
 
-/* A alça no topo da gaveta (gaveta.ts): arrastar ou as setas mudam a altura. Durante o arrasto a gaveta e a barra de botões seguem o ponteiro sem transição. */
+/* A alça no topo da gaveta (gaveta.ts): arrastar ou as setas mudam a altura. Durante o arrasto a gaveta (height inline) e a barra de botões (--gaveta inline) seguem o ponteiro sem transição. */
 .alca-da-gaveta { position: absolute; top: 0; left: 0; right: 0; height: 14px; z-index: 3; display: flex; justify-content: center; align-items: center; cursor: ns-resize; touch-action: none; }
 .alca-da-gaveta::before { content: ''; width: 40px; height: 4px; border-radius: 999px; background: var(--suave); opacity: .5; transition: opacity var(--duracao) var(--curva); }
 .alca-da-gaveta:hover::before, .alca-da-gaveta:focus-visible::before { opacity: 1; }
 .alca-da-gaveta:focus-visible { outline: none; box-shadow: var(--foco); border-radius: 16px 16px 0 0; }
-.pagina[data-gaveta-arrastando] .mapa-do-fluxo, .pagina[data-gaveta-arrastando] .dicas { transition: none; }
+.pagina[data-gaveta-arrastando] .dicas { transition: none; }
 
 /* A janela externa: o mapa ocupa a janela inteira, sem vão, sem alça e sem a lateral. O seletor com :root vence o que a lateral faz com a gaveta. */
 :root .mapa-do-fluxo.externo { position: fixed; inset: 0; height: auto; border-radius: 0; border: 0; background: var(--fundo); animation: none; opacity: 1; }

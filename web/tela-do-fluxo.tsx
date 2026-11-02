@@ -64,7 +64,7 @@ export function TelaDoFluxo(props: PropsDaTela) {
   )
 }
 
-function PassoAPasso({ fluxo, revisao, estado, decidir, ladoALado, narrador, mapa, navegacao, indice, setIndice }: PropsDaTela & { indice: number; setIndice: (indice: number | ((atual: number) => number)) => void }) {
+function PassoAPasso({ fluxo, revisao, estado, decidir, achados, escolherAchados, ladoALado, narrador, mapa, navegacao, indice, setIndice }: PropsDaTela & { indice: number; setIndice: (indice: number | ((atual: number) => number)) => void }) {
   const [comentando, setComentando] = useState(false)
   const [destaque, setDestaque] = useState<[number, number] | null>(null)
   const passo = fluxo.passos[indice] ?? fluxo.passos[0]!
@@ -110,7 +110,7 @@ function PassoAPasso({ fluxo, revisao, estado, decidir, ladoALado, narrador, map
         </div>
         <article className="passo">
           <h2><span className={`papel papel-${passo.papel}`}>{passo.papel}</span> {passo.simbolo} <span className="local"><Caminho caminho={passo.arquivo} />:{passo.linhas[0]}–{passo.linhas[1]}</span></h2>
-          <FrasesDoPasso passo={passo} fluxo={fluxo} narrador={narrador} destacar={setDestaque} />
+          <FrasesDoPasso passo={passo} fluxo={fluxo} narrador={narrador} destacar={setDestaque} achados={achados} escolher={escolherAchados} />
           {(passo.avisos ?? []).map(aviso => <p key={aviso} className="alerta">{aviso}</p>)}
           <Decisoes hunkIds={passo.hunkIds} opcoes={['revisado']} estado={estado} decidir={decidir} comentando={comentando} setComentando={setComentando} />
           {passo.hunkIds.length > 0

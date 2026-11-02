@@ -1,7 +1,8 @@
 // O narrador na página: frases presas a linhas do diff, a frase mecânica quando não há IA e os avisos do topo.
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
-import type { EstadoDoNarrador, Fluxo, Passo } from '../src/contrato'
+import { chaveDaFrase, type AchadosEscolhidos, type EstadoDoNarrador, type Fluxo, type Passo } from '../src/contrato'
 import { escutar, tolerarQueda } from './eventos'
+import type { EscolherAchados } from './main'
 
 export interface Narrador {
   estado?: EstadoDoNarrador
@@ -64,22 +65,32 @@ export function BotaoNarrarTodos({ fluxos, narrador }: { fluxos: Fluxo[]; narrad
 }
 
 // Passar o mouse numa frase acende no diff as linhas da âncora. Frase sem âncora válida aparece marcada.
-export function FrasesDoPasso({ passo, fluxo, narrador, destacar }: { passo: Passo; fluxo: Fluxo; narrador: Narrador; destacar: (linhas: Linhas) => void }) {
+// O botão no fim da linha leva a frase para o feedback da correção; clicar nele não mexe no destaque.
+export function FrasesDoPasso({ passo, fluxo, narrador, destacar, achados, escolher }: { passo: Passo; fluxo: Fluxo; narrador: Narrador; destacar: (linhas: Linhas) => void; achados: AchadosEscolhidos; escolher: EscolherAchados }) {
   const { explicacao } = passo
   if (!explicacao) return <MecanicaDoPasso passo={passo} fluxo={fluxo} narrador={narrador} />
   return (
     <ul className="frases">
-      {explicacao.frases.map(({ texto, linhas }) => (
-        <li
-          key={texto} tabIndex={0} className={/^atenção:/i.test(texto) ? 'atencao' : ''}
-          onMouseEnter={() => destacar(linhas)} onMouseLeave={() => destacar(null)} onFocus={() => destacar(linhas)} onBlur={() => destacar(null)}
-        >
-          {texto}{' '}
-          {linhas
-            ? <span className="local">linhas {linhas[0]}–{linhas[1]}</span>
-            : <span className="sem-ancora" title="As linhas citadas estão fora do passo ou faltam: confira no código">sem âncora válida</span>}
-        </li>
-      ))}
+      {explicacao.frases.map(({ texto, linhas }) => {
+        const chave = chaveDaFrase(passo.hunkIds, texto)
+        const dentro = chave in achados
+        return (
+          <li
+            key={texto} tabIndex={0} className={/^atenção:/i.test(texto) ? 'atencao' : ''}
+            onMouseEnter={() => destacar(linhas)} onMouseLeave={() => destacar(null)} onFocus={() => destacar(linhas)} onBlur={() => destacar(null)}
+          >
+            {texto}{' '}
+            {linhas
+              ? <span className="local">linhas {linhas[0]}–{linhas[1]}</span>
+              : <span className="sem-ancora" title="As linhas citadas estão fora do passo ou faltam: confira no código">sem âncora válida</span>}
+            {passo.hunkIds.length > 0 && (
+              <button className={dentro ? 'na-correcao ativa' : 'na-correcao'} aria-pressed={dentro} onClick={e => { e.stopPropagation(); escolher([chave], !dentro) }}>
+                {dentro ? 'na correção ✓' : '+ correção'}
+              </button>
+            )}
+          </li>
+        )
+      })}
     </ul>
   )
 }
