@@ -10,6 +10,10 @@ import { idDoNo, type ArquivoAlterado, type Fluxo, type Orfao, type Passo, type 
 
 const SALTOS_MAXIMOS = 6
 const RISCOS = ['baixo', 'baixo', 'medio', 'alto', 'alto'] as const
+// Dois fluxos viram um quando o menor tem pelo menos esta fração dos trechos alterados dentro do outro,
+// desde que o resultado não passe do teto de passos: um fluxo maior que isso deixa de ser lido de uma vez.
+const SOBREPOSICAO_MINIMA = 0.8
+const PASSOS_MAXIMOS = 32
 
 export interface Aresta { de: Unidade; para: Unidade; linha: number; fronteira?: Fronteira; usoDeTipo?: boolean }
 // Trilha é o caminho de uma unidade alterada: da fonte até ela e dela (ou de quem a chamou) até a saída.
@@ -33,8 +37,7 @@ export function montarRevisao(alterados: ArquivoAlterado[], analisador: Analisad
     else trilhas.push(trilha, ...trilhasPorHttp(unidade, trilha, trechos, analisador))
   }
 
-  const fluxos = juntarTrilhas(trilhas)
-    .map(grupo => montarFluxo(grupo, trechos, analisador))
+  const fluxos = juntarFluxosParecidos(juntarTrilhas(trilhas), trechos, analisador)
     .sort((a, b) => RISCOS.indexOf(b.risco) - RISCOS.indexOf(a.risco) || a.titulo.localeCompare(b.titulo))
   return {
     versao: 1,
@@ -197,13 +200,58 @@ function juntarTrilhas(trilhas: Trilha[]): Trilha[][] {
   return [...grupos.values()]
 }
 
+// Cada componente tem a própria saída (a tela), então o pai de vários filhos alterados vira "nasce" em um fluxo por filho,
+// todos com quase os mesmos trechos. Fluxos em que o menor tem SOBREPOSICAO_MINIMA dos trechos alterados dentro do outro
+// são refeitos como um só, do par mais parecido (Jaccard) para o menos, e a junção que passaria de PASSOS_MAXIMOS não acontece.
+// O fluxo juntado é montado de novo com as trilhas de todos: passos sem repetição, risco da saída de maior risco e a entrada
+// do fluxo mais arriscado. O id sai das unidades, então não depende da ordem em que a junção aconteceu.
+function juntarFluxosParecidos(grupos: Trilha[][], trechos: Map<Unidade, string[]>, analisador: Analisador): Fluxo[] {
+  interface Candidato { grupo: Trilha[]; fluxo: Fluxo; hunks: Set<string>; partes: Unidade[] }
+  const hunksDe = (fluxo: Fluxo) => new Set(fluxo.passos.flatMap(p => p.hunkIds))
+  let candidatos: Candidato[] = grupos.map(grupo => {
+    const fluxo = montarFluxo(grupo, trechos, analisador)
+    return { grupo, fluxo, hunks: hunksDe(fluxo), partes: [saidaDoGrupo(grupo)] }
+  })
+  const tentadas = new Set<string>()
+  for (;;) {
+    const pares: { a: Candidato; b: Candidato; jaccard: number }[] = []
+    for (const [i, a] of candidatos.entries()) {
+      for (const b of candidatos.slice(i + 1)) {
+        const comum = [...a.hunks].filter(h => b.hunks.has(h)).length
+        const menor = Math.min(a.hunks.size, b.hunks.size)
+        if (menor === 0 || comum / menor < SOBREPOSICAO_MINIMA || tentadas.has(chaveDoPar(a, b))) continue
+        pares.push({ a, b, jaccard: comum / (a.hunks.size + b.hunks.size - comum) })
+      }
+    }
+    pares.sort((x, y) => y.jaccard - x.jaccard || chaveDoPar(x.a, x.b).localeCompare(chaveDoPar(y.a, y.b)))
+    const par = pares[0]
+    if (!par) break
+    const { a, b } = par
+    const partes = [...new Set([...a.partes, ...b.partes])]
+    const grupo = [...a.grupo, ...b.grupo]
+    const fluxo = montarFluxo(grupo, trechos, analisador, partes)
+    if (fluxo.passos.length > PASSOS_MAXIMOS) {
+      tentadas.add(chaveDoPar(a, b))
+      continue
+    }
+    const maisArriscado = [a, b].reduce((x, y) => (RISCOS.indexOf(y.fluxo.risco) > RISCOS.indexOf(x.fluxo.risco) ? y : x))
+    const entrada = maisArriscado.fluxo.entrada ?? fluxo.entrada
+    if (entrada) fluxo.entrada = entrada
+    candidatos = [...candidatos.filter(c => c !== a && c !== b), { grupo, fluxo, hunks: hunksDe(fluxo), partes }]
+  }
+  return candidatos.map(c => c.fluxo)
+}
+
+const chaveDoPar = (a: { fluxo: Fluxo }, b: { fluxo: Fluxo }) => [a.fluxo.id, b.fluxo.id].sort().join('+')
+
 function saidaDoGrupo(grupo: Trilha[]): Unidade {
   return grupo.map(t => t.saida).reduce((a, b) => (riscoDasSaidas(b.saidas) > riscoDasSaidas(a.saidas) ? b : a))
 }
 
 // A ordem dos passos segue a execução: de cada começo, a unidade visita quem ela chama na ordem das linhas.
 // A saída que ainda chama outros passos aparece de novo no fim, quando o valor volta para ela.
-function montarFluxo(grupo: Trilha[], trechos: Map<Unidade, string[]>, analisador: Analisador): Fluxo {
+// Fluxo juntado de vários: "partes" são as saídas de cada um, e o título as lista depois da seta.
+function montarFluxo(grupo: Trilha[], trechos: Map<Unidade, string[]>, analisador: Analisador, partes: Unidade[] = []): Fluxo {
   const saida = saidaDoGrupo(grupo)
   const unidades = new Set(grupo.flatMap(t => [...t.unidades]))
   const arestas = new Map<string, Aresta>()
@@ -247,12 +295,21 @@ function montarFluxo(grupo: Trilha[], trechos: Map<Unidade, string[]>, analisado
   const primeira = comecos[0] ?? saida
   return {
     id: createHash('sha1').update([...unidades].map(u => u.chave).sort().join('\n')).digest('hex').slice(0, 10),
-    titulo: primeira === saida ? rotulo(primeira) : `${rotulo(primeira)} → ${rotulo(saida)}`,
+    titulo: partes.length > 1 ? tituloDeVarios(primeira, partes) : primeira === saida ? rotulo(primeira) : `${rotulo(primeira)} → ${rotulo(saida)}`,
     risco: RISCOS[riscoDasSaidas(saida.saidas)]!,
     entrada: [...primeira.fontes][0],
     saida: saidaPrincipal(saida.saidas),
     passos,
   }
+}
+
+// "App → Mapa, Lateral, +2": o começo e as saídas dos fluxos juntados, as mais arriscadas primeiro. O próprio começo só sai
+// da lista se sobra outra saída; quando a lista passa de três, o resto vira o "+N".
+function tituloDeVarios(primeira: Unidade, partes: Unidade[]): string {
+  const rotulos = [...partes].sort((a, b) => riscoDasSaidas(b.saidas) - riscoDasSaidas(a.saidas) || rotulo(a).localeCompare(rotulo(b))).map(rotulo)
+  const outras = [...new Set(rotulos)].filter(r => r !== rotulo(primeira))
+  if (outras.length === 0) return rotulo(primeira)
+  return `${rotulo(primeira)} → ${outras.slice(0, 3).join(', ')}${outras.length > 3 ? `, +${outras.length - 3}` : ''}`
 }
 
 // Fonte alterada que devolve o valor a uma unidade do fluxo, como a consulta ao banco num helper:
