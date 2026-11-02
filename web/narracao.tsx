@@ -87,7 +87,7 @@ export function FrasesDoOrfao({ explicacao, hunkIds, grupo, narrador, destacar, 
 
 // Passar o mouse numa frase acende no diff as linhas da âncora. Frase sem âncora válida aparece marcada.
 // O botão no fim da linha leva a frase para o feedback da correção; clicar nele não mexe no destaque.
-function ListaDeFrases({ explicacao, hunkIds, destacar, achados, escolher }: { explicacao: Explicacao; hunkIds: string[]; destacar: (linhas: Linhas) => void; achados: AchadosEscolhidos; escolher: EscolherAchados }) {
+export function ListaDeFrases({ explicacao, hunkIds, destacar, achados, escolher }: { explicacao: Explicacao; hunkIds: string[]; destacar: (linhas: Linhas) => void; achados: AchadosEscolhidos; escolher: EscolherAchados }) {
   return (
     <ul className="frases">
       {explicacao.frases.map(({ texto, linhas }) => {

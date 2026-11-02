@@ -46,3 +46,11 @@
 .linhas .menos { color: var(--alto); }
 
 .tela-do-arquivo > header h1 { overflow-wrap: anywhere; }
+
+/* O arquivo aberto no modo árvore: o botão do arquivo inteiro vai para a ponta do cabeçalho e a lista de fluxos fica logo embaixo. */
+.tela-do-arquivo > header > button { margin-left: auto; }
+.fluxos-do-arquivo { margin: 0 0 14px; font-size: 13px; overflow-wrap: anywhere; }
+.fluxos-do-arquivo a { color: var(--acento); font-weight: var(--peso-rotulo); }
+/* O pedido de narração é discreto: parece um link, não um botão de decisão. */
+.narrar-trecho { padding: 0; border: 0; background: none; box-shadow: none; color: var(--acento); font: inherit; font-size: 12.5px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.trecho > .detalhe { margin: 8px 0; }

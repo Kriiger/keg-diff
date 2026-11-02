@@ -151,7 +151,7 @@ function App() {
   return (
     <div className={modo === 'fluxo' && mapaAberto && fluxoAberto ? 'pagina com-mapa' : 'pagina'}>
       {modo === 'arvore'
-        ? <ModoArvore revisao={revisao} estado={estado} decidir={decidir} comentarLinha={comentarLinha} ladoALado={ladoALado} cabeca={<CabecaDaLateral revisao={revisao} checklist={checklist} estado={estado} />}>{avisoDeServidor}</ModoArvore>
+        ? <ModoArvore revisao={revisao} estado={estado} decidir={decidir} comentarLinha={comentarLinha} ladoALado={ladoALado} narrador={narrador} achados={achados} escolherAchados={escolherAchados} cabeca={<CabecaDaLateral revisao={revisao} checklist={checklist} estado={estado} />}>{avisoDeServidor}<AvisoDoNarrador narrador={narrador} /></ModoArvore>
         : <>
           <LateralDoFluxo revisao={revisao} checklist={checklist} estado={estado} endereco={rota} secoes={SECOES} />
           <main className="conteudo">
@@ -182,14 +182,15 @@ function TelaAtual({ rota, fluxo, passoInicial, itemInicial, checklist, segundos
 
 // A mesma lista do README e dos useAtalhos: mudou uma, mude as outras.
 const ATALHOS = [
-  ['j / k', 'próximo e anterior (passo no fluxo, pulando os já vistos em outro fluxo; item nas listas, arquivo na árvore)'],
+  ['j / k', 'próximo e anterior (passo no fluxo, pulando os já vistos em outro fluxo; item nas listas; trecho na árvore, passando ao arquivo vizinho nas pontas)'],
   ['n', 'vai ao próximo trecho ainda não revisado, em qualquer tela; sem nenhum, abre o fechamento (modo fluxo)'],
   ['[ / ]', 'fluxo anterior e próximo (depois dos fluxos, os grupos de trechos)'],
-  ['x', 'marca revisado (de novo desfaz); na árvore, o arquivo inteiro'],
+  ['x', 'marca revisado (de novo desfaz); na árvore, o trecho atual, e o cursor vai ao próximo trecho sem decisão'],
+  ['X', 'na árvore, marca o arquivo inteiro como revisado (de novo desfaz)'],
   ['c', 'comenta'],
   ['⌥D', 'na caixa de comentário, alterna entre corrija e dúvida (a dúvida pede resposta, não correção)'],
-  ['d', 'código morto (órfãos)'],
-  ['f', 'falso positivo (órfãos); com o mapa aberto, ajusta a vista para ver tudo'],
+  ['d', 'código morto (órfãos, também na árvore)'],
+  ['f', 'falso positivo (órfãos, também na árvore); com o mapa aberto, ajusta a vista para ver tudo'],
   ['v', 'modo fluxo ou modo árvore (arquivos e pastas)'],
   ['l', 'diff lado a lado ou empilhado'],
   ['a', 'aparência: tema do sistema, claro ou escuro'],
