@@ -1,13 +1,16 @@
 // A lateral da revisão, nos dois modos: um painel flutuante com a marca e o progresso no topo, as seções recolhíveis no meio
 // e, se houver, um rodapé fixo. O modo fluxo monta as seções aqui; o modo árvore (arvore.tsx) usa o mesmo molde e as mesmas seções.
-import { useId, useState, type MouseEvent, type ReactNode } from 'react'
+import { useId, useMemo, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import type { Estado, Revisao } from '../src/contrato'
 import { Icone, type NomeDoIcone } from './icones'
 import { Logo } from './logo'
 import type { Checklist } from './main'
 import { alternarLateral, fecharGaveta, useLateralAberta } from './recolher'
-import { arquivosDoFluxo, nomesCurtos, plural } from './resumo'
+import { HierarquiaDeFluxos } from './hierarquia-de-fluxos'
+import { montarHierarquia, type FluxoDaLista } from './hierarquia'
+import { arquivosDoFluxo, plural } from './resumo'
 import { decididos, encurtarBase } from './telas'
+import { ArquivosDosFluxos, TrilhaDoFluxo } from './trilha-de-arquivos'
 
 type Grupo = 'orfaos' | 'testes' | 'outros'
 const ICONE_DO_GRUPO: Record<Grupo, NomeDoIcone> = { orfaos: 'orfao', testes: 'teste', outros: 'outros' }
@@ -92,12 +95,14 @@ interface PropsDoItem {
   progresso?: { feitos: number; total: number; nota?: string }
   risco?: string
   dica?: string
-  sub?: string
+  sub?: ReactNode
+  nivel?: number               // dentro da hierarquia de fluxos: o recuo vem do nível, como na árvore
 }
 
-function ItemDaLateral({ destino, rotulo, icone, endereco, progresso, risco, dica, sub }: PropsDoItem) {
+function ItemDaLateral({ destino, rotulo, icone, endereco, progresso, risco, dica, sub, nivel }: PropsDoItem) {
+  const recuo = nivel === undefined ? undefined : ({ '--nivel': nivel } as CSSProperties)
   return (
-    <a href={`#${destino}`} className={risco ? `item-da-lista risco-${risco}` : 'item-da-lista'} aria-current={endereco === destino ? 'page' : undefined} title={dica}>
+    <a href={`#${destino}`} className={risco ? `item-da-lista risco-${risco}` : 'item-da-lista'} aria-current={endereco === destino ? 'page' : undefined} title={dica} style={recuo}>
       <Icone nome={icone} />
       <span className="rotulo">{rotulo}{sub && <span className="sub-do-item">{sub}</span>}</span>
       {progresso && <Contagem {...progresso} />}
@@ -124,6 +129,12 @@ export function LateralDoFluxo({ revisao, checklist, estado, endereco, secoes }:
   const doFluxo = checklist.fluxos.flatMap(f => f.hunkIds)
   const nota = doFluxo.length > new Set(doFluxo).size ? 'Um trecho pode estar em mais de um fluxo.' : undefined
   const grupos = (Object.keys(secoes) as Grupo[]).filter(grupo => checklist[grupo].length > 0)
+  // Os fluxos com passos em comum dividem um nó (hierarquia.ts); a linha de cada fluxo é a de sempre.
+  const hierarquia = useMemo(() => montarHierarquia(checklist.fluxos), [checklist])
+  const linhaDoFluxo = ({ fluxo, hunkIds }: FluxoDaLista, nivel?: number) => {
+    const arquivos = arquivosDoFluxo(fluxo)
+    return <ItemDaLateral key={fluxo.id} destino={`fluxo/${fluxo.id}`} rotulo={fluxo.titulo} icone="fluxo" endereco={endereco} progresso={{ ...progresso(hunkIds), nota }} risco={fluxo.risco} sub={<TrilhaDoFluxo fluxo={fluxo} todos={todos} />} dica={arquivos.length > 0 ? `Passa por ${arquivos.join(', ')}` : undefined} nivel={nivel} />
+  }
   const fechamento = <ItemDaLateral destino="fechamento" rotulo="Fechamento" icone="fechar" endereco={endereco} progresso={progresso(checklist.todos)} />
   return (
     <MoldeDaLateral cabeca={<CabecaDaLateral revisao={revisao} checklist={checklist} estado={estado} />} rodape={fechamento}>
@@ -131,10 +142,8 @@ export function LateralDoFluxo({ revisao, checklist, estado, endereco, secoes }:
       {checklist.fluxos.length > 0 && (
         <SecaoRecolhivel titulo="Fluxos">
           <p className="nota-da-secao">{plural(checklist.fluxos.length, 'fluxo', 'fluxos')} atravessando {plural(revisao.arquivos.length, 'arquivo', 'arquivos')} do diff. {nota}</p>
-          {checklist.fluxos.map(({ fluxo, hunkIds }) => {
-            const arquivos = arquivosDoFluxo(fluxo)
-            return <ItemDaLateral key={fluxo.id} destino={`fluxo/${fluxo.id}`} rotulo={fluxo.titulo} icone="fluxo" endereco={endereco} progresso={{ ...progresso(hunkIds), nota }} risco={fluxo.risco} sub={nomesCurtos(arquivos, todos).join(' · ')} dica={arquivos.length > 0 ? `Passa por ${arquivos.join(', ')}` : undefined} />
-          })}
+          <ArquivosDosFluxos fluxos={checklist.fluxos.map(f => f.fluxo)} todos={todos} />
+          <HierarquiaDeFluxos nos={hierarquia} estado={estado} endereco={endereco} todos={todos} linha={linhaDoFluxo} />
         </SecaoRecolhivel>
       )}
       {grupos.length > 0 && (

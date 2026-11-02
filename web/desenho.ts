@@ -17,7 +17,8 @@ void elk.layout({
   edges: [{ id: 'a>b', sources: ['a'], targets: ['b'] }, { id: 'b>c', sources: ['b'], targets: ['c'] }, { id: 'a>c', sources: ['a'], targets: ['c'] }],
 })
 
-// Enquanto o ELK trabalha, fica o desenho anterior. `calcular` começa o cálculo (a gaveta já está subindo); quem usa decide quando mostrar.
+// Só devolve o desenho que bate com o que está visível agora: quem usa guarda o anterior (para ancorar o novo) e decide quando mostrar.
+// `calcular` começa o cálculo (a gaveta já está subindo).
 export function useDesenho(grafo: Grafo | undefined, visiveis: Set<string>, arestas: ArestaDoGrafo[], calcular: boolean): Desenho | undefined {
   const [desenho, setDesenho] = useState<Desenho>()
   const chave = `${[...visiveis].sort().join('|')}#${arestas.length}`
@@ -28,12 +29,13 @@ export function useDesenho(grafo: Grafo | undefined, visiveis: Set<string>, ares
     const guardado = calculados.get(chave)
     if (guardado) return setDesenho(guardado)
     let vigente = true
-    calcularLayout(elk, [...visiveis], arestas).then(layout => {
+    const porId = new Map(grafo.nos.map(no => [no.id, no]))
+    calcularLayout(elk, [...visiveis].flatMap(id => porId.get(id) ?? []), arestas).then(layout => {
       const novo = { ...layout, chave, visiveis, arestas }
       calculados.set(chave, novo)
       if (vigente) setDesenho(novo)
     })
     return () => { vigente = false }
   }, [chave, calcular, grafo])
-  return desenho
+  return desenho?.chave === chave ? desenho : undefined
 }

@@ -32,9 +32,9 @@ export async function verificarLogin(): Promise<{ motivo?: string; metodo?: stri
   return { metodo }
 }
 
-export async function chamarClaude(modelo: string, prompt: string): Promise<Resposta> {
+export async function chamarClaude(modelo: string, esforco: string, prompt: string): Promise<Resposta> {
   const args = [
-    '-p', '--safe-mode', '--tools', '', '--model', modelo,
+    '-p', '--safe-mode', '--tools', '', '--model', modelo, '--effort', esforco,
     '--system-prompt-file', PROMPT_DO_NARRADOR, '--output-format', 'json', '--no-session-persistence',
   ]
   const { saida, falha } = await executar(args, prompt)

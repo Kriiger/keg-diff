@@ -6,9 +6,13 @@ import path from 'node:path'
 import { chamarClaude } from './claude-cli.js'
 import type { Fluxo, Frase, Passo, Revisao } from './contrato.js'
 
-export interface OpcoesDoNarrador {
-  semIa: boolean
+export interface ConfigDoNarrador {
   modelo: string
+  esforco: string
+}
+
+export interface OpcoesDoNarrador extends ConfigDoNarrador {
+  semIa: boolean
 }
 
 interface Narracao {
@@ -17,6 +21,9 @@ interface Narracao {
 }
 
 const MODELO_PADRAO = 'sonnet'
+const ESFORCOS = ['low', 'medium', 'high', 'xhigh', 'max']
+// Narrar frases ancoradas em linhas não pede raciocínio longo: medium gasta bem menos tokens que o padrão do claude.
+const ESFORCO_PADRAO = 'medium'
 const FRASES_POR_PASSO = 3
 const LINHAS_POR_PASSO = 200
 const PROMPT_DO_SISTEMA = readFileSync(path.join(import.meta.dirname, 'narrador.md'), 'utf8')
@@ -24,27 +31,31 @@ const PROMPT_DO_SISTEMA = readFileSync(path.join(import.meta.dirname, 'narrador.
 // Resposta com is_error, como a de limite de uso: a narração para até a pessoa pedir de novo.
 export class PausaDaNarracao extends Error {}
 
-// keg.config.json na raiz do projeto: { "narrador": { "modelo": "sonnet" } }.
-// O modelo vira argumento do claude, então só entra nome que não pareça opção.
-export function lerModelo(raiz: string): string {
+// keg.config.json na raiz do projeto: { "narrador": { "modelo": "sonnet", "esforco": "medium" } }.
+// O modelo vira argumento do claude, então só entra nome que não pareça opção; esforço fora da lista cai no padrão.
+export function lerConfigDoNarrador(raiz: string): ConfigDoNarrador {
   const arquivo = path.join(raiz, 'keg.config.json')
-  let modelo: unknown
+  let narrador: { modelo?: unknown; esforco?: unknown } | undefined
   try {
-    modelo = JSON.parse(readFileSync(arquivo, 'utf8')).narrador?.modelo
+    narrador = JSON.parse(readFileSync(arquivo, 'utf8')).narrador
   } catch {}
-  return typeof modelo === 'string' && /^[A-Za-z0-9][\w.[\]-]*$/.test(modelo) ? modelo : MODELO_PADRAO
+  const { modelo, esforco } = narrador ?? {}
+  return {
+    modelo: typeof modelo === 'string' && /^[A-Za-z0-9][\w.[\]-]*$/.test(modelo) ? modelo : MODELO_PADRAO,
+    esforco: typeof esforco === 'string' && ESFORCOS.includes(esforco) ? esforco : ESFORCO_PADRAO,
+  }
 }
 
 // Deixa a narração do fluxo no cache; quem chama a aplica ao review.json com preencherDoCache.
 // aoChamar avisa de cada chamada ao claude, antes dela, para a conta do consumo não depender de a chamada dar certo.
-export async function narrarFluxo(fluxo: Fluxo, revisao: Revisao, raiz: string, { modelo, aoChamar }: { modelo: string; aoChamar: () => void }) {
+export async function narrarFluxo(fluxo: Fluxo, revisao: Revisao, raiz: string, { modelo, esforco, aoChamar }: ConfigDoNarrador & { aoChamar: () => void }) {
   const prompt = montarPrompt(fluxo, revisao, raiz)
-  const arquivo = arquivoDoCache(raiz, prompt, modelo)
+  const arquivo = arquivoDoCache(raiz, prompt, { modelo, esforco })
   if (existsSync(arquivo)) return
   // JSON fora do formato ganha uma nova tentativa, uma só.
   for (let tentativa = 0; tentativa < 2; tentativa++) {
     aoChamar()
-    const resposta = await chamarClaude(modelo, prompt)
+    const resposta = await chamarClaude(modelo, esforco, prompt)
     if (resposta.erro) throw new PausaDaNarracao(resposta.texto)
     const narracao = validar(resposta.texto, fluxo, modelo)
     if (!narracao) continue
@@ -56,9 +67,9 @@ export async function narrarFluxo(fluxo: Fluxo, revisao: Revisao, raiz: string, 
 }
 
 // O motor monta o review.json com o que já está no cache: fluxo sem trecho novo não é narrado de novo.
-export function preencherDoCache(revisao: Revisao, raiz: string, modelo: string) {
+export function preencherDoCache(revisao: Revisao, raiz: string, config: ConfigDoNarrador) {
   for (const fluxo of revisao.fluxos) {
-    const arquivo = arquivoDoCache(raiz, montarPrompt(fluxo, revisao, raiz), modelo)
+    const arquivo = arquivoDoCache(raiz, montarPrompt(fluxo, revisao, raiz), config)
     if (!existsSync(arquivo)) continue
     const narracao: Narracao = JSON.parse(readFileSync(arquivo, 'utf8'))
     for (const { id, frases } of narracao.passos) {
@@ -68,9 +79,10 @@ export function preencherDoCache(revisao: Revisao, raiz: string, modelo: string)
   }
 }
 
-// O hash cobre as regras do narrador, o modelo e o fluxo inteiro: código de cada passo, trechos e vizinhos.
-function arquivoDoCache(raiz: string, prompt: string, modelo: string): string {
-  const hash = createHash('sha1').update([PROMPT_DO_SISTEMA, modelo, prompt].join('\0')).digest('hex').slice(0, 16)
+// O hash cobre as regras do narrador, o modelo, o esforço e o fluxo inteiro: código de cada passo, trechos e vizinhos.
+// O esforço entra para uma narração feita com outro esforço não ser reaproveitada em silêncio.
+function arquivoDoCache(raiz: string, prompt: string, { modelo, esforco }: ConfigDoNarrador): string {
+  const hash = createHash('sha1').update([PROMPT_DO_SISTEMA, modelo, esforco, prompt].join('\0')).digest('hex').slice(0, 16)
   return path.join(raiz, '.revisao', 'cache', `${hash}.json`)
 }
 

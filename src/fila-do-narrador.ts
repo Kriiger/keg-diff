@@ -24,7 +24,7 @@ export class FilaDoNarrador {
   }
 
   estado(): EstadoDoNarrador {
-    return { ativo: this.motivo === undefined, motivo: this.motivo, pausa: this.pausa, narrando: [...this.fila], falhas: this.falhas, modelo: this.opcoes.modelo }
+    return { ativo: this.motivo === undefined, motivo: this.motivo, pausa: this.pausa, narrando: [...this.fila], falhas: this.falhas, modelo: this.opcoes.modelo, esforco: this.opcoes.esforco }
   }
 
   // "retomar" é a pessoa pedindo de novo depois da pausa; abrir um fluxo não conta.
@@ -72,7 +72,7 @@ export class FilaDoNarrador {
       return
     }
     try {
-      await narrarFluxo(fluxo, revisao, this.raiz, { modelo: this.opcoes.modelo, aoChamar: () => this.sessao.contarChamada() })
+      await narrarFluxo(fluxo, revisao, this.raiz, { modelo: this.opcoes.modelo, esforco: this.opcoes.esforco, aoChamar: () => this.sessao.contarChamada() })
       this.gravarRevisao()
     } catch (erro) {
       if (erro instanceof PausaDaNarracao) {
@@ -88,7 +88,7 @@ export class FilaDoNarrador {
   private gravarRevisao() {
     const antes = readFileSync(this.arquivoDaRevisao, 'utf8')
     const revisao: Revisao = JSON.parse(antes)
-    preencherDoCache(revisao, this.raiz, this.opcoes.modelo)
+    preencherDoCache(revisao, this.raiz, this.opcoes)
     const depois = JSON.stringify(revisao, null, 2) + '\n'
     if (depois !== antes) writeFileSync(this.arquivoDaRevisao, depois)
   }

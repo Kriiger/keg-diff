@@ -63,7 +63,8 @@ Atalhos (a mesma lista aparece na ajuda, tecla `?`), todos fora das caixas de te
 | `v` | modo fluxo ou modo árvore (o mesmo do seletor no canto superior direito) |
 | `l` | diff lado a lado ou empilhado |
 | `a` | aparência: alterna entre tema do sistema, claro e escuro (a escolha fica neste navegador) |
-| `m` | abre e fecha o mapa do fluxo |
+| `m` | abre e fecha o mapa do fluxo; com o mapa numa janela externa, traz essa janela à frente |
+| `z` | com o mapa aberto, maximiza e restaura a altura dele (a alça no topo da gaveta ou as setas ↑ ↓ nela também mudam a altura) |
 | `s` | recolhe e mostra a lateral (a escolha fica neste navegador; no celular a lateral é uma gaveta e `esc` a fecha) |
 | `p` `t` | volta ao panorama; abre o fechamento |
 | `1` a `5` `y` | no fechamento: dá a nota; copia o feedback como prompt |
@@ -128,7 +129,7 @@ Cada passo alterado ganha até três frases curtas, cada uma presa a linhas do p
 - **Trava de login:** antes da primeira chamada, o keg roda `claude auth status`. Só narra com `claude.ai` ou `oauth_token`; com chave de API ou provedor de terceiros não narra e mostra o motivo no topo da página, e sem login pede para você entrar com `claude` (depois, rode o `keg diff` de novo). O processo do narrador nasce sem `ANTHROPIC_API_KEY` e as outras variáveis de chave, numa pasta temporária vazia.
 - **Pausa:** uma resposta com erro, como o limite de uso, pausa a narração e mostra um aviso com o botão "Tentar de novo". Nada se repete sozinho.
 - **Sem narrador:** com `--sem-ia`, sem login ou em pausa, o passo mostra uma frase mecânica montada do grafo ("recebe X de Y, chama Z e entrega W a Y"), e a página diz o motivo. Os tipos dessa frase e das etiquetas saem sem o `import("...")` do compilador e, acima de 60 caracteres, perdem primeiro o miolo dos objetos (`{ a: string; b: number }` vira `{…}`), para o nome do tipo e dos genéricos continuar legível.
-- **Modelo:** `sonnet`. Para trocar, crie `keg.config.json` na raiz do projeto: `{ "narrador": { "modelo": "opus" } }`.
+- **Modelo e esforço:** `sonnet` com esforço `medium`, para gastar menos tokens. Para trocar, crie `keg.config.json` na raiz do projeto: `{ "narrador": { "modelo": "opus", "esforco": "high" } }`. O esforço aceita `low`, `medium`, `high`, `xhigh` e `max`; qualquer outro valor volta para `medium`. Mudar o esforço narra os fluxos de novo, porque o cache é por modelo e esforço.
 
 ## O que fica no seu projeto
 

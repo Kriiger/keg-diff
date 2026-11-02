@@ -8,7 +8,7 @@ import type { Revisao } from './contrato.js'
 import { gravarFeedback } from './feedback.js'
 import { lerHistorico } from './historico.js'
 import { aplicarManifesto } from './manifesto.js'
-import { lerModelo, preencherDoCache, type OpcoesDoNarrador } from './narrador.js'
+import { lerConfigDoNarrador, preencherDoCache, type OpcoesDoNarrador } from './narrador.js'
 import { observarProjeto } from './observador.js'
 import { resumirHistorico } from './resumo-do-historico.js'
 import { abrirTela } from './servidor.js'
@@ -58,7 +58,7 @@ async function rodar() {
   exigirRepositorio()
   const raiz = process.cwd()
   const inicio = performance.now()
-  const narrador = { semIa, modelo: lerModelo(raiz) }
+  const narrador = { semIa, ...lerConfigDoNarrador(raiz) }
   const motor = new Motor(raiz, lerConfig(raiz))
   // Antes da análise: o manifesto que o agente gravou em .revisao/ não pode entrar no diff como arquivo novo.
   esconderDoGit()
@@ -92,7 +92,7 @@ function lerConfig(raiz: string): Config {
 async function gerarRevisao(motor: Motor, argsDoGit: string[], raiz: string, narrador: OpcoesDoNarrador): Promise<Analise> {
   const { revisao, tempos } = await motor.analisar(argsDoGit)
   aplicarManifesto(revisao, raiz)
-  if (!narrador.semIa) preencherDoCache(revisao, raiz, narrador.modelo)
+  if (!narrador.semIa) preencherDoCache(revisao, raiz, narrador)
   const pastaDaRevisao = path.join(raiz, '.revisao')
   mkdirSync(pastaDaRevisao, { recursive: true })
   // Grava num arquivo ao lado e renomeia: a página, avisada no meio da gravação, nunca lê um JSON pela metade.

@@ -29,6 +29,14 @@ function aplicar(tema: Tema) {
   else document.documentElement.dataset.tema = tema
 }
 
+// Outra aba (o mapa em outra janela, por exemplo) trocou o tema: esta acompanha.
+addEventListener('storage', e => {
+  if (e.key !== CHAVE) return
+  atual = lerTema()
+  aplicar(atual)
+  for (const observador of observadores) observador()
+})
+
 export function ciclarTema() {
   atual = ORDEM[(ORDEM.indexOf(atual) + 1) % ORDEM.length]!
   aplicar(atual)

@@ -100,11 +100,49 @@ export function nomesCurtos(caminhos: string[], todos: string[]): string[] {
   return caminhos.map(caminho => (todos.filter(outro => nomeDe(outro) === nomeDe(caminho)).length > 1 ? caminho.split('/').slice(-2).join('/') : nomeDe(caminho)))
 }
 
-export interface LinhaDeFluxo { fluxo: Fluxo; hunkIds: string[]; arquivos: string[]; camadas: Lado[]; nasce: Passo; termina: Passo }
+// Os arquivos na ordem em que o fluxo passa por eles, repetindo quando ele volta ("Dashboard.tsx → route.ts → Dashboard.tsx").
+// Diferente de arquivosDoFluxo, conta também os passos de contexto: é o caminho inteiro, e não só onde o diff está.
+export function trilhaDoFluxo(fluxo: Fluxo): string[] {
+  return fluxo.passos.map(p => p.arquivo).filter((arquivo, i, todos) => arquivo !== todos[i - 1])
+}
+
+// Quantos fluxos passam por cada arquivo (cada fluxo conta uma vez, mesmo voltando ao arquivo), do mais cruzado ao menos.
+export function fluxosPorArquivo(fluxos: Fluxo[]): [string, number][] {
+  const contagem = new Map<string, number>()
+  for (const fluxo of fluxos) {
+    for (const arquivo of new Set(trilhaDoFluxo(fluxo))) contagem.set(arquivo, (contagem.get(arquivo) ?? 0) + 1)
+  }
+  return [...contagem].sort(([a, x], [b, y]) => y - x || a.localeCompare(b))
+}
 
 // A camada de cada passo vem do grafo do mapa (o motor só sabe o lado quando a diretiva, a rota ou o fetch o dizem).
+function ladosDoGrafo(revisao: Revisao): Map<string, Lado | undefined> {
+  return new Map((revisao.grafo?.nos ?? []).map(no => [no.id, no.lado]))
+}
+
+export interface GrupoDePassos { arquivo: string; lado?: Lado; passos: { passo: Passo; indice: number }[] }
+
+// Os passos em grupos de arquivo, na ordem do fluxo: passos seguidos no mesmo arquivo formam um grupo e, quando o fluxo volta a um
+// arquivo, nasce outro grupo dele. Agrupar o arquivo todo de uma vez embaralharia a ordem dos passos.
+export function agruparPassos(fluxo: Fluxo, revisao: Revisao): GrupoDePassos[] {
+  const lados = ladosDoGrafo(revisao)
+  const grupos: GrupoDePassos[] = []
+  fluxo.passos.forEach((passo, indice) => {
+    let grupo = grupos.at(-1)
+    if (grupo?.arquivo !== passo.arquivo) {
+      grupo = { arquivo: passo.arquivo, passos: [] }
+      grupos.push(grupo)
+    }
+    grupo.passos.push({ passo, indice })
+    grupo.lado ??= lados.get(idDoNo(passo))
+  })
+  return grupos
+}
+
+export interface LinhaDeFluxo { fluxo: Fluxo; hunkIds: string[]; arquivos: string[]; camadas: Lado[]; nasce: Passo; termina: Passo }
+
 export function linhasDeFluxo(fluxos: { fluxo: Fluxo; hunkIds: string[] }[], revisao: Revisao): LinhaDeFluxo[] {
-  const lados = new Map((revisao.grafo?.nos ?? []).map(no => [no.id, no.lado]))
+  const lados = ladosDoGrafo(revisao)
   return fluxos.map(({ fluxo, hunkIds }) => {
     const camadas = new Set(fluxo.passos.map(passo => lados.get(idDoNo(passo))))
     return {

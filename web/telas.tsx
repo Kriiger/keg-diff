@@ -1,21 +1,16 @@
-// As telas da revisão: o fluxo passo a passo e as listas de trechos fora dos fluxos.
+// As telas da revisão fora do fluxo (a do fluxo é tela-do-fluxo.tsx): as listas de trechos, o diff dos trechos e os atalhos de uma letra.
 import { PatchDiff } from '@pierre/diffs/react'
-import { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import type { Estado, Fluxo, Passo, Revisao } from '../src/contrato'
-import { Caminho } from './caminho'
+import { useEffect, useRef, useState } from 'react'
+import type { Estado, Revisao } from '../src/contrato'
 import { Decisoes } from './decisoes'
-import { tolerarQueda } from './eventos'
 import type { Decidir, Decisao, Item } from './main'
 import { useTrocando } from './modo'
-import { FrasesDoPasso, semNarracao, type Narrador } from './narracao'
+import type { Narrador } from './narracao'
 import { indiceInicial, useCursor, type Navegacao } from './proximo'
 import { MODOS, useTema } from './tema'
 
 // Um tema claro e um escuro; qual vale vem da escolha da pessoa (tema.tsx) ou, em "Sistema", do prefers-color-scheme. O fundo do diff vem de estilo/telas.css.
 const TEMAS = { light: 'github-light', dark: 'github-dark' } as const
-// O mapa leva o React Flow e o ELK (mais de 1 MB): só baixa quando alguém aperta m.
-const carregarMapa = () => import('./mapa')
-const Mapa = lazy(carregarMapa)
 
 export interface Contexto {
   revisao: Revisao
@@ -52,83 +47,6 @@ export function useAtalhos(atalhos: Record<string, () => void>) {
     addEventListener('keydown', aoTeclar)
     return () => removeEventListener('keydown', aoTeclar)
   }, [])
-}
-
-export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrador, mapa, navegacao, passoInicial }: Contexto & { fluxo: Fluxo; passoInicial?: string }) {
-  // Abre no passo que o n ou o mapa pediu ou, sem pedido, no primeiro passo alterado que ainda espera decisão.
-  const [indice, setIndice] = useState(() => {
-    const pedido = fluxo.passos.findIndex(p => p.id === passoInicial)
-    if (pedido >= 0) return pedido
-    return indiceInicial(navegacao, `fluxo/${fluxo.id}`) ?? Math.max(0, fluxo.passos.findIndex(p => decididos(p.hunkIds, estado) < p.hunkIds.length))
-  })
-  const [comentando, setComentando] = useState(false)
-  const [destaque, setDestaque] = useState<[number, number] | null>(null)
-  const passo = fluxo.passos[indice] ?? fluxo.passos[0]!
-  // O fluxo é narrado quando você o abre. Com o narrador em pausa ou desligado, o pedido nem sai.
-  const narradorPronto = narrador.estado?.ativo === true && !narrador.estado.pausa
-  const faltaNarrar = semNarracao(fluxo)
-  useEffect(() => {
-    if (narradorPronto && faltaNarrar) narrador.pedir([fluxo.id], false)
-  }, [fluxo.id, narradorPronto, faltaNarrar])
-  // Baixa e avalia o mapa (>1 MB) com a página ociosa: se o download caísse na primeira abertura, travaria a subida da gaveta.
-  useEffect(() => {
-    const espera = setTimeout(carregarMapa, 1500)
-    return () => clearTimeout(espera)
-  }, [])
-  // Atualização pela função: j apertado rápido não perde passo entre um render e outro.
-  const andar = (passos: number) => {
-    setComentando(false)
-    setDestaque(null)
-    setIndice(atual => Math.min(Math.max(atual + passos, 0), fluxo.passos.length - 1))
-  }
-  useCursor(navegacao, `fluxo/${fluxo.id}`, indice, destino => andar(destino - indice))
-  const marcar = () => {
-    if (passo.hunkIds.length === 0) return andar(1)
-    const pronto = passo.hunkIds.every(id => estado[id]?.decisao === 'revisado')
-    decidir(passo.hunkIds, pronto ? null : 'revisado')
-    if (!pronto) andar(1)
-  }
-  useAtalhos({ j: () => andar(1), k: () => andar(-1), x: marcar, c: () => setComentando(passo.hunkIds.length > 0), m: mapa.alternar, Escape: () => mapa.aberto && mapa.alternar() })
-
-  return (
-    <section className="tela-do-fluxo">
-      <header>
-        <h1>{fluxo.titulo}</h1>
-        <span className={`selo risco-${fluxo.risco}`}>risco {fluxo.risco}</span>
-        {/* O mapa (>1 MB) baixa e avalia ao apontar o botão: o primeiro clique, antes do prefetch ocioso, não deixa a tela vazia esperando o download. */}
-        <button className="botao-do-mapa" onClick={mapa.alternar} onPointerEnter={carregarMapa} onFocus={carregarMapa}>Mapa <kbd>m</kbd></button>
-      </header>
-      <div className="fluxo">
-        <ol className="linha-do-tempo">
-          {fluxo.passos.map((p, i) => (
-            <li key={p.id}>
-              <button className={`passo-da-linha papel-${p.papel} ${i === indice ? 'atual' : ''}`} onClick={() => andar(i - indice)}>
-                <span className="marcador">{marcadorDoPasso(p, estado)}</span>
-                <span className="papel">{p.papel}</span>
-                <span className="simbolo">{p.simbolo}</span>
-                <span className="local"><Caminho caminho={p.arquivo} />:{p.linhas[0]}</span>
-                {p.fronteira && <span className="fronteira">⇄ {p.fronteira}</span>}
-              </button>
-            </li>
-          ))}
-        </ol>
-        <article className="passo">
-          <h2><span className={`papel papel-${passo.papel}`}>{passo.papel}</span> {passo.simbolo} <span className="local"><Caminho caminho={passo.arquivo} />:{passo.linhas[0]}–{passo.linhas[1]}</span></h2>
-          <FrasesDoPasso passo={passo} fluxo={fluxo} narrador={narrador} destacar={setDestaque} />
-          {(passo.avisos ?? []).map(aviso => <p key={aviso} className="alerta">{aviso}</p>)}
-          <Decisoes hunkIds={passo.hunkIds} opcoes={['revisado']} estado={estado} decidir={decidir} comentando={comentando} setComentando={setComentando} />
-          {passo.hunkIds.length > 0
-            ? <DiffDosTrechos revisao={revisao} arquivo={passo.arquivo} hunkIds={passo.hunkIds} ladoALado={ladoALado} destaque={destaque} />
-            : <CodigoDoPasso key={passo.id} passo={passo} />}
-        </article>
-      </div>
-      {mapa.aberto && (
-        <Suspense fallback={null}>
-          <Mapa revisao={revisao} fluxo={fluxo} indice={indice} irParaPasso={i => andar(i - indice)} fechar={mapa.alternar} />
-        </Suspense>
-      )}
-    </section>
-  )
 }
 
 export function TelaDeTrechos(props: Contexto & { rota: string; titulo: string; explicacao: string; itens: Item[]; opcoes: readonly Decisao[] }) {
@@ -189,26 +107,6 @@ export function DiffDosTrechos({ revisao, arquivo, hunkIds, ladoALado, destaque 
   const patch = [`diff --git a/${arquivo} b/${arquivo}`, `--- ${antes}`, `+++ ${depois}`, ...hunks.map(h => h.patch)].join('\n') + '\n'
   const selecionadas = destaque ? { start: destaque[0], end: destaque[1], side: 'additions' as const, endSide: 'additions' as const } : null
   return <PatchDiff patch={patch} selectedLines={selecionadas} options={{ diffStyle: ladoALado ? 'split' : 'unified', theme: TEMAS, themeType: MODOS[tema], overflow: 'wrap' }} />
-}
-
-// Passo de contexto: não mudou, mas o revisor precisa ver o que ele faz com o dado.
-function CodigoDoPasso({ passo }: { passo: Passo }) {
-  const [codigo, setCodigo] = useState<{ de: number; linhas: string[] }>()
-  useEffect(() => {
-    const [de, ate] = passo.linhas
-    const busca = new URLSearchParams({ arquivo: passo.arquivo, de: String(de), ate: String(Math.min(ate, de + 199)) })
-    fetch(`/api/codigo?${busca}`).then(r => (r.ok ? r.json() : undefined)).then(setCodigo).catch(tolerarQueda)
-  }, [passo])
-  if (!codigo) return null
-  return (
-    <pre className="codigo">
-      {codigo.linhas.map((linha, i) => <div key={i}><span className="numero">{codigo.de + i}</span>{linha}</div>)}
-    </pre>
-  )
-}
-
-function marcadorDoPasso(passo: Passo, estado: Estado): string {
-  return passo.hunkIds.length === 0 ? '○' : marcador(passo.hunkIds, estado)
 }
 
 export function marcador(hunkIds: string[], estado: Estado): string {

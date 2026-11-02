@@ -26,12 +26,27 @@ a:focus-visible { border-radius: 10px; }
 .feedback { background: var(--codigo-fundo); border: 1px solid var(--codigo-borda); border-radius: var(--painel-raio); padding: 14px 16px; white-space: pre-wrap; font: var(--peso-texto) 13px/1.55 var(--fonte-codigo); }
 
 .fluxo { display: grid; grid-template-columns: minmax(230px, 310px) 1fr; gap: 20px; align-items: start; }
-.linha-do-tempo { list-style: none; margin: 0; padding: 10px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+/* Os passos agrupados por arquivo (passos-por-arquivo.tsx) reusam a árvore do modo árvore: .arvore e .linha-da-arvore (arvore.css) dão o recuo
+   por nível e as linhas-guia. O nó do arquivo cresce com o caminho (que quebra nas pastas), em vez de cortá-lo; os passos são filhos de dois
+   a três textos por linha, então a altura deles é a do conteúdo. */
+.linha-do-tempo { margin: 0; padding: 8px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+.passos-por-arquivo ul { gap: 2px; margin: 2px 0 4px; }
+.arvore .linha-da-arvore.grupo-do-arquivo { height: auto; align-items: flex-start; padding-block: 3px; line-height: 18px; }
+.grupo-do-arquivo > .icone { margin-top: 1px; }
+/* A seta dos grupos com a medida da árvore (16px, traço 2) e a cor de texto miúdo: em --suave ela quase sumia sobre o painel dos passos. */
+.passos-por-arquivo .grupo-do-arquivo > .seta { width: 16px; height: 16px; padding: 2px; color: var(--texto-miudo); }
+.grupo-do-arquivo .rotulo { white-space: normal; overflow: visible; }
+.grupo-do-arquivo .caminho { color: var(--texto); font-weight: var(--peso-destaque); }
+.grupo-do-arquivo .pasta-do-caminho { font-weight: var(--peso-rotulo); }
+.lado-do-arquivo, .grupo-do-arquivo .marcador { flex: none; font-size: 11px; color: var(--suave); }
 .passo-da-linha { display: grid; grid-template-columns: 20px 1fr; width: 100%; text-align: left; background: transparent; border: 0; border-radius: 10px; padding: 8px 12px; }
+.passos-por-arquivo .passo-da-linha { padding: 5px 8px 5px calc(var(--base) + var(--nivel) * var(--recuo) + 8px); border-radius: 8px; }
 .passo-da-linha > :not(.marcador) { grid-column: 2; }
 .passo-da-linha .marcador { grid-row: 1 / span 4; }
 .passo-da-linha:hover { background: var(--botao-fundo); }
 .passo-da-linha.atual { background: var(--selecionado); }
+/* O número é a ordem do fluxo inteiro, de um arquivo ao outro: apagado, para o papel colorido continuar sendo o que se lê primeiro. */
+.ordem { margin-right: 6px; font-variant-numeric: tabular-nums; color: var(--suave); }
 .papel { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: var(--peso-destaque); }
 .papel-nasce .papel, .papel.papel-nasce { color: var(--nasce); }
 .papel-processa .papel, .papel.papel-processa { color: var(--processa); }

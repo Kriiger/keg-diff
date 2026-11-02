@@ -215,6 +215,7 @@ export interface EstadoDoNarrador {
   narrando: string[]               // ids dos fluxos na fila ou em andamento
   falhas: Record<string, string>   // id do fluxo -> o que deu errado nele
   modelo: string
+  esforco: string                  // --effort do claude: low, medium, high, xhigh ou max
 }
 
 // .revisao/historico.jsonl — uma linha por revisão que chegou a 100%, com os números da tabela "Como medir" do Roteiro 1.

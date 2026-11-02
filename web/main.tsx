@@ -19,6 +19,8 @@ import { ModoArvore } from './arvore'
 import { useCronometro } from './cronometro'
 import { escutar, reconectar, tolerarQueda, useServidorDesligado } from './eventos'
 import { Fechamento } from './fechamento'
+import { atenderJanelaExterna, ehJanelaExterna } from './janela-do-mapa'
+import { MapaExterno } from './mapa-externo'
 import { CabecaDaLateral, LateralDoFluxo } from './lateral'
 import { alternarModo, useModo } from './modo'
 import { AvisoDoNarrador, useNarrador } from './narracao'
@@ -26,7 +28,8 @@ import { Panorama } from './panorama'
 import { useNavegacao } from './proximo'
 import { alternarLateral, fecharGaveta } from './recolher'
 import { BotaoDoTema, ciclarTema } from './tema'
-import { TelaDeTrechos, TelaDoFluxo, decididos, useAtalhos, type Contexto } from './telas'
+import { TelaDoFluxo } from './tela-do-fluxo'
+import { TelaDeTrechos, decididos, useAtalhos, type Contexto } from './telas'
 
 export type Decisao = Estado[string]['decisao']
 export type Decidir = (hunkIds: string[], decisao: Decisao | null, comentario?: string) => void
@@ -79,6 +82,9 @@ function App() {
   const [tela = '', id, passoDoEndereco] = endereco.split('/')
   const rota = id ? `${tela}/${id}` : tela
   const { navegacao, atalhos } = useNavegacao(checklist, estado, rota)
+
+  // O mapa em outra janela precisa saber que esta página está viva, não importa a tela.
+  useEffect(atenderJanelaExterna, [])
 
   useEffect(() => {
     const carregar = () => {
@@ -145,7 +151,7 @@ function App() {
 // A tela do endereço: um fluxo, um grupo de trechos, o fechamento ou, se nenhum casa, o panorama.
 function TelaAtual({ rota, fluxo, passoInicial, checklist, segundos, contexto }: { rota: string; fluxo?: Fluxo; passoInicial?: string; checklist: Checklist; segundos: () => number; contexto: Contexto }) {
   const { revisao, estado, narrador } = contexto
-  if (fluxo) return <TelaDoFluxo key={fluxo.id} fluxo={fluxo} passoInicial={passoInicial} {...contexto} />
+  if (fluxo) return <TelaDoFluxo fluxo={fluxo} passoInicial={passoInicial} {...contexto} />
   if (rota in SECOES) return <TelaDeTrechos key={rota} rota={rota} {...SECOES[rota as Secao]} itens={checklist[rota as Secao]} {...contexto} />
   if (rota === 'fechamento') return <Fechamento revisao={revisao} checklist={checklist} estado={estado} secoes={SECOES} segundos={segundos} />
   return <Panorama revisao={revisao} checklist={checklist} estado={estado} narrador={narrador} segundos={segundos} />
@@ -163,7 +169,8 @@ const ATALHOS = [
   ['v', 'modo fluxo ou modo árvore (arquivos e pastas)'],
   ['l', 'diff lado a lado ou empilhado'],
   ['a', 'aparência: tema do sistema, claro ou escuro'],
-  ['m', 'abre e fecha o mapa de quem chama quem (no fluxo)'],
+  ['m', 'abre e fecha o mapa de quem chama quem (no fluxo); com o mapa numa janela externa, traz essa janela à frente'],
+  ['z', 'com o mapa aberto, maximiza e restaura a altura dele'],
   ['s', 'recolhe e mostra a lateral'],
   ['p', 'volta ao panorama'],
   ['t', 'abre o fechamento: terminei?'],
@@ -214,4 +221,6 @@ function montarChecklist(revisao: Revisao): Checklist {
 }
 
 recarregarSeChunkSumiu()
-createRoot(document.getElementById('raiz')!).render(<StrictMode><App /></StrictMode>)
+// A janela externa do mapa é a mesma página com o endereço #mapa-externo: o mesmo bundle, outra raiz.
+const Raiz = ehJanelaExterna() ? MapaExterno : App
+createRoot(document.getElementById('raiz')!).render(<StrictMode><Raiz /></StrictMode>)

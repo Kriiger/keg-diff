@@ -137,6 +137,31 @@
 .rotulo { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 /* A linha miúda do fluxo: os arquivos que ele atravessa. Os mesmos nomes se repetem de um fluxo a outro, e é isso que ela mostra. */
 .sub-do-item { display: block; font: var(--peso-texto) 11.5px/16px var(--fonte); color: var(--suave); }
+/* A trilha do fluxo: os arquivos na ordem dos passos, com o ícone do modo árvore. Quebra de linha só nas setas; o nome do arquivo não parte. */
+.trilha { display: block; margin-top: 2px; }
+.trilha-arquivo { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; color: var(--texto-miudo); }
+.trilha-arquivo .icone { width: 12px; height: 12px; }
+.trilha-seta { margin: 0 4px; }
+/* A hierarquia entre fluxos (hierarquia-de-fluxos.tsx): reaproveita a árvore (arvore.css), com um vão entre as linhas como o das seções.
+   O nó do passo dividido tem a seta (botão, que só recolhe) e o rótulo (link, que abre o primeiro fluxo no primeiro passo). A linha de
+   fluxo dentro dela recua com o nível, no mesmo passo de 12px, e a 0 mantém o recuo de 10px das linhas soltas. */
+.hierarquia, .hierarquia ul { gap: 3px; }
+.hierarquia .item-da-lista { padding-left: calc(var(--base) + var(--nivel, 0) * var(--recuo) + 4px); }
+.no-do-grupo { font-weight: var(--peso-rotulo); }
+.alternar-do-grupo { position: relative; flex: none; display: grid; place-items: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 4px; background: transparent; }
+/* A seta tem 16px: a área de clique cresce para fora dela (o toque errava o alvo) sem mexer no layout. */
+.alternar-do-grupo::after { content: ''; position: absolute; inset: -4px -3px; }
+.alternar-do-grupo .seta { color: var(--texto-miudo); }
+.alternar-do-grupo:hover .seta { color: var(--texto); }
+.no-do-grupo .rotulo { display: block; }
+.simbolo-do-grupo { color: var(--texto); font-weight: var(--peso-destaque); }
+.arquivo-do-grupo { color: var(--texto-miudo); font-weight: var(--peso-texto); font-size: 12px; }
+.total-do-grupo { flex: none; font: var(--peso-texto) 11.5px var(--fonte); color: var(--suave); white-space: nowrap; }
+/* O resumo no topo da seção: cada arquivo do diff e quantos fluxos passam por ele, em linhas rentes como as da árvore. */
+.arquivos-dos-fluxos { list-style: none; margin: 0 0 6px; padding: 0 2px; display: flex; flex-direction: column; }
+.arquivos-dos-fluxos li { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 8px; border-radius: 6px; font-size: 12.5px; font-weight: var(--peso-rotulo); }
+.arquivos-dos-fluxos .icone { color: var(--suave); }
+.arquivos-dos-fluxos .rotulo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nota-da-secao { margin: 0 0 4px; padding: 0 10px; font-size: 11.5px; line-height: 1.4; color: var(--suave); }
 .so-leitor { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .contagem { font: var(--peso-rotulo) 12px var(--fonte); font-variant-numeric: tabular-nums; color: var(--suave); }

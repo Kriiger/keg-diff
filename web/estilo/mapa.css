@@ -1,5 +1,5 @@
 /* A gaveta do mapa: painel de vidro que sobe de baixo, ao lado da lateral (12px de vão dela e das bordas; recolhida ou gaveta, ele começa na borda). */
-.mapa-do-fluxo { position: fixed; left: calc(var(--largura) + 24px); right: 12px; bottom: 12px; height: var(--gaveta); z-index: 5; display: flex; flex-direction: column; overflow: hidden; border-radius: 16px; opacity: 0; will-change: transform, opacity; }
+.mapa-do-fluxo { position: fixed; left: calc(var(--largura) + 24px); right: 12px; bottom: 12px; height: var(--gaveta); z-index: 5; display: flex; flex-direction: column; overflow: hidden; border-radius: 16px; opacity: 0; will-change: transform, opacity; transition: var(--transicao-cores), height var(--duracao-longa) var(--curva); }
 :root[data-lateral='recolhida'] .mapa-do-fluxo { left: 12px; }
 /* Invisível até o mapa.tsx liberar a subida (um quadro depois da montagem); sem transição de opacidade aqui, a troca é seca. */
 .mapa-do-fluxo[data-subindo="true"] { opacity: 1; animation: subir var(--duracao-longa) var(--curva); }
@@ -15,7 +15,7 @@
 .mapa-do-fluxo > header .fora-da-vista { padding: 2px 10px; font-size: 12px; color: var(--texto-miudo); background: transparent; box-shadow: inset 0 0 0 1px var(--painel-borda); text-align: left; }
 
 /* As variáveis --xy-* são as do React Flow; o seletor longo vence o tema claro/escuro dele. */
-.pagina .mapa-do-fluxo .react-flow {
+:root .mapa-do-fluxo .react-flow {
   flex: 1; min-height: 0; background: transparent;
   --xy-background-color: transparent; --xy-background-color-default: transparent;
   --xy-background-pattern-dots-color-default: rgb(128 128 128 / .35);
@@ -32,29 +32,63 @@
 .mapa-do-fluxo .react-flow__edge-textbg { rx: 8; }
 .mapa-do-fluxo .react-flow__controls { border: 1px solid var(--painel-borda); border-radius: 12px; overflow: hidden; background: var(--painel-solido); box-shadow: none; }
 
-/* O nó é um painel cinza sobre a gaveta (desfoque dentro de desfoque não refrata); só a borda e a tinta levam a cor do papel. */
+/* O nó é um painel cinza sobre a gaveta (desfoque dentro de desfoque não refrata); só a borda e a tinta levam a cor do papel.
+   248x92 são LARGURA e ALTURA de rotas.ts: o ELK e o Enquadramento calculam com essas medidas.
+   Dois eixos que não se misturam: a TINTA e o selo do rodapé dizem se o trecho mudou neste diff (alterado) ou já existia (vizinho);
+   a BORDA diz se ele é passo do fluxo (cheia, opacidade total) ou contexto de fora dele (tracejada, mais apagada). */
 .no-do-mapa {
-  --cor: var(--processa); width: 232px; height: 72px; padding: 7px 12px; border-radius: 12px; position: relative; overflow: hidden; cursor: pointer;
-  display: flex; flex-direction: column; justify-content: center; font-size: 14px; line-height: 1.3; color: var(--texto);
-  background: var(--painel-solido); border: 1px solid var(--painel-borda);
+  --cor: var(--processa); width: 248px; height: 92px; padding: 7px 12px; border-radius: 12px; position: relative; overflow: hidden; cursor: pointer;
+  display: flex; flex-direction: column; justify-content: center; gap: 1px; font-size: 14px; line-height: 1.3; color: var(--texto);
+  background: var(--painel-solido); border: 1.5px solid var(--suave);
   transition: var(--transicao-cores), opacity var(--duracao) var(--curva);
 }
 .no-do-mapa:hover { background: color-mix(in srgb, var(--painel-solido) 85%, var(--texto)); }
 .no-do-mapa.papel-nasce { --cor: var(--nasce); }
 .no-do-mapa.papel-termina { --cor: var(--termina); }
-.no-do-mapa.alterado { border: 1.5px solid color-mix(in srgb, var(--cor) 65%, transparent); background-image: linear-gradient(color-mix(in srgb, var(--cor) 10%, transparent), color-mix(in srgb, var(--cor) 10%, transparent)); }
-.no-do-mapa.vizinho { border: 1.5px dashed var(--suave); background: transparent; }
+.no-do-mapa.alterado { border-color: color-mix(in srgb, var(--cor) 65%, transparent); background-image: linear-gradient(color-mix(in srgb, var(--cor) 10%, transparent), color-mix(in srgb, var(--cor) 10%, transparent)); }
+.no-do-mapa.vizinho { background: transparent; }
+.no-do-mapa.contexto { border-style: dashed; opacity: .8; }
 /* O passo atual é a posição na revisão e fica marcado pela barra à esquerda; o anel de foco é o destaque temporário (nos.tsx diz "fixado"). */
 .no-do-mapa.atual { border-left: 6px solid var(--texto); padding-left: 9px; }
-.no-do-mapa .pasta-do-caminho { display: none; }
-.no-do-mapa .simbolo, .no-do-mapa .local { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.no-do-mapa .simbolo { font-size: 15px; font-weight: var(--peso-destaque); }
-.no-do-mapa .papel { font-size: 13px; color: color-mix(in srgb, var(--cor) 75%, var(--texto)); }
-.no-do-mapa .local { font-size: 13px; color: var(--texto-miudo); }
-.no-do-mapa .lado { text-transform: none; letter-spacing: 0; font-weight: var(--peso-texto); color: var(--texto-miudo); }
-.no-do-mapa .topo { display: flex; align-items: center; gap: 6px; }
-.no-do-mapa .papel { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* O nome quebra em até duas linhas (nos.tsx põe <wbr> entre as palavras do camelCase); overflow-wrap só age se uma palavra sozinha não couber. */
+.no-do-mapa .simbolo { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 15px; line-height: 1.25; font-weight: var(--peso-destaque); }
+.no-do-mapa .papel { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: color-mix(in srgb, var(--cor) 75%, var(--texto)); }
+.no-do-mapa .topo, .no-do-mapa .rodape { display: flex; align-items: center; gap: 6px; }
+.no-do-mapa .rodape { justify-content: space-between; font-size: 12px; line-height: 16px; color: var(--texto-miudo); }
+.no-do-mapa .linha { flex: none; }
+.no-do-mapa .selo-alterado { font-weight: var(--peso-destaque); color: var(--texto); }
+.no-do-mapa .selo-existia { font-style: italic; }
+.no-do-mapa .linhas { font-weight: var(--peso-texto); font-variant-numeric: tabular-nums; color: var(--texto-miudo); }
+.no-do-mapa .marcas { margin-left: auto; display: flex; flex: none; gap: 4px; }
 .no-do-mapa .mais, .no-do-mapa .relacao { flex: none; font: var(--peso-destaque) 12px/16px var(--fonte); font-variant-numeric: tabular-nums; border-radius: 999px; padding: 0 7px; background: var(--botao-hover); color: var(--texto-miudo); }
+/* Amostra da legenda: o mesmo bloco, em miniatura (as regras de borda e tinta são as de cima). */
+.no-do-mapa.amostra { display: inline-block; width: 22px; height: 14px; padding: 0; border-radius: 4px; cursor: help; flex: none; }
+
+/* O contêiner do arquivo, como uma pasta de árvore: vidro neutro atrás dos blocos (abaixo das ligações, zIndex -1) e o nome do arquivo no topo. */
+.arquivo-do-mapa { position: relative; width: 100%; height: 100%; border-radius: 16px; border: 1px solid var(--painel-borda); background: var(--painel-fundo); }
+.cabeca-do-arquivo { position: absolute; top: 9px; left: 14px; right: 14px; display: flex; align-items: center; gap: 8px; pointer-events: auto; font-size: 13px; }
+/* O nome do arquivo nunca perde letra: quem encolhe e ganha reticências é a pasta. */
+.cabeca-do-arquivo .caminho { display: flex; min-width: 0; font-size: 13px; font-weight: var(--peso-destaque); color: var(--texto); }
+.cabeca-do-arquivo .pasta-do-caminho { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--peso-texto); color: var(--texto-miudo); }
+.lado-do-arquivo { flex: none; margin-left: auto; font: var(--peso-destaque) 12px/16px var(--fonte); border-radius: 999px; padding: 0 8px; background: var(--botao-hover); color: var(--texto-miudo); }
+
+/* Layout novo: os blocos deslizam das posições antigas para as novas, os novos surgem e as ligações reaparecem (o CSS troca de animação
+   a cada versão do desenho, data-camada, para a mesma regra rodar de novo). Sob prefers-reduced-motion o base.css zera as durações. */
+.mapa-do-fluxo .react-flow__node { transition: transform var(--duracao) var(--curva); }
+.mapa-do-fluxo .react-flow__node-no { animation: surgir var(--duracao) var(--curva); }
+.mapa-do-fluxo .area-do-grafo[data-camada="0"] .react-flow__edge { animation: reaparecer-a var(--duracao) var(--curva); }
+.mapa-do-fluxo .area-do-grafo[data-camada="1"] .react-flow__edge { animation: reaparecer-b var(--duracao) var(--curva); }
+@keyframes surgir { from { opacity: 0; } }
+@keyframes reaparecer-a { from { opacity: 0; } }
+@keyframes reaparecer-b { from { opacity: 0; } }
+
+/* O aviso de que o bloco clicado também é alterado em outro fluxo: flutua no canto, sem mexer no tamanho do cabeçalho nem da vista. */
+.mapa-do-fluxo .outro-fluxo { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; max-width: min(560px, calc(100% - 170px)); padding: 6px 12px; border-radius: 12px; font-size: 13px; color: var(--texto-miudo); background: var(--painel-solido); border: 1px solid var(--painel-borda); }
+.mapa-do-fluxo .outro-fluxo strong { color: var(--texto); }
+.mapa-do-fluxo .outro-fluxo a { color: var(--texto); font-weight: var(--peso-destaque); text-decoration: underline; text-underline-offset: 3px; }
+.mapa-do-fluxo .outro-fluxo a:focus-visible { outline: none; box-shadow: var(--foco); border-radius: 4px; }
+.mapa-do-fluxo > header h2 { display: flex; min-width: 0; gap: 6px; }
+.mapa-do-fluxo > header .nome-do-fluxo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--peso-texto); color: var(--texto-miudo); }
 
 /* O destaque (foco.ts): o bloco apontado ganha o anel de foco, quem se liga a ele leva a borda cheia e uma etiqueta com a relação,
    e o resto esmaece. Etiqueta e anel dizem o mesmo que a cor, para o destaque não depender dela. */
@@ -66,10 +100,21 @@
 .mapa-do-fluxo .no-do-mapa.relacao-chama .relacao, .mapa-do-fluxo .no-do-mapa.relacao-ambos .relacao, .mapa-do-fluxo .no-do-mapa.relacao-origem .relacao { color: var(--texto); }
 .mapa-do-fluxo .no-do-mapa.relacao-chamado .relacao, .mapa-do-fluxo .no-do-mapa.relacao-destino .relacao { color: var(--acento); }
 
-.faixa-da-fronteira { width: 44px; position: relative; border-radius: 22px; border-left: 1px dashed var(--suave); border-right: 1px dashed var(--suave); background: var(--painel-fundo); }
-/* O rótulo corre na vertical, dentro dos 44px da faixa: na horizontal ele passava da faixa e do enquadramento (que mede só a faixa) e saía da gaveta. */
-.faixa-da-fronteira span { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); writing-mode: vertical-rl; max-height: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: var(--peso-destaque); color: var(--texto); background: var(--painel-solido); border-radius: 999px; padding: 10px 4px; }
-
 @media (max-width: 860px) {
   .mapa-do-fluxo { left: 12px; }
 }
+
+/* A segunda fileira do cabeçalho: o que está na tela e a legenda dos blocos. */
+.mapa-do-fluxo > header .situacao-do-mapa { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; font-size: 12px; color: var(--texto-miudo); }
+.mapa-do-fluxo > header .resumo-do-mapa { font-weight: var(--peso-destaque); color: var(--texto); }
+
+/* A alça no topo da gaveta (gaveta.ts): arrastar ou as setas mudam a altura. Durante o arrasto a gaveta e a barra de botões seguem o ponteiro sem transição. */
+.alca-da-gaveta { position: absolute; top: 0; left: 0; right: 0; height: 14px; z-index: 3; display: flex; justify-content: center; align-items: center; cursor: ns-resize; touch-action: none; }
+.alca-da-gaveta::before { content: ''; width: 40px; height: 4px; border-radius: 999px; background: var(--suave); opacity: .5; transition: opacity var(--duracao) var(--curva); }
+.alca-da-gaveta:hover::before, .alca-da-gaveta:focus-visible::before { opacity: 1; }
+.alca-da-gaveta:focus-visible { outline: none; box-shadow: var(--foco); border-radius: 16px 16px 0 0; }
+.pagina[data-gaveta-arrastando] .mapa-do-fluxo, .pagina[data-gaveta-arrastando] .dicas { transition: none; }
+
+/* A janela externa: o mapa ocupa a janela inteira, sem vão, sem alça e sem a lateral. O seletor com :root vence o que a lateral faz com a gaveta. */
+:root .mapa-do-fluxo.externo { position: fixed; inset: 0; height: auto; border-radius: 0; border: 0; background: var(--fundo); animation: none; opacity: 1; }
+.aviso-do-mapa-externo { position: fixed; z-index: 10; left: 50%; top: 10px; transform: translateX(-50%); max-width: calc(100% - 32px); margin: 0; padding: 6px 14px; border-radius: 12px; font-size: 13px; color: var(--texto); background: var(--painel-solido); border: 1px solid var(--painel-borda); }
