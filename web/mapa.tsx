@@ -6,9 +6,11 @@ import ELK from 'elkjs/lib/elk.bundled.js'
 import { useEffect, useMemo, useState } from 'react'
 import { idDoNo, type ArestaDoGrafo, type Fluxo, type Grafo, type NoDoGrafo, type Revisao } from '../src/contrato'
 
-const LARGURA = 220
-const ALTURA = 66
+const LARGURA = 232
+const ALTURA = 72
 const LARGURA_DA_FAIXA = 44
+// Abaixo disso o texto do nó fica miúdo demais: num grafo largo, o fitView para aqui e quem lê arrasta o desenho.
+const ZOOM_LEGIVEL = 0.75
 const ROTULOS: Partial<Record<ArestaDoGrafo['tipo'], string>> = { http: 'http', dinamico: 'dinâmico' }
 const OPCOES_DO_ELK = {
   'elk.algorithm': 'layered', 'elk.direction': 'RIGHT',
@@ -74,7 +76,7 @@ export default function Mapa({ revisao, fluxo, indice, irParaPasso, fechar }: Pr
       </header>
       {/* Remontar o React Flow a cada layout reenquadra o desenho, e a expansão sempre cabe na tela. */}
       <ReactFlow key={desenho?.chave} nodes={nos} edges={ligacoes} nodeTypes={TIPOS} onNodeClick={escolher} colorMode="system"
-        nodesConnectable={false} fitView fitViewOptions={{ padding: 0.15, maxZoom: 1 }} minZoom={0.1} attributionPosition="bottom-left">
+        nodesConnectable={false} fitView fitViewOptions={{ padding: 0.15, minZoom: ZOOM_LEGIVEL, maxZoom: 1 }} minZoom={0.1} attributionPosition="bottom-left">
         <Background gap={20} />
         <Controls showInteractive={false} position="bottom-right" />
       </ReactFlow>

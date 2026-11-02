@@ -3,6 +3,10 @@
 import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Estado, Fluxo, Revisao } from '../src/contrato'
+import './estilo/base.css'
+import './estilo/lateral.css'
+import './estilo/telas.css'
+import './estilo/mapa.css'
 import { useCronometro } from './cronometro'
 import { escutar, reconectar, useServidorDesligado } from './eventos'
 import { Fechamento } from './fechamento'
@@ -101,7 +105,7 @@ function App() {
     <div className={mapaAberto && fluxoAberto ? 'pagina com-mapa' : 'pagina'}>
       <Lateral revisao={revisao} checklist={checklist} estado={estado} endereco={rota} />
       <main className="conteudo">
-        {desligado && <p className="alerta grave">Servidor desligado. Rode <code>keg diff</code> de novo: a página reconecta sozinha. <button onClick={reconectar}>Tentar agora</button></p>}
+        {desligado && <p className="alerta grave servidor-desligado" role="alert">Servidor desligado. Rode <code>keg diff</code> de novo: a página reconecta sozinha. <button onClick={reconectar}>Tentar agora</button></p>}
         <AvisoDoNarrador narrador={narrador} />
         <TelaAtual rota={rota} fluxo={fluxoAberto} passoInicial={passoDoEndereco} checklist={checklist} segundos={segundos} contexto={contexto} />
       </main>

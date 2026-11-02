@@ -10,6 +10,8 @@ import { indiceInicial, useCursor, type Navegacao } from './proximo'
 // O mesmo limite do cli.ts: acima disso a revisão não fecha.
 const TRECHOS_DEMAIS = 40
 const ORDEM_DO_RISCO = { alto: 0, medio: 1, baixo: 2 }
+// Um tema claro e um escuro, escolhidos pelo prefers-color-scheme; o fundo do diff vem de estilo/telas.css.
+const TEMAS = { light: 'github-light', dark: 'github-dark' } as const
 const NOMES: Record<Decisao, string> = { revisado: 'Revisado', 'codigo-morto': 'Código morto', 'falso-positivo': 'Falso positivo', comentado: 'Comentado' }
 const TECLAS: Record<Decisao, string> = { revisado: 'x', 'codigo-morto': 'd', 'falso-positivo': 'f', comentado: 'c' }
 // O mapa leva o React Flow e o ELK (mais de 1 MB): só baixa quando alguém aperta m.
@@ -272,7 +274,7 @@ function DiffDosTrechos({ revisao, arquivo, hunkIds, ladoALado, destaque }: { re
   const depois = alterado.status === 'removido' ? '/dev/null' : `b/${arquivo}`
   const patch = [`diff --git a/${arquivo} b/${arquivo}`, `--- ${antes}`, `+++ ${depois}`, ...hunks.map(h => h.patch)].join('\n') + '\n'
   const selecionadas = destaque ? { start: destaque[0], end: destaque[1], side: 'additions' as const, endSide: 'additions' as const } : null
-  return <PatchDiff patch={patch} selectedLines={selecionadas} options={{ diffStyle: ladoALado ? 'split' : 'unified', themeType: 'system', overflow: 'wrap' }} />
+  return <PatchDiff patch={patch} selectedLines={selecionadas} options={{ diffStyle: ladoALado ? 'split' : 'unified', theme: TEMAS, themeType: 'system', overflow: 'wrap' }} />
 }
 
 // Passo de contexto: não mudou, mas o revisor precisa ver o que ele faz com o dado.

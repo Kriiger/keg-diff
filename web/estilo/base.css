@@ -1,0 +1,90 @@
+/* Tokens e peças comuns. Visual sóbrio: fundo neutro, botões em pílula cinza e uma pílula sólida para a ação principal.
+   Cor só onde significa algo (risco, revisado, papéis do fluxo, diff). O vidro é sutil e só nas peças que flutuam. */
+:root {
+  --fundo: #ffffff; --texto: #0f0f0f; --suave: #5f5f5f;
+  --acento: #065fd4; --selecionado: rgb(0 0 0 / .08);
+  --nasce: #1b6e3c; --processa: #4a4a4a; --termina: #8a4a12;
+  --alto: #b3261e; --medio: #7a5200; --baixo: #5f5f5f; --ok: #1b6e3c;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --titulo: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+
+  /* Painel: o cinza discreto das caixas do YouTube. Vidro: o que flutua sobre o conteúdo. */
+  --painel-fundo: rgb(0 0 0 / .05); --painel-solido: #f2f2f2; --painel-borda: rgb(0 0 0 / .06); --painel-raio: 12px;
+  --vidro-fundo: rgb(255 255 255 / .74); --vidro-solido: #ffffff;
+  --vidro-borda: rgb(0 0 0 / .1); --vidro-brilho: inset 0 1px 0 rgb(255 255 255 / .7);
+  --vidro-sombra: 0 6px 24px rgb(0 0 0 / .13), 0 1px 3px rgb(0 0 0 / .08);
+  --vidro-filtro: blur(18px) saturate(140%);
+
+  --escurecer: rgb(0 0 0 / .4);
+  --botao-fundo: rgb(0 0 0 / .05); --botao-hover: rgb(0 0 0 / .1);
+  --primario: #0f0f0f; --primario-hover: #272727; --primario-texto: #ffffff;
+  --codigo-fundo: #fbfbfb; --codigo-borda: rgb(0 0 0 / .1);
+  --foco: 0 0 0 2px var(--fundo), 0 0 0 4px var(--acento);
+  --ritmo: .16s cubic-bezier(.2, .7, .3, 1);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: #0f0f0f; --texto: #f1f1f1; --suave: #aaaaaa;
+    --acento: #3ea6ff; --selecionado: rgb(255 255 255 / .12);
+    --nasce: #7ccf9b; --processa: #b4b4b4; --termina: #e8a26b;
+    --alto: #f28f8f; --medio: #e0b457; --baixo: #aaaaaa; --ok: #7ccf9b;
+
+    --painel-fundo: rgb(255 255 255 / .07); --painel-solido: #212121; --painel-borda: rgb(255 255 255 / .08);
+    --vidro-fundo: rgb(33 33 33 / .72); --vidro-solido: #212121;
+    --vidro-borda: rgb(255 255 255 / .12); --vidro-brilho: inset 0 1px 0 rgb(255 255 255 / .07);
+    --vidro-sombra: 0 8px 30px rgb(0 0 0 / .5), 0 1px 3px rgb(0 0 0 / .4);
+
+    --escurecer: rgb(0 0 0 / .62);
+    --botao-fundo: rgb(255 255 255 / .1); --botao-hover: rgb(255 255 255 / .2);
+    --primario: #f1f1f1; --primario-hover: #d9d9d9; --primario-texto: #0f0f0f;
+    --codigo-fundo: #141414; --codigo-borda: rgb(255 255 255 / .12);
+  }
+}
+
+/* Sem transparência, o vidro e os painéis viram fundo sólido; sem backdrop-filter no navegador, idem. */
+@media (prefers-reduced-transparency: reduce) {
+  :root { --vidro-fundo: var(--vidro-solido); --painel-fundo: var(--painel-solido); --vidro-filtro: none; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --vidro-fundo: var(--vidro-solido); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fundo); color: var(--texto); font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+code, kbd { font-family: var(--mono); font-size: 0.92em; }
+h1, h2 { font-family: var(--titulo); }
+h1 { font-size: 20px; font-weight: 600; margin: 0; }
+h2 { font-size: 15px; font-weight: 600; margin: 0; }
+.detalhe { color: var(--suave); margin: 0; }
+.aviso-central { text-align: center; margin-top: 30vh; color: var(--suave); }
+::selection { background: color-mix(in srgb, var(--acento) 30%, transparent); }
+
+/* O teclado conduz a página inteira: o foco precisa aparecer sobre qualquer superfície. */
+:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+button:focus-visible, textarea:focus-visible { outline-offset: 1px; box-shadow: var(--foco); }
+:focus:not(:focus-visible) { outline: none; }
+
+kbd { display: inline-block; min-width: 1.7em; padding: 0 6px; text-align: center; line-height: 1.55; color: var(--suave); background: var(--botao-fundo); border-radius: 6px; }
+
+button { font: inherit; font-weight: 500; color: inherit; cursor: pointer; }
+button, .selo, .sem-ancora { -webkit-tap-highlight-color: transparent; }
+.botoes button, .alerta button, .narrar-todos, .botao-do-mapa, .mapa-do-fluxo > header button {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; border: 0;
+  background: var(--botao-fundo);
+  transition: background var(--ritmo), color var(--ritmo), transform var(--ritmo);
+}
+.botoes button:hover, .alerta button:hover, .narrar-todos:hover, .botao-do-mapa:hover, .mapa-do-fluxo > header button:hover { background: var(--botao-hover); }
+.botoes button:active, .alerta button:active, .narrar-todos:active, .botao-do-mapa:active, .mapa-do-fluxo > header button:active { transform: scale(.97); }
+.botoes button:disabled, .narrar-todos:disabled { opacity: .5; cursor: not-allowed; }
+/* A decisão ativa e o botão de confirmar são a ação principal: pílula sólida, como o "Inscrever-se". */
+.botoes button.ativa { background: var(--primario); color: var(--primario-texto); font-weight: 600; }
+.botoes button.ativa:hover { background: var(--primario-hover); }
+.botoes button.ativa kbd { color: inherit; background: color-mix(in srgb, var(--primario-texto) 16%, transparent); }
+.notas button { min-width: 44px; justify-content: center; }
