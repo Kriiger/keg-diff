@@ -1,0 +1,28 @@
+/* O modo árvore: pastas e arquivos na lateral, o diff do arquivo escolhido na área principal. */
+.arvore, .arvore ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.arvore ul { margin-top: 4px; }
+
+/* O recuo vai no botão (não na lista) para o fundo do hover ocupar a largura inteira da lateral. */
+.linha-da-arvore { --nivel: 0; display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 0; border-radius: 10px; background: transparent; padding: 6px 10px 6px calc(10px + var(--nivel) * 14px); }
+.linha-da-arvore:hover { background: var(--botao-fundo); }
+.linha-da-arvore.atual { background: var(--selecionado); font-weight: var(--peso-destaque); }
+.linha-da-arvore .rotulo { overflow-wrap: anywhere; }
+.pasta .rotulo { color: var(--suave); }
+.seta { width: 14px; height: 14px; flex: none; color: var(--suave); transition: transform var(--duracao) var(--curva); }
+.seta.aberta { transform: rotate(90deg); }
+
+/* A letra do status (A, M, D, R) só ganha cor quando significa algo: novo, removido e renomeado. Modificado fica neutro. */
+.status { flex: none; width: 14px; text-align: center; font-size: 11px; font-weight: var(--peso-destaque); color: var(--suave); }
+.status-novo { color: var(--ok); }
+.status-removido { color: var(--alto); }
+.status-renomeado { color: var(--acento); }
+.selo.status-novo { --cor: var(--ok); }
+.selo.status-removido { --cor: var(--alto); }
+.selo.status-renomeado { --cor: var(--acento); }
+
+.linhas { display: inline-flex; gap: 6px; font-size: 12px; font-weight: var(--peso-rotulo); font-variant-numeric: tabular-nums; }
+.linha-da-arvore .linhas { margin-left: auto; }
+.linhas .mais { color: var(--ok); }
+.linhas .menos { color: var(--alto); }
+
+.tela-do-arquivo > header h1 { overflow-wrap: anywhere; }

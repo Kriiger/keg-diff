@@ -33,8 +33,9 @@
 .contagem.completa { color: var(--ok); }
 
 /* Barra de botões flutuantes. Com a gaveta do mapa aberta, ela sobe para ficar acima da gaveta. */
-.dicas { position: fixed; z-index: 6; right: 16px; bottom: 16px; display: flex; gap: 4px; padding: 6px; border-radius: 999px; transition: bottom var(--duracao-longa) var(--curva), var(--transicao-cores); }
-.pagina.com-mapa .dicas { bottom: calc(var(--gaveta) + 28px); }
+.dicas { position: fixed; z-index: 6; right: 16px; bottom: 16px; display: flex; gap: 4px; padding: 6px; border-radius: 999px; transition: transform var(--duracao-longa) var(--curva), var(--transicao-cores); }
+/* Sobe por transform (compositor) e não por bottom, que refaria o layout a cada quadro da subida da gaveta. */
+.pagina.com-mapa .dicas { transform: translateY(calc(-1 * (var(--gaveta) + 12px))); }
 .dicas button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; border-radius: 999px; padding: 5px 12px; color: var(--texto); }
 .dicas button:hover { background: var(--botao-hover); }
 .dicas svg { width: 16px; height: 16px; flex: none; }
@@ -51,4 +52,5 @@
   .pagina { grid-template-columns: 1fr; }
   .lateral { position: static; height: auto; margin: 12px 12px 0; }
   .dicas { left: 12px; right: 12px; bottom: 12px; justify-content: center; }
+  .pagina.com-mapa .dicas { transform: translateY(calc(-1 * (var(--gaveta) + 16px))); }
 }

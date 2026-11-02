@@ -9,9 +9,12 @@ import './estilo/lateral.css'
 import './estilo/telas.css'
 import './estilo/alertas.css'
 import './estilo/mapa.css'
+import './estilo/arvore.css'
+import { ModoArvore } from './arvore'
 import { useCronometro } from './cronometro'
 import { escutar, reconectar, useServidorDesligado } from './eventos'
 import { Fechamento } from './fechamento'
+import { alternarModo, useModo } from './modo'
 import { AvisoDoNarrador, useNarrador } from './narracao'
 import { useNavegacao } from './proximo'
 import { BotaoDoTema, ciclarTema } from './tema'
@@ -61,6 +64,7 @@ function App() {
   const checklist = useMemo(() => revisao && montarChecklist(revisao), [revisao])
   const narrador = useNarrador()
   const desligado = useServidorDesligado()
+  const modo = useModo()
   const completa = checklist !== undefined && checklist.todos.length > 0 && decididos(checklist.todos, estado) === checklist.todos.length
   const segundos = useCronometro(completa)
   // "fluxo/<id>/<passo>" é o endereço que o mapa usa para levar a um passo de outro fluxo.
@@ -87,9 +91,10 @@ function App() {
     gravarPreferencia(atual ? 'empilhado' : 'lado-a-lado')
     return !atual
   })
+  // Panorama, fechamento, n e [ ] andam pelo endereço do modo fluxo: no modo árvore não há para onde ir.
   useAtalhos({
-    '?': () => setAjuda(aberta => !aberta), Escape: () => setAjuda(false), p: () => (location.hash = ''), t: () => (location.hash = 'fechamento'), v: alternarVisao, a: ciclarTema,
-    ...atalhos,
+    '?': () => setAjuda(aberta => !aberta), Escape: () => setAjuda(false), v: alternarModo, l: alternarVisao, a: ciclarTema,
+    ...(modo === 'fluxo' && { p: () => (location.hash = ''), t: () => (location.hash = 'fechamento'), ...atalhos }),
   })
 
   const decidir: Decidir = (hunkIds, decisao, comentario) => {
@@ -103,17 +108,22 @@ function App() {
   const fluxoAberto = checklist.fluxos.find(f => `fluxo/${f.fluxo.id}` === rota)?.fluxo
   const mapa = { aberto: mapaAberto, alternar: () => setMapaAberto(aberto => !aberto) }
   const contexto = { revisao, estado, decidir, ladoALado, narrador, mapa, navegacao }
+  const avisoDeServidor = desligado && <p className="alerta grave servidor-desligado" role="alert">Servidor desligado. Rode <code>keg diff</code> de novo: a página reconecta sozinha. <button onClick={reconectar}>Tentar agora</button></p>
 
   return (
-    <div className={mapaAberto && fluxoAberto ? 'pagina com-mapa' : 'pagina'}>
-      <Lateral revisao={revisao} checklist={checklist} estado={estado} endereco={rota} />
-      <main className="conteudo">
-        {desligado && <p className="alerta grave servidor-desligado" role="alert">Servidor desligado. Rode <code>keg diff</code> de novo: a página reconecta sozinha. <button onClick={reconectar}>Tentar agora</button></p>}
-        <AvisoDoNarrador narrador={narrador} />
-        <TelaAtual rota={rota} fluxo={fluxoAberto} passoInicial={passoDoEndereco} checklist={checklist} segundos={segundos} contexto={contexto} />
-      </main>
+    <div className={modo === 'fluxo' && mapaAberto && fluxoAberto ? 'pagina com-mapa' : 'pagina'}>
+      {modo === 'arvore'
+        ? <ModoArvore revisao={revisao} estado={estado} decidir={decidir} ladoALado={ladoALado} cabeca={<CabecaDaLateral revisao={revisao} checklist={checklist} estado={estado} />}>{avisoDeServidor}</ModoArvore>
+        : <>
+          <Lateral revisao={revisao} checklist={checklist} estado={estado} endereco={rota} />
+          <main className="conteudo">
+            {avisoDeServidor}
+            <AvisoDoNarrador narrador={narrador} />
+            <TelaAtual rota={rota} fluxo={fluxoAberto} passoInicial={passoDoEndereco} checklist={checklist} segundos={segundos} contexto={contexto} />
+          </main>
+        </>}
       <div className="dicas">
-        <button onClick={alternarVisao}>{ladoALado ? 'empilhado' : 'lado a lado'} <kbd>v</kbd></button>
+        <button onClick={alternarVisao}>{ladoALado ? 'empilhado' : 'lado a lado'} <kbd>l</kbd></button>
         <BotaoDoTema />
         <button onClick={() => setAjuda(true)}>atalhos <kbd>?</kbd></button>
       </div>
@@ -131,10 +141,23 @@ function TelaAtual({ rota, fluxo, passoInicial, checklist, segundos, contexto }:
   return <Panorama revisao={revisao} checklist={checklist} estado={estado} narrador={narrador} />
 }
 
-// A coluna da esquerda é a checklist: cada fluxo e cada grupo de trechos com o quanto falta.
-function Lateral({ revisao, checklist, estado, endereco }: { revisao: Revisao; checklist: Checklist; estado: Estado; endereco: string }) {
+// O topo da lateral nos dois modos: a marca e o quanto da revisão já tem decisão.
+function CabecaDaLateral({ revisao, checklist, estado }: { revisao: Revisao; checklist: Checklist; estado: Estado }) {
   const feitos = decididos(checklist.todos, estado)
   const total = checklist.todos.length
+  return (
+    <>
+      <a href="#" className="marca">keg diff <span>{encurtarBase(revisao.base)}</span></a>
+      <div className="cobertura">
+        <div className="barra"><div style={{ width: `${total === 0 ? 100 : (feitos / total) * 100}%` }} /></div>
+        <span>{feitos} de {total} trechos revisados</span>
+      </div>
+    </>
+  )
+}
+
+// A coluna da esquerda é a checklist: cada fluxo e cada grupo de trechos com o quanto falta.
+function Lateral({ revisao, checklist, estado, endereco }: { revisao: Revisao; checklist: Checklist; estado: Estado; endereco: string }) {
   const link = (destino: string, rotulo: string, hunkIds: string[], classe = '') => (
     <a key={destino} href={`#${destino}`} className={`item-da-lista ${classe} ${endereco === destino ? 'atual' : ''}`}>
       <span className="rotulo">{rotulo}</span>
@@ -145,11 +168,7 @@ function Lateral({ revisao, checklist, estado, endereco }: { revisao: Revisao; c
   )
   return (
     <nav className="lateral">
-      <a href="#" className="marca">keg diff <span>{encurtarBase(revisao.base)}</span></a>
-      <div className="cobertura">
-        <div className="barra"><div style={{ width: `${total === 0 ? 100 : (feitos / total) * 100}%` }} /></div>
-        <span>{feitos} de {total} trechos revisados</span>
-      </div>
+      <CabecaDaLateral revisao={revisao} checklist={checklist} estado={estado} />
       <a href="#" className={`item-da-lista ${endereco === '' ? 'atual' : ''}`}><span className="rotulo">Panorama</span></a>
       <h2>Fluxos</h2>
       {checklist.fluxos.map(({ fluxo, hunkIds }) => link(`fluxo/${fluxo.id}`, fluxo.titulo, hunkIds, `risco-${fluxo.risco}`))}
@@ -167,14 +186,15 @@ function Lateral({ revisao, checklist, estado, endereco }: { revisao: Revisao; c
 
 // A mesma lista do README e dos useAtalhos: mudou uma, mude as outras.
 const ATALHOS = [
-  ['j / k', 'próximo e anterior (passo no fluxo, item nas listas)'],
-  ['n', 'vai ao próximo trecho ainda não revisado, em qualquer tela; sem nenhum, abre o fechamento'],
+  ['j / k', 'próximo e anterior (passo no fluxo, item nas listas, arquivo na árvore)'],
+  ['n', 'vai ao próximo trecho ainda não revisado, em qualquer tela; sem nenhum, abre o fechamento (modo fluxo)'],
   ['[ / ]', 'fluxo anterior e próximo (depois dos fluxos, os grupos de trechos)'],
-  ['x', 'marca revisado (de novo desfaz)'],
+  ['x', 'marca revisado (de novo desfaz); na árvore, o arquivo inteiro'],
   ['c', 'comenta'],
   ['d', 'código morto (órfãos)'],
   ['f', 'falso positivo (órfãos)'],
-  ['v', 'diff lado a lado ou empilhado'],
+  ['v', 'modo fluxo ou modo árvore (arquivos e pastas)'],
+  ['l', 'diff lado a lado ou empilhado'],
   ['a', 'aparência: tema do sistema, claro ou escuro'],
   ['m', 'abre e fecha o mapa de quem chama quem (no fluxo)'],
   ['p', 'volta ao panorama'],

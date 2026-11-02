@@ -15,7 +15,8 @@ const ORDEM_DO_RISCO = { alto: 0, medio: 1, baixo: 2 }
 // Um tema claro e um escuro; qual vale vem da escolha da pessoa (tema.tsx) ou, em "Sistema", do prefers-color-scheme. O fundo do diff vem de estilo/telas.css.
 const TEMAS = { light: 'github-light', dark: 'github-dark' } as const
 // O mapa leva o React Flow e o ELK (mais de 1 MB): só baixa quando alguém aperta m.
-const Mapa = lazy(() => import('./mapa'))
+const carregarMapa = () => import('./mapa')
+const Mapa = lazy(carregarMapa)
 
 export interface Contexto {
   revisao: Revisao
@@ -112,6 +113,11 @@ export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado, narrad
   useEffect(() => {
     if (narradorPronto && faltaNarrar) narrador.pedir([fluxo.id], false)
   }, [fluxo.id, narradorPronto, faltaNarrar])
+  // Baixa e avalia o mapa (>1 MB) com a página ociosa: se o download caísse na primeira abertura, travaria a subida da gaveta.
+  useEffect(() => {
+    const espera = setTimeout(carregarMapa, 1500)
+    return () => clearTimeout(espera)
+  }, [])
   // Atualização pela função: j apertado rápido não perde passo entre um render e outro.
   const andar = (passos: number) => {
     setComentando(false)
@@ -212,7 +218,7 @@ export function TelaDeTrechos(props: Contexto & { rota: string; titulo: string; 
 // Os trechos do review.json vêm sem linhas de contexto: o patch mostra só o que mudou.
 // O diff mostra exatamente os trechos que a decisão marca, nem mais nem menos.
 // "destaque" são as linhas da âncora da frase sob o mouse, no lado novo do arquivo.
-function DiffDosTrechos({ revisao, arquivo, hunkIds, ladoALado, destaque }: { revisao: Revisao; arquivo: string; hunkIds: string[]; ladoALado: boolean; destaque?: [number, number] | null }) {
+export function DiffDosTrechos({ revisao, arquivo, hunkIds, ladoALado, destaque }: { revisao: Revisao; arquivo: string; hunkIds: string[]; ladoALado: boolean; destaque?: [number, number] | null }) {
   const tema = useTema()
   const alterado = revisao.arquivos.find(a => a.caminho === arquivo)
   const hunks = alterado?.hunks.filter(h => hunkIds.includes(h.id)) ?? []
@@ -244,7 +250,7 @@ function marcadorDoPasso(passo: Passo, estado: Estado): string {
   return passo.hunkIds.length === 0 ? '○' : marcador(passo.hunkIds, estado)
 }
 
-function marcador(hunkIds: string[], estado: Estado): string {
+export function marcador(hunkIds: string[], estado: Estado): string {
   if (decididos(hunkIds, estado) < hunkIds.length) return '●'
   return hunkIds.some(id => estado[id]?.comentario) ? '✎' : '✓'
 }

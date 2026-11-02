@@ -38,6 +38,7 @@ Em seguida a página de revisão abre no navegador, servida em `http://127.0.0.1
 - **Panorama:** tamanho do diff, fluxos por risco e a cobertura, quantos trechos já têm decisão.
 - **Fluxo:** a linha do tempo nasce → processa → termina à esquerda e o diff do passo à direita. Passo de contexto mostra o código atual.
 - **Mapa:** responde "quem chama isso?" sem sair do fluxo. Abre num painel embaixo da tela (tecla `m` ou o botão Mapa), com o diff do passo ainda em cima. O React Flow desenha e o ELK organiza em camadas, da fonte à esquerda até a saída à direita. Nó alterado é cheio; vizinho sem alteração é tracejado; o passo atual mostra quem o chama, e clicar num nó mostra os vizinhos dele e, se ele é um passo ou um trecho alterado, leva até ele (também em outro fluxo). A fronteira cliente/servidor aparece como uma faixa. Salto que o compilador não prova, como o `fetch` para uma rota do projeto (`http`) e o callback passado em prop (`dinâmico`), vira aresta tracejada com rótulo. O grafo vem do `review.json` (campo `grafo`): as funções alteradas, os passos dos fluxos e os vizinhos até 2 saltos, com no máximo 5 vizinhos por lado e o aviso "+N" do que ficou de fora.
+- **Modo árvore:** o jeito tradicional de ler um diff, ao lado do modo fluxo (tecla `v` alterna; a escolha fica neste navegador, em `keg-modo`). A lateral vira a árvore de pastas com os arquivos alterados: pastas recolhíveis, pasta com uma única subpasta compactada (`src/web/estilo`), pastas antes de arquivos em ordem alfabética, a letra do status (A adicionado, M modificado, D removido, R renomeado), `+N −M` por arquivo e o total em cada pasta. A área principal mostra o diff inteiro do arquivo escolhido, com o mesmo componente do modo fluxo. `j` `k` andam pelos arquivos na ordem da lateral, `x` marca o arquivo inteiro como revisado e `c` comenta. `n`, `[`, `]`, `p` e `t` só valem no modo fluxo. O renome vem do git (`-M`) no campo `renomeadoDe` do `review.json`; um renome sem mudança de conteúdo aparece sem diff.
 - **Fechamento:** responde "terminei?". Mostra a cobertura (com destaque em 100%), o que ainda falta, uma nota de 1 a 5 para a sensação de controle e o feedback pronto para o agente, com o botão "copiar como prompt".
 - **Órfãos, testes e outros trechos:** o que não entrou em fluxo, cada um com o seu diff. Órfão recebe revisado, código morto ou falso positivo.
 
@@ -45,13 +46,14 @@ Atalhos (a mesma lista aparece na ajuda, tecla `?`), todos fora das caixas de te
 
 | Tecla | O que faz |
 | --- | --- |
-| `j` `k` | próximo e anterior: passo no fluxo, item nas listas |
+| `j` `k` | próximo e anterior: passo no fluxo, item nas listas, arquivo na árvore |
 | `n` | vai ao próximo trecho ainda não revisado, em qualquer tela, depois do ponto onde você está e dando a volta; sem nenhum, abre o fechamento |
 | `[` `]` | fluxo anterior e próximo; depois do último fluxo vêm órfãos, testes e outros trechos |
-| `x` | marca revisado (de novo desfaz) |
+| `x` | marca revisado (de novo desfaz); na árvore, o arquivo inteiro |
 | `c` | comenta; `esc` cancela e `⌘↵` salva |
 | `d` `f` | código morto e falso positivo, nos órfãos |
-| `v` | diff lado a lado ou empilhado |
+| `v` | modo fluxo ou modo árvore |
+| `l` | diff lado a lado ou empilhado |
 | `a` | aparência: alterna entre tema do sistema, claro e escuro (a escolha fica neste navegador) |
 | `m` | abre e fecha o mapa do fluxo |
 | `p` `t` | volta ao panorama; abre o fechamento |

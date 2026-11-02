@@ -1,32 +1,28 @@
 // Tela Mapa: "quem chama isso?" sem sair da revisão. O React Flow desenha, o ELK dá as camadas
 // (fonte à esquerda, saída à direita) e o grafo vem pronto no review.json: aqui não há compilador.
 import '@xyflow/react/dist/style.css'
-import { Background, Controls, Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type NodeProps } from '@xyflow/react'
+import { Background, Controls, Handle, Position, ReactFlow, type Node, type NodeProps } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk.bundled.js'
 import { useEffect, useMemo, useState } from 'react'
+import { desenharAresta, TIPOS_DE_ARESTA } from './arestas'
+import { ALTURA, calcularLayout, idDaAresta, LARGURA, type Layout } from './rotas'
 import { MODOS, useTema } from './tema'
 import { idDoNo, type ArestaDoGrafo, type Fluxo, type Grafo, type NoDoGrafo, type Revisao } from '../src/contrato'
 
-const LARGURA = 232
-const ALTURA = 72
 const LARGURA_DA_FAIXA = 44
 // Abaixo disso o texto do nó fica miúdo demais: num grafo largo, o fitView para aqui e quem lê arrasta o desenho.
 const ZOOM_LEGIVEL = 0.75
-const ROTULOS: Partial<Record<ArestaDoGrafo['tipo'], string>> = { http: 'http', dinamico: 'dinâmico' }
-const OPCOES_DO_ELK = {
-  'elk.algorithm': 'layered', 'elk.direction': 'RIGHT',
-  'elk.layered.spacing.nodeNodeBetweenLayers': '90', 'elk.spacing.nodeNode': '28',
-}
 
 // O ELK sem worker: o bundle já traz o algoritmo, e a página não precisa de um segundo arquivo para carregar.
 const elk = new ELK()
+// Desenhos que o ELK já calculou, por grafo (um review.json novo é outro objeto e zera o cache): reabrir a gaveta não refaz o layout.
+const desenhosCalculados = new WeakMap<Grafo, Map<string, Desenho>>()
 
 interface DadosDoNo extends Record<string, unknown> { no: NoDoGrafo; atual: boolean; escondidos: number }
 type NoDoMapa = Node<DadosDoNo, 'no'>
 type NoDaFaixa = Node<{ rotulo: string; altura: number }, 'faixa'>
-type Posicoes = Map<string, { x: number; y: number }>
 // O que o ELK desenhou: a chave diz quais nós e arestas entraram, para o desenho antigo ficar até o novo chegar.
-interface Desenho { chave: string; posicoes: Posicoes; visiveis: Set<string>; arestas: ArestaDoGrafo[] }
+interface Desenho extends Layout { chave: string; visiveis: Set<string>; arestas: ArestaDoGrafo[] }
 
 interface PropsDoMapa {
   revisao: Revisao
@@ -39,26 +35,48 @@ interface PropsDoMapa {
 export default function Mapa({ revisao, fluxo, indice, irParaPasso, fechar }: PropsDoMapa) {
   const [abertos, setAbertos] = useState(new Set<string>())
   const [desenho, setDesenho] = useState<Desenho>()
+  // Só depois que a gaveta termina de subir: o ELK roda na thread principal e travaria a animação.
+  const [pronta, setPronta] = useState(false)
+  const [subindo, setSubindo] = useState(false)
   const tema = useTema()
   const grafo = revisao.grafo
   const atual = idDoNo(fluxo.passos[indice] ?? fluxo.passos[0]!)
   const visiveis = useMemo(() => (grafo ? idsVisiveis(grafo, fluxo, abertos, atual) : new Set<string>()), [grafo, fluxo, abertos, atual])
-  const arestas = useMemo(() => (grafo?.arestas ?? []).filter(a => visiveis.has(a.de) && visiveis.has(a.para)), [grafo, visiveis])
+  // Autoligação não tem rota que se veja, e o par repetido daria dois ids iguais ao React Flow e ao ELK.
+  const arestas = useMemo(() => {
+    const doTrecho = (grafo?.arestas ?? []).filter(a => a.de !== a.para && visiveis.has(a.de) && visiveis.has(a.para))
+    return [...new Map(doTrecho.map(a => [idDaAresta(a), a])).values()]
+  }, [grafo, visiveis])
   const chave = `${[...visiveis].sort().join('|')}#${arestas.length}`
 
+  // A subida começa um quadro depois da montagem. Na 1ª abertura o lazy ainda suspende e a gaveta já nascia depois do commit pesado;
+  // da 2ª em diante ele está resolvido, a gaveta monta no mesmo commit que re-renderiza a tela toda e a animação perdia os primeiros quadros.
   useEffect(() => {
+    let segundo = 0
+    const primeiro = requestAnimationFrame(() => { segundo = requestAnimationFrame(() => setSubindo(true)) })
+    return () => { cancelAnimationFrame(primeiro); cancelAnimationFrame(segundo) }
+  }, [])
+
+  useEffect(() => {
+    if (!pronta || !grafo) return
+    const calculados = desenhosCalculados.get(grafo) ?? new Map<string, Desenho>()
+    desenhosCalculados.set(grafo, calculados)
+    const guardado = calculados.get(chave)
+    if (guardado) return setDesenho(guardado)
     let vigente = true
-    const filhos = [...visiveis].map(id => ({ id, width: LARGURA, height: ALTURA }))
-    const ligacoes = arestas.map(a => ({ id: `${a.de}>${a.para}`, sources: [a.de], targets: [a.para] }))
-    elk.layout({ id: 'raiz', layoutOptions: OPCOES_DO_ELK, children: filhos, edges: ligacoes }).then(resultado => {
-      const posicoes: Posicoes = new Map((resultado.children ?? []).map(no => [no.id, { x: no.x ?? 0, y: no.y ?? 0 }]))
-      if (vigente) setDesenho({ chave, posicoes, visiveis, arestas })
+    calcularLayout(elk, [...visiveis], arestas).then(layout => {
+      const novo = { ...layout, chave, visiveis, arestas }
+      calculados.set(chave, novo)
+      if (vigente) setDesenho(novo)
     })
     return () => { vigente = false }
-  }, [chave])
+  }, [chave, pronta, grafo])
 
   const nos = useMemo(() => (grafo && desenho ? montarNos(grafo, desenho, atual) : []), [grafo, desenho, atual])
-  const ligacoes = useMemo(() => (desenho?.arestas ?? []).map(desenharAresta), [desenho])
+  const ligacoes = useMemo(() => (desenho?.arestas ?? []).flatMap(a => {
+    const rota = desenho?.rotas.get(idDaAresta(a))
+    return rota ? [desenharAresta(a, rota)] : []
+  }), [desenho])
 
   // Clicar expande os vizinhos e, se o nó é um passo ou um trecho alterado, leva a ele.
   const escolher = (_: unknown, node: Node) => {
@@ -67,21 +85,26 @@ export default function Mapa({ revisao, fluxo, indice, irParaPasso, fechar }: Pr
     irPara(no, revisao, fluxo, irParaPasso)
   }
 
-  if (!grafo) return <aside className="mapa-do-fluxo"><p className="detalhe">Este review.json não tem o grafo. Rode <code>keg diff</code> de novo.</p></aside>
+  if (!grafo) return <aside className="mapa-do-fluxo" data-subindo={subindo}><p className="detalhe">Este review.json não tem o grafo. Rode <code>keg diff</code> de novo.</p></aside>
   return (
-    <aside className="mapa-do-fluxo">
+    <aside className="mapa-do-fluxo" data-subindo={subindo} onAnimationEnd={e => e.target === e.currentTarget && setPronta(true)}>
       <header>
         <h2>Mapa · quem chama quem</h2>
         <span className="detalhe">cheio: alterado · tracejado: vizinho sem alteração · linha tracejada: o compilador não prova</span>
         <button onClick={() => setAbertos(new Set())}>Recolher</button>
         <button onClick={fechar}>Fechar <kbd>m</kbd></button>
       </header>
-      {/* Remontar o React Flow a cada layout reenquadra o desenho, e a expansão sempre cabe na tela. */}
-      <ReactFlow key={desenho?.chave} nodes={nos} edges={ligacoes} nodeTypes={TIPOS} onNodeClick={escolher} colorMode={MODOS[tema]}
-        nodesConnectable={false} fitView fitViewOptions={{ padding: 0.15, minZoom: ZOOM_LEGIVEL, maxZoom: 1 }} minZoom={0.1} attributionPosition="bottom-left">
-        <Background gap={20} />
-        <Controls showInteractive={false} position="bottom-right" />
-      </ReactFlow>
+      {/* A área existe desde o começo e só aparece (fade) quando o primeiro layout chega; sem ela o grafo pularia na tela. */}
+      <div className="area-do-grafo" data-pronta={desenho !== undefined}>
+        {/* Remontar o React Flow a cada layout reenquadra o desenho, e a expansão sempre cabe na tela. */}
+        {desenho && (
+          <ReactFlow key={desenho.chave} nodes={nos} edges={ligacoes} nodeTypes={TIPOS} edgeTypes={TIPOS_DE_ARESTA} onNodeClick={escolher} colorMode={MODOS[tema]}
+            nodesConnectable={false} nodesDraggable={false} fitView fitViewOptions={{ padding: 0.15, minZoom: ZOOM_LEGIVEL, maxZoom: 1 }} minZoom={0.1} attributionPosition="bottom-left">
+            <Background gap={20} />
+            <Controls showInteractive={false} position="bottom-right" />
+          </ReactFlow>
+        )}
+      </div>
     </aside>
   )
 }
@@ -159,15 +182,6 @@ function faixaDaFronteira({ arestas, posicoes }: Desenho, porId: Map<string, NoD
     data: { rotulo: `${primeiro.esquerda.lado} | ${primeiro.direita.lado}`, altura: Math.max(...ys) + ALTURA + 80 - topo },
     draggable: false, selectable: false, focusable: false, zIndex: -1, style: { pointerEvents: 'none' },
   }]
-}
-
-function desenharAresta({ de, para, tipo }: ArestaDoGrafo): Edge {
-  return {
-    id: `${de}>${para}`, source: de, target: para, type: 'smoothstep', label: ROTULOS[tipo],
-    markerEnd: { type: MarkerType.ArrowClosed },
-    className: tipo === 'chamada' ? '' : 'aresta-tracejada',
-    style: tipo === 'chamada' ? {} : { strokeDasharray: '6 4' },
-  }
 }
 
 // Passo do fluxo aberto: seleciona o passo. Trecho alterado de outro fluxo ou órfão: abre o lugar dele.

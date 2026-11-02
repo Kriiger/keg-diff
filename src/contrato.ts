@@ -18,6 +18,7 @@ export interface Revisao {
 export interface ArquivoAlterado {
   caminho: string
   status: 'novo' | 'alterado' | 'removido'
+  renomeadoDe?: string             // caminho antigo, quando o git viu um renome (-M); sem mudança de conteúdo, hunks vem vazio
   hunks: Hunk[]
 }
 

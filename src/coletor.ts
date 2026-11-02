@@ -53,6 +53,9 @@ function lerPatch(texto: string): ArquivoAlterado[] {
     else if (linha.startsWith('@@')) abrirHunk(atual, linha)
     else if (linha.startsWith('new file mode')) atual.status = 'novo'
     else if (linha.startsWith('deleted file mode')) atual.status = 'removido'
+    // Renome puro não traz "---"/"+++": sem estas duas linhas o arquivo sumiria da revisão.
+    else if (linha.startsWith('rename from ')) atual.renomeadoDe = linha.slice('rename from '.length)
+    else if (linha.startsWith('rename to ')) atual.caminho = linha.slice('rename to '.length)
     else if (linha.startsWith('--- ')) caminhoAntigo = linha.slice(4)
     else if (linha.startsWith('+++ ')) atual.caminho = linha === '+++ /dev/null' ? caminhoAntigo : linha.slice(4)
   }
