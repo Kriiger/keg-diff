@@ -7,7 +7,7 @@ import {
   METODO_HTTP, PAGINA_DO_APP, PAGINA_DO_PAGES, ROTA_DO_APP, ROTA_DO_PAGES, metodoDaChamada, padraoDaRota, pesoDaRota, regraDaConfig, tipoDoSql,
 } from './catalogo.js'
 import {
-  EMBRULHO, abrirProjeto, atributoDeEvento, caminhoDaUrl, cortar, declaracaoDe, declaracoesDoModulo, diretiva, diretivaDaFuncao,
+  EMBRULHO, abrirProjeto, atributoDeEvento, caminhoDaUrl, carregadoPorHtml, chamadaQueRecebe, cortar, declaracaoDe, declaracoesDoModulo, diretiva, diretivaDaFuncao,
   ehFuncao, ehRedirecionamento, ehSetterDeEstado, lerEntradasDoPacote, propDoComponente, nomeDe, normalizar, semExtensao, usaRetorno,
 } from './sintaxe.js'
 
@@ -59,7 +59,7 @@ export class Analisador {
 
   ehEntrada(caminho: string): boolean {
     return [ROTA_DO_APP, ROTA_DO_PAGES, PAGINA_DO_APP, PAGINA_DO_PAGES, INTERCEPTADOR].some(r => r.test(caminho))
-      || this.entradasDoPacote.has(semExtensao(caminho))
+      || this.entradasDoPacote.has(semExtensao(caminho)) || carregadoPorHtml(this.raiz, caminho)
   }
 
   ninguemImporta(caminho: string): boolean {
@@ -126,6 +126,8 @@ export class Analisador {
       const chamador = this.unidadeQueContem(referencia)
       if (chamador !== u) u.chamadores.push({ unidade: chamador, linha: referencia.getStartLineNumber() })
     }
+    const recebedora = chamadaQueRecebe(u.no)
+    if (recebedora) u.chamadores.push({ unidade: this.unidadeQueContem(recebedora), linha: recebedora.getStartLineNumber() })
     return u.chamadores
   }
 
@@ -201,6 +203,8 @@ export class Analisador {
     else if (exportado && PAGINA_DO_PAGES.test(u.arquivo) && /^(default|get(ServerSide|Static)Props)$/.test(exportado)) u.fontes.add('pagina')
     if (exportado && this.entradasDoPacote.has(semExtensao(u.arquivo))) adicionar(u, 'pacote', 'pacote')
     if (Node.isSourceFile(u.no) && this.entradasDoPacote.has(semExtensao(u.arquivo))) u.fontes.add('pacote')
+    // O corpo do script que o index.html carrega é onde a página começa.
+    if (Node.isSourceFile(u.no) && carregadoPorHtml(this.raiz, u.arquivo)) u.fontes.add('pagina')
   }
 
   private lerChamada(u: Unidade, chamada: CallExpression) {

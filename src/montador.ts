@@ -3,6 +3,7 @@
 import { createHash } from 'node:crypto'
 import { ARQUIVO_DE_CODIGO, type Analisador, type Fronteira, type Unidade } from './analisador.js'
 import { ARQUIVO_DE_TESTE, riscoDasSaidas } from './catalogo.js'
+import { darIdsAosHunks, partirHunk } from './coletor.js'
 import { tiposDe } from './sintaxe.js'
 import type { ArquivoAlterado, Fluxo, Orfao, Passo, Revisao, Teste } from './contrato.js'
 
@@ -13,7 +14,8 @@ interface Aresta { de: Unidade; para: Unidade; linha: number; fronteira?: Fronte
 // Trilha é o caminho de uma unidade alterada: da fonte até ela e dela (ou de quem a chamou) até a saída.
 interface Trilha { fonte: Unidade; saida: Unidade; arestas: Aresta[]; unidades: Set<Unidade> }
 
-export function montarRevisao(arquivos: ArquivoAlterado[], analisador: Analisador, base: string): Revisao {
+export function montarRevisao(alterados: ArquivoAlterado[], analisador: Analisador, base: string): Revisao {
+  const arquivos = alterados.map(arquivo => partirAcrescimos(arquivo, analisador))
   const orfaos: Orfao[] = []
   const testes: Teste[] = []
   const trechos = new Map<Unidade, string[]>()
@@ -48,6 +50,19 @@ export function montarRevisao(arquivos: ArquivoAlterado[], analisador: Analisado
       divergenciasDoManifesto: 0,
     },
   }
+}
+
+// Um acréscimo que cobre várias funções, como um arquivo novo, vira um trecho por função de fora:
+// revisar um passo não marca o arquivo inteiro, e mudar uma função depois só reabre ela.
+function partirAcrescimos(arquivo: ArquivoAlterado, analisador: Analisador): ArquivoAlterado {
+  if (arquivo.status === 'removido' || !ARQUIVO_DE_CODIGO.test(arquivo.caminho) || ARQUIVO_DE_TESTE.test(arquivo.caminho)) return arquivo
+  const partido = { ...arquivo, hunks: arquivo.hunks.flatMap(hunk => {
+    const unidades = analisador.unidadesDoTrecho(arquivo.caminho, hunk.linhas)
+    const deFora = unidades.filter(u => !unidades.some(outra => outra !== u && outra.no.containsRange(u.no.getPos(), u.no.getEnd())))
+    return partirHunk(hunk, deFora.map(u => u.linhas[1]))
+  }) }
+  darIdsAosHunks(partido)
+  return partido
 }
 
 // Cada trecho cai na sua unidade. Import e linha solta pegam carona na primeira unidade do arquivo.

@@ -1,7 +1,7 @@
 // As telas da revisão: o panorama, o fluxo passo a passo e as listas de trechos fora dos fluxos.
 import { PatchDiff } from '@pierre/diffs/react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { Estado, Fluxo, Hunk, Passo, Revisao } from '../src/contrato'
+import type { Estado, Fluxo, Passo, Revisao } from '../src/contrato'
 import type { Checklist, Decidir, Decisao, Item } from './main'
 
 // O mesmo limite do cli.ts: acima disso a revisão não fecha.
@@ -15,6 +15,7 @@ interface Contexto {
   revisao: Revisao
   estado: Estado
   decidir: Decidir
+  ladoALado: boolean
 }
 
 // "e89d090ae0d6...bf157df72e51" vira "e89d090...bf157df", como o git log --oneline mostra.
@@ -84,7 +85,7 @@ export function Panorama({ revisao, checklist, estado }: { revisao: Revisao; che
   )
 }
 
-export function TelaDoFluxo({ fluxo, revisao, estado, decidir }: Contexto & { fluxo: Fluxo }) {
+export function TelaDoFluxo({ fluxo, revisao, estado, decidir, ladoALado }: Contexto & { fluxo: Fluxo }) {
   // Abre no primeiro passo alterado que ainda espera decisão.
   const [indice, setIndice] = useState(() => Math.max(0, fluxo.passos.findIndex(p => decididos(p.hunkIds, estado) < p.hunkIds.length)))
   const [comentando, setComentando] = useState(false)
@@ -128,7 +129,7 @@ export function TelaDoFluxo({ fluxo, revisao, estado, decidir }: Contexto & { fl
           {(passo.avisos ?? []).map(aviso => <p key={aviso} className="alerta">{aviso}</p>)}
           <Decisoes hunkIds={passo.hunkIds} opcoes={['revisado']} estado={estado} decidir={decidir} comentando={comentando} setComentando={setComentando} />
           {passo.hunkIds.length > 0
-            ? <DiffDosTrechos revisao={revisao} arquivo={passo.arquivo} hunkIds={passo.hunkIds} linhas={passo.linhas} />
+            ? <DiffDosTrechos revisao={revisao} arquivo={passo.arquivo} hunkIds={passo.hunkIds} ladoALado={ladoALado} />
             : <CodigoDoPasso key={passo.id} passo={passo} />}
         </article>
       </div>
@@ -137,7 +138,7 @@ export function TelaDoFluxo({ fluxo, revisao, estado, decidir }: Contexto & { fl
 }
 
 export function TelaDeTrechos(props: Contexto & { titulo: string; explicacao: string; itens: Item[]; opcoes: readonly Decisao[] }) {
-  const { titulo, explicacao, itens, opcoes, revisao, estado, decidir } = props
+  const { titulo, explicacao, itens, opcoes, revisao, estado, decidir, ladoALado } = props
   const [indice, setIndice] = useState(0)
   const [comentando, setComentando] = useState(false)
   useEffect(() => {
@@ -170,7 +171,7 @@ export function TelaDeTrechos(props: Contexto & { titulo: string; explicacao: st
           <h2><span className="marcador">{marcador(item.hunkIds, estado)}</span> {item.titulo}</h2>
           {item.detalhe && <p className="detalhe">{item.detalhe}</p>}
           <Decisoes hunkIds={item.hunkIds} opcoes={opcoes} estado={estado} decidir={decidir} comentando={comentando && i === indice} setComentando={setComentando} />
-          <DiffDosTrechos revisao={revisao} arquivo={item.arquivo} hunkIds={item.hunkIds} />
+          <DiffDosTrechos revisao={revisao} arquivo={item.arquivo} hunkIds={item.hunkIds} ladoALado={ladoALado} />
         </article>
       ))}
     </section>
@@ -232,28 +233,15 @@ function CaixaDeComentario({ inicial, salvar, cancelar }: { inicial: string; sal
 }
 
 // Os trechos do review.json vêm sem linhas de contexto: o patch mostra só o que mudou.
-function DiffDosTrechos({ revisao, arquivo, hunkIds, linhas }: { revisao: Revisao; arquivo: string; hunkIds: string[]; linhas?: [number, number] }) {
+// O diff mostra exatamente os trechos que a decisão marca, nem mais nem menos.
+function DiffDosTrechos({ revisao, arquivo, hunkIds, ladoALado }: { revisao: Revisao; arquivo: string; hunkIds: string[]; ladoALado: boolean }) {
   const alterado = revisao.arquivos.find(a => a.caminho === arquivo)
   const hunks = alterado?.hunks.filter(h => hunkIds.includes(h.id)) ?? []
   if (!alterado || hunks.length === 0) return null
   const antes = alterado.status === 'novo' ? '/dev/null' : `a/${arquivo}`
   const depois = alterado.status === 'removido' ? '/dev/null' : `b/${arquivo}`
-  const trechos = hunks.map(h => (linhas ? recortar(h, linhas) : h.patch))
-  const patch = [`diff --git a/${arquivo} b/${arquivo}`, `--- ${antes}`, `+++ ${depois}`, ...trechos].join('\n') + '\n'
-  return <PatchDiff patch={patch} options={{ diffStyle: 'unified', themeType: 'system', overflow: 'wrap' }} />
-}
-
-// Arquivo novo vira um trecho só, do tamanho do arquivo. No passo, o diff mostra só as linhas dele;
-// a decisão continua presa ao trecho inteiro. Trecho com remoção fica como está: não dá para cortar sem perder o par.
-function recortar(hunk: Hunk, [inicio, fim]: [number, number]): string {
-  const [cabecalho = '', ...linhas] = hunk.patch.split('\n')
-  const soAcrescimo = linhas.every(l => l.startsWith('+') || l.startsWith('\\'))
-  if (!soAcrescimo || (hunk.linhas[0] >= inicio && hunk.linhas[1] <= fim)) return hunk.patch
-  const de = Math.max(inicio, hunk.linhas[0])
-  const ate = Math.min(fim, hunk.linhas[1])
-  const antigo = /^@@ -(\d+)/.exec(cabecalho)?.[1] ?? '0'
-  const novas = linhas.filter(l => l.startsWith('+')).slice(de - hunk.linhas[0], ate - hunk.linhas[0] + 1)
-  return [`@@ -${antigo},0 +${de},${novas.length} @@`, ...novas].join('\n')
+  const patch = [`diff --git a/${arquivo} b/${arquivo}`, `--- ${antes}`, `+++ ${depois}`, ...hunks.map(h => h.patch)].join('\n') + '\n'
+  return <PatchDiff patch={patch} options={{ diffStyle: ladoALado ? 'split' : 'unified', themeType: 'system', overflow: 'wrap' }} />
 }
 
 // Passo de contexto: não mudou, mas o revisor precisa ver o que ele faz com o dado.

@@ -40,6 +40,26 @@ export function lerEntradasDoPacote(raiz: string): Set<string> {
   return entradas
 }
 
+// Entrada do Vite: um index.html carrega o arquivo por <script src>. Procura da pasta do arquivo até a raiz,
+// e o src vale a partir da pasta do html, com ou sem a barra do começo.
+export function carregadoPorHtml(raiz: string, caminho: string): boolean {
+  for (let pasta = path.dirname(caminho); ; pasta = path.dirname(pasta)) {
+    const html = path.join(raiz, pasta, 'index.html')
+    const scripts = existsSync(html) ? [...readFileSync(html, 'utf8').matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/g)] : []
+    if (scripts.some(([, src = '']) => path.join(pasta, src.replace(/^\.?\//, '')) === path.normalize(caminho))) return true
+    if (pasta === '.') return false
+  }
+}
+
+// useAtalhos({ j: () => andar(1) }): a função vai num objeto direto para uma chamada, que a roda
+// por uma chave dinâmica que o compilador não segue. Devolve essa chamada: quem a faz é o chamador.
+export function chamadaQueRecebe(no: Node): Node | undefined {
+  const pai = no.getParent()
+  const objeto = Node.isPropertyAssignment(pai) ? pai.getParent() : pai
+  const chamada = objeto?.getParent()
+  return Node.isObjectLiteralExpression(objeto) && Node.isCallExpression(chamada) && chamada.getArguments().includes(objeto) ? chamada : undefined
+}
+
 export function ehFuncao(no: Node): boolean {
   if (Node.isFunctionDeclaration(no) || Node.isMethodDeclaration(no)) return true
   if (!Node.isArrowFunction(no) && !Node.isFunctionExpression(no)) return false

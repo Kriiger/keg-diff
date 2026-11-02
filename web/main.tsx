@@ -44,6 +44,7 @@ function App() {
   const [erro, setErro] = useState<string>()
   const [endereco, setEndereco] = useState(location.hash.slice(1))
   const [ajuda, setAjuda] = useState(false)
+  const [ladoALado, setLadoALado] = useState(() => lerPreferencia() === 'lado-a-lado')
   const checklist = useMemo(() => revisao && montarChecklist(revisao), [revisao])
 
   useEffect(() => {
@@ -63,7 +64,11 @@ function App() {
     }
   }, [])
 
-  useAtalhos({ '?': () => setAjuda(aberta => !aberta), Escape: () => setAjuda(false), p: () => (location.hash = '') })
+  const alternarVisao = () => setLadoALado(atual => {
+    gravarPreferencia(atual ? 'empilhado' : 'lado-a-lado')
+    return !atual
+  })
+  useAtalhos({ '?': () => setAjuda(aberta => !aberta), Escape: () => setAjuda(false), p: () => (location.hash = ''), v: alternarVisao })
 
   const decidir: Decidir = (hunkIds, decisao, comentario) => {
     fetch('/api/estado', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hunkIds, decisao, comentario }) })
@@ -75,16 +80,20 @@ function App() {
   if (!revisao || !checklist) return <p className="aviso-central">Carregando…</p>
   const fluxoAberto = checklist.fluxos.find(f => `fluxo/${f.fluxo.id}` === endereco)?.fluxo
   const secao = endereco in SECOES ? (endereco as Secao) : undefined
+  const contexto = { revisao, estado, decidir, ladoALado }
 
   return (
     <div className="pagina">
       <Lateral revisao={revisao} checklist={checklist} estado={estado} endereco={endereco} />
       <main className="conteudo">
-        {fluxoAberto && <TelaDoFluxo key={fluxoAberto.id} fluxo={fluxoAberto} revisao={revisao} estado={estado} decidir={decidir} />}
-        {secao && <TelaDeTrechos key={secao} {...SECOES[secao]} itens={checklist[secao]} revisao={revisao} estado={estado} decidir={decidir} />}
+        {fluxoAberto && <TelaDoFluxo key={fluxoAberto.id} fluxo={fluxoAberto} {...contexto} />}
+        {secao && <TelaDeTrechos key={secao} {...SECOES[secao]} itens={checklist[secao]} {...contexto} />}
         {!fluxoAberto && !secao && <Panorama revisao={revisao} checklist={checklist} estado={estado} />}
       </main>
-      <button className="dica" onClick={() => setAjuda(true)}>? atalhos</button>
+      <div className="dicas">
+        <button onClick={alternarVisao}>{ladoALado ? 'empilhado' : 'lado a lado'} <kbd>v</kbd></button>
+        <button onClick={() => setAjuda(true)}>atalhos <kbd>?</kbd></button>
+      </div>
       {ajuda && <Ajuda fechar={() => setAjuda(false)} />}
     </div>
   )
@@ -123,7 +132,7 @@ function Lateral({ revisao, checklist, estado, endereco }: { revisao: Revisao; c
 }
 
 function Ajuda({ fechar }: { fechar: () => void }) {
-  const atalhos = [['j / k', 'próximo e anterior'], ['x', 'marca revisado (de novo desfaz)'], ['c', 'comenta'], ['d', 'código morto (órfãos)'], ['f', 'falso positivo (órfãos)'], ['p', 'volta ao panorama'], ['?', 'abre e fecha esta ajuda']]
+  const atalhos = [['j / k', 'próximo e anterior'], ['x', 'marca revisado (de novo desfaz)'], ['c', 'comenta'], ['d', 'código morto (órfãos)'], ['f', 'falso positivo (órfãos)'], ['v', 'diff lado a lado ou empilhado'], ['p', 'volta ao panorama'], ['?', 'abre e fecha esta ajuda']]
   return (
     <div className="fundo-da-ajuda" onClick={fechar}>
       <dl className="ajuda">
@@ -131,6 +140,21 @@ function Ajuda({ fechar }: { fechar: () => void }) {
       </dl>
     </div>
   )
+}
+
+// Preferência de quem revisa, só neste navegador. Sem storage (aba privada), fica empilhado.
+function lerPreferencia(): string | null {
+  try {
+    return localStorage.getItem('keg-visao')
+  } catch {
+    return null
+  }
+}
+
+function gravarPreferencia(visao: string) {
+  try {
+    localStorage.setItem('keg-visao', visao)
+  } catch {}
 }
 
 // Todo trecho cai em algum lugar: fluxo, órfão, teste ou "outros". É isso que fecha o N de N.

@@ -2,7 +2,7 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import type { ArquivoAlterado } from './contrato.js'
+import type { ArquivoAlterado, Hunk } from './contrato.js'
 
 // Árvore vazia do git: deixa comparar num repositório que ainda não tem commit.
 const ARVORE_VAZIA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
@@ -70,7 +70,7 @@ function abrirHunk(arquivo: ArquivoAlterado, cabecalho: string) {
 
 // O id é o hash do conteúdo, não das linhas: editar acima do trecho não perde a decisão,
 // mas mudar o próprio trecho volta ele para "não revisado".
-function darIdsAosHunks(arquivo: ArquivoAlterado) {
+export function darIdsAosHunks(arquivo: ArquivoAlterado) {
   const vistos = new Map<string, number>()
   for (const hunk of arquivo.hunks) {
     const corpo = hunk.patch.slice(hunk.patch.indexOf('\n') + 1)
@@ -79,6 +79,22 @@ function darIdsAosHunks(arquivo: ArquivoAlterado) {
     vistos.set(id, repeticoes + 1)
     hunk.id = repeticoes === 0 ? id : `${id}-${repeticoes + 1}`
   }
+}
+
+// Corta um trecho só de acréscimo depois de cada linha de "fins". Trecho com remoção fica inteiro:
+// cortar separaria a linha removida da que a substituiu.
+export function partirHunk(hunk: Hunk, fins: number[]): Hunk[] {
+  const [cabecalho = '', ...corpo] = hunk.patch.split('\n')
+  const [inicio, fim] = hunk.linhas
+  const cortes = [...new Set(fins)].filter(linha => linha >= inicio && linha < fim).sort((a, b) => a - b)
+  if (cortes.length === 0 || !corpo.every(linha => linha.startsWith('+') || linha.startsWith('\\'))) return [hunk]
+  const antigo = /^@@ -(\d+)/.exec(cabecalho)?.[1] ?? '0'
+  return [...cortes, fim].map((ate, i) => {
+    const de = i === 0 ? inicio : cortes[i - 1]! + 1
+    // O último pedaço leva junto o "\ No newline at end of file".
+    const linhas = i === cortes.length ? corpo.slice(de - inicio) : corpo.slice(de - inicio, ate - inicio + 1)
+    return { id: '', linhas: [de, ate], patch: [`@@ -${antigo},0 +${de},${ate - de + 1} @@`, ...linhas].join('\n') }
+  })
 }
 
 function arquivosNaoRastreados(): ArquivoAlterado[] {

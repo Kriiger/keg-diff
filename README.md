@@ -34,7 +34,7 @@ Em seguida a página de revisão abre no navegador, servida em `http://127.0.0.1
 - **Fluxo:** a linha do tempo nasce → processa → termina à esquerda e o diff do passo à direita. Passo de contexto mostra o código atual.
 - **Órfãos, testes e outros trechos:** o que não entrou em fluxo, cada um com o seu diff. Órfão recebe revisado, código morto ou falso positivo.
 
-Atalhos: `j` e `k` passam de passo, `x` marca revisado, `c` comenta, `d` e `f` marcam código morto e falso positivo nos órfãos, `p` volta ao panorama, `?` mostra a ajuda. Rodar o `keg diff` de novo em outro terminal atualiza a página aberta.
+Atalhos: `j` e `k` passam de passo, `x` marca revisado, `c` comenta, `d` e `f` marcam código morto e falso positivo nos órfãos, `v` alterna o diff entre lado a lado e empilhado, `p` volta ao panorama, `?` mostra a ajuda. Rodar o `keg diff` de novo em outro terminal atualiza a página aberta.
 
 Cada decisão fica presa ao hash do trecho: se o agente mudar o trecho depois, ele volta para "não revisado". Sem terminal (num script ou num agente), o keg não abre a página.
 
