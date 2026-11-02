@@ -3,7 +3,8 @@
 import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { WorkerPoolContextProvider } from '@pierre/diffs/react'
 import { createRoot } from 'react-dom/client'
-import type { AchadosEscolhidos, Estado, Fluxo, Revisao, TipoDoComentario } from '../src/contrato'
+import type { AchadosEscolhidos, Estado, Explicacao, Fluxo, Revisao, TipoDoComentario } from '../src/contrato'
+import { agruparOrfaos } from '../src/orfaos'
 import './estilo/tema.css'
 import './estilo/base.css'
 import './estilo/lateral.css'
@@ -44,6 +45,8 @@ export interface Item {
   detalhe?: string
   arquivo: string
   hunkIds: string[]
+  explicacao?: Explicacao          // só no órfão: as frases do narrador
+  grupo?: string                   // só no órfão: o id do grupo em que o narrador o narra (ver orfaos.ts)
 }
 
 export interface Checklist {
@@ -83,9 +86,9 @@ function App() {
   const modo = useModo()
   const completa = checklist !== undefined && checklist.todos.length > 0 && decididos(checklist.todos, estado) === checklist.todos.length
   const segundos = useCronometro(completa)
-  // "fluxo/<id>/<passo>" é o endereço que o mapa usa para levar a um passo de outro fluxo.
+  // "fluxo/<id>/<passo>" é o endereço que o mapa usa para levar a um passo de outro fluxo; "orfaos/<posição>", o do Fechamento para um órfão.
   const [tela = '', id, passoDoEndereco] = endereco.split('/')
-  const rota = id ? `${tela}/${id}` : tela
+  const rota = id && !(tela in SECOES) ? `${tela}/${id}` : tela
   const { navegacao, atalhos } = useNavegacao(revisao, checklist, estado, rota)
 
   // O mapa em outra janela precisa saber que esta página está viva, não importa a tela.
@@ -154,7 +157,7 @@ function App() {
           <main className="conteudo">
             {avisoDeServidor}
             <AvisoDoNarrador narrador={narrador} />
-            <TelaAtual rota={rota} fluxo={fluxoAberto} passoInicial={passoDoEndereco} checklist={checklist} segundos={segundos} contexto={contexto} />
+            <TelaAtual rota={rota} fluxo={fluxoAberto} passoInicial={passoDoEndereco} itemInicial={tela in SECOES ? id : undefined} checklist={checklist} segundos={segundos} contexto={contexto} />
           </main>
         </>}
       <AlternadorDeModo />
@@ -169,10 +172,10 @@ function App() {
 }
 
 // A tela do endereço: um fluxo, um grupo de trechos, o fechamento ou, se nenhum casa, o panorama.
-function TelaAtual({ rota, fluxo, passoInicial, checklist, segundos, contexto }: { rota: string; fluxo?: Fluxo; passoInicial?: string; checklist: Checklist; segundos: () => number; contexto: Contexto }) {
+function TelaAtual({ rota, fluxo, passoInicial, itemInicial, checklist, segundos, contexto }: { rota: string; fluxo?: Fluxo; passoInicial?: string; itemInicial?: string; checklist: Checklist; segundos: () => number; contexto: Contexto }) {
   const { revisao, estado, narrador, achados, escolherAchados } = contexto
   if (fluxo) return <TelaDoFluxo fluxo={fluxo} passoInicial={passoInicial} {...contexto} />
-  if (rota in SECOES) return <TelaDeTrechos key={rota} rota={rota} {...SECOES[rota as Secao]} itens={checklist[rota as Secao]} {...contexto} />
+  if (rota in SECOES) return <TelaDeTrechos key={rota} rota={rota} {...SECOES[rota as Secao]} itens={checklist[rota as Secao]} itemInicial={itemInicial} {...contexto} />
   if (rota === 'fechamento') return <Fechamento revisao={revisao} checklist={checklist} estado={estado} achados={achados} escolherAchados={escolherAchados} secoes={SECOES} segundos={segundos} />
   return <Panorama revisao={revisao} checklist={checklist} estado={estado} narrador={narrador} segundos={segundos} />
 }
@@ -229,8 +232,10 @@ function gravarPreferencia(visao: string) {
 // Todo trecho cai em algum lugar: fluxo, órfão, teste ou "outros". É isso que fecha o N de N.
 function montarChecklist(revisao: Revisao): Checklist {
   const fluxos = revisao.fluxos.map(fluxo => ({ fluxo, hunkIds: [...new Set(fluxo.passos.flatMap(p => p.hunkIds))] }))
+  const grupos = agruparOrfaos(revisao)
   const orfaos = revisao.orfaos.map(o => ({
     chave: `${o.arquivo}#${o.simbolo ?? ''}`, titulo: o.simbolo ?? o.arquivo, detalhe: `${o.arquivo} · ${MOTIVOS[o.motivo]}`, arquivo: o.arquivo, hunkIds: o.hunkIds,
+    explicacao: o.explicacao, grupo: grupos.find(g => g.orfaos.includes(o))?.id,
   }))
   const testes = revisao.testes.map(t => ({ chave: t.arquivo, titulo: t.arquivo, arquivo: t.arquivo, hunkIds: t.hunkIds }))
   const vistos = new Set([...fluxos, ...orfaos, ...testes].flatMap(g => g.hunkIds))

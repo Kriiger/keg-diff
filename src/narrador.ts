@@ -4,7 +4,8 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { chamarClaude } from './claude-cli.js'
-import type { Fluxo, Frase, Passo, Revisao } from './contrato.js'
+import type { Fluxo, Frase, Hunk, Orfao, Passo, Revisao } from './contrato.js'
+import { agruparOrfaos, type GrupoDeOrfaos } from './orfaos.js'
 
 export interface ConfigDoNarrador {
   modelo: string
@@ -20,13 +21,32 @@ interface Narracao {
   passos: { id: string; frases: Frase[] }[]
 }
 
+// O cache de um grupo de órfãos: "o1", "o2"... é a posição do órfão no grupo (ver descreverOrfaos).
+interface NarracaoDeOrfaos {
+  modelo: string
+  orfaos: { id: string; frases: Frase[] }[]
+}
+
+// Quem chama o claude; o padrão é o claude de verdade, e uma resposta falsa entra no lugar nas verificações.
+type Chamar = typeof chamarClaude
+
 const MODELO_PADRAO = 'sonnet'
 const ESFORCOS = ['low', 'medium', 'high', 'xhigh', 'max']
 // Narrar frases ancoradas em linhas não pede raciocínio longo: medium gasta bem menos tokens que o padrão do claude.
 const ESFORCO_PADRAO = 'medium'
 const FRASES_POR_PASSO = 3
 const LINHAS_POR_PASSO = 200
-const PROMPT_DO_SISTEMA = readFileSync(path.join(import.meta.dirname, 'narrador.md'), 'utf8')
+const LINHAS_POR_ORFAO = 120
+// Os órfãos têm o prompt próprio (narrador-orfaos.md): a pergunta deles é "isto é código morto?", não "o que o dado faz?".
+const ARQUIVO_DO_SISTEMA = path.join(import.meta.dirname, 'narrador.md')
+const ARQUIVO_DO_SISTEMA_DE_ORFAOS = path.join(import.meta.dirname, 'narrador-orfaos.md')
+const PROMPT_DO_SISTEMA = readFileSync(ARQUIVO_DO_SISTEMA, 'utf8')
+const PROMPT_DO_SISTEMA_DE_ORFAOS = readFileSync(ARQUIVO_DO_SISTEMA_DE_ORFAOS, 'utf8')
+const MOTIVOS_DO_ORFAO: Record<Orfao['motivo'], string> = {
+  'sem-chamador': 'sem chamador (nenhuma função do projeto chama este código)',
+  'sem-saida': 'sem saída (o dado que passa por ele não chega a banco, resposta HTTP ou tela)',
+  'arquivo-sem-import': 'arquivo que ninguém importa',
+}
 
 // Resposta com is_error, como a de limite de uso: a narração para até a pessoa pedir de novo.
 export class PausaDaNarracao extends Error {}
@@ -48,16 +68,29 @@ export function lerConfigDoNarrador(raiz: string): ConfigDoNarrador {
 
 // Deixa a narração do fluxo no cache; quem chama a aplica ao review.json com preencherDoCache.
 // aoChamar avisa de cada chamada ao claude, antes dela, para a conta do consumo não depender de a chamada dar certo.
-export async function narrarFluxo(fluxo: Fluxo, revisao: Revisao, raiz: string, { modelo, esforco, aoChamar }: ConfigDoNarrador & { aoChamar: () => void }) {
+export async function narrarFluxo(fluxo: Fluxo, revisao: Revisao, raiz: string, opcoes: OpcoesDeChamada) {
   const prompt = montarPrompt(fluxo, revisao, raiz)
-  const arquivo = arquivoDoCache(raiz, prompt, { modelo, esforco })
+  await narrarComCache(raiz, prompt, { sistema: PROMPT_DO_SISTEMA, arquivoDoSistema: ARQUIVO_DO_SISTEMA }, opcoes, texto => validar(texto, fluxo, opcoes.modelo))
+}
+
+// O mesmo para um grupo de órfãos: uma chamada para todos eles, com o prompt próprio.
+export async function narrarOrfaos(grupo: GrupoDeOrfaos, revisao: Revisao, raiz: string, opcoes: OpcoesDeChamada) {
+  const descritos = descreverOrfaos(grupo, revisao)
+  const prompt = montarPromptDeOrfaos(grupo, descritos, raiz)
+  await narrarComCache(raiz, prompt, { sistema: PROMPT_DO_SISTEMA_DE_ORFAOS, arquivoDoSistema: ARQUIVO_DO_SISTEMA_DE_ORFAOS }, opcoes, texto => validarOrfaos(texto, descritos, opcoes.modelo))
+}
+
+type OpcoesDeChamada = ConfigDoNarrador & { aoChamar: () => void; chamar?: Chamar }
+
+async function narrarComCache<T>(raiz: string, prompt: string, { sistema, arquivoDoSistema }: { sistema: string; arquivoDoSistema: string }, { modelo, esforco, aoChamar, chamar = chamarClaude }: OpcoesDeChamada, validarTexto: (texto: string) => T | undefined) {
+  const arquivo = arquivoDoCache(raiz, prompt, { modelo, esforco }, sistema)
   if (existsSync(arquivo)) return
   // JSON fora do formato ganha uma nova tentativa, uma só.
   for (let tentativa = 0; tentativa < 2; tentativa++) {
     aoChamar()
-    const resposta = await chamarClaude(modelo, esforco, prompt)
+    const resposta = await chamar(modelo, esforco, prompt, arquivoDoSistema)
     if (resposta.erro) throw new PausaDaNarracao(resposta.texto)
-    const narracao = validar(resposta.texto, fluxo, modelo)
+    const narracao = validarTexto(resposta.texto)
     if (!narracao) continue
     mkdirSync(path.dirname(arquivo), { recursive: true })
     writeFileSync(arquivo, JSON.stringify(narracao, null, 2) + '\n')
@@ -66,7 +99,7 @@ export async function narrarFluxo(fluxo: Fluxo, revisao: Revisao, raiz: string, 
   throw new Error('a resposta do modelo veio fora do formato, mesmo na segunda tentativa')
 }
 
-// O motor monta o review.json com o que já está no cache: fluxo sem trecho novo não é narrado de novo.
+// O motor monta o review.json com o que já está no cache: fluxo sem trecho novo não é narrado de novo, e os órfãos também não.
 export function preencherDoCache(revisao: Revisao, raiz: string, config: ConfigDoNarrador) {
   for (const fluxo of revisao.fluxos) {
     const arquivo = arquivoDoCache(raiz, montarPrompt(fluxo, revisao, raiz), config)
@@ -77,12 +110,22 @@ export function preencherDoCache(revisao: Revisao, raiz: string, config: ConfigD
       if (passo) passo.explicacao = { frases, modelo: narracao.modelo }
     }
   }
+  for (const grupo of agruparOrfaos(revisao)) {
+    const descritos = descreverOrfaos(grupo, revisao)
+    const arquivo = arquivoDoCache(raiz, montarPromptDeOrfaos(grupo, descritos, raiz), config, PROMPT_DO_SISTEMA_DE_ORFAOS)
+    if (!existsSync(arquivo)) continue
+    const narracao: NarracaoDeOrfaos = JSON.parse(readFileSync(arquivo, 'utf8'))
+    for (const { id, frases } of narracao.orfaos) {
+      const orfao = descritos.find(d => d.id === id)?.orfao
+      if (orfao) orfao.explicacao = { frases, modelo: narracao.modelo }
+    }
+  }
 }
 
-// O hash cobre as regras do narrador, o modelo, o esforço e o fluxo inteiro: código de cada passo, trechos e vizinhos.
+// O hash cobre as regras do narrador (as dos fluxos ou as dos órfãos), o modelo, o esforço e o fluxo inteiro: código de cada passo, trechos e vizinhos.
 // O esforço entra para uma narração feita com outro esforço não ser reaproveitada em silêncio.
-function arquivoDoCache(raiz: string, prompt: string, { modelo, esforco }: ConfigDoNarrador): string {
-  const hash = createHash('sha1').update([PROMPT_DO_SISTEMA, modelo, esforco, prompt].join('\0')).digest('hex').slice(0, 16)
+function arquivoDoCache(raiz: string, prompt: string, { modelo, esforco }: ConfigDoNarrador, sistema = PROMPT_DO_SISTEMA): string {
+  const hash = createHash('sha1').update([sistema, modelo, esforco, prompt].join('\0')).digest('hex').slice(0, 16)
   return path.join(raiz, '.revisao', 'cache', `${hash}.json`)
 }
 
@@ -104,22 +147,21 @@ function descreverPasso(passo: Passo, fluxo: Fluxo, revisao: Revisao, raiz: stri
   if (passo.fronteira) linhas.push(`fronteira: ${passo.fronteira}`)
   for (const aviso of passo.avisos ?? []) linhas.push(`aviso do compilador: ${aviso}`)
   if (trechos.length > 0) linhas.push('trechos alterados:', ...trechos.map(t => t.patch))
-  linhas.push('código (linhas com + foram alteradas):', ...codigoNumerado(passo, trechos.map(t => t.linhas), raiz))
+  linhas.push('código (linhas com + foram alteradas):', ...codigoNumerado(passo.arquivo, passo.linhas, trechos.map(t => t.linhas), raiz, LINHAS_POR_PASSO, 'passo'))
   return linhas.join('\n')
 }
 
-function codigoNumerado(passo: Passo, alteradas: [number, number][], raiz: string): string[] {
-  const arquivo = path.join(raiz, passo.arquivo)
+function codigoNumerado(arquivoRelativo: string, [de, ate]: [number, number], alteradas: [number, number][], raiz: string, limite: number, quem: 'passo' | 'órfão'): string[] {
+  const arquivo = path.join(raiz, arquivoRelativo)
   if (!existsSync(arquivo)) return ['(arquivo não existe mais)']
-  const [de, ate] = passo.linhas
-  const fim = Math.min(ate, de + LINHAS_POR_PASSO - 1)
+  const fim = Math.min(ate, de + limite - 1)
   const codigo = readFileSync(arquivo, 'utf8').split('\n').slice(de - 1, fim)
   const linhas = codigo.map((texto, i) => {
     const numero = de + i
     const marca = alteradas.some(([inicio, final]) => numero >= inicio && numero <= final) ? '+' : ' '
     return `${marca}${String(numero).padStart(4)}  ${texto}`
   })
-  return fim < ate ? [...linhas, `(passo cortado na linha ${fim}; ele vai até a ${ate})`] : linhas
+  return fim < ate ? [...linhas, `(${quem} cortado na linha ${fim}; ele vai até a ${ate})`] : linhas
 }
 
 // undefined = fora do formato pedido. A frase com linhas fora do passo não derruba a resposta: fica sem âncora.
@@ -136,6 +178,47 @@ function validar(texto: string, fluxo: Fluxo, modelo: string): Narracao | undefi
     if (frases.length > 0) passos.push({ id: item.id, frases })
   }
   return passos.length > 0 ? { modelo, passos } : undefined
+}
+
+// Um órfão no prompt: "o1", "o2"... pela posição no grupo, e o intervalo de linhas que cobre os trechos dele (a âncora das frases cai aí).
+export interface OrfaoDescrito { id: string; orfao: Orfao; intervalo: [number, number]; trechos: Hunk[] }
+
+export function descreverOrfaos(grupo: GrupoDeOrfaos, revisao: Revisao): OrfaoDescrito[] {
+  return grupo.orfaos.map((orfao, i) => {
+    const trechos = revisao.arquivos.find(a => a.caminho === orfao.arquivo)?.hunks.filter(h => orfao.hunkIds.includes(h.id)) ?? []
+    const intervalo: [number, number] = trechos.length > 0 ? [Math.min(...trechos.map(h => h.linhas[0])), Math.max(...trechos.map(h => h.linhas[1]))] : [0, 0]
+    return { id: `o${i + 1}`, orfao, intervalo, trechos }
+  })
+}
+
+export function montarPromptDeOrfaos(grupo: GrupoDeOrfaos, descritos: OrfaoDescrito[], raiz: string): string {
+  const arquivos = [...new Set(grupo.orfaos.map(o => o.arquivo))].join(', ')
+  return [`Órfãos de ${arquivos}`, ...descritos.map(d => descreverOrfao(d, raiz))].join('\n\n')
+}
+
+function descreverOrfao({ id, orfao, intervalo, trechos }: OrfaoDescrito, raiz: string): string {
+  const nome = orfao.simbolo ?? (orfao.motivo === 'arquivo-sem-import' ? 'arquivo inteiro' : 'trechos fora de função')
+  const onde = intervalo[0] > 0 ? `${orfao.arquivo}:${intervalo[0]}-${intervalo[1]}` : orfao.arquivo
+  const linhas = [`Órfão ${id} · ${nome} · ${onde} · motivo: ${MOTIVOS_DO_ORFAO[orfao.motivo]}`]
+  if (trechos.length > 0) linhas.push('trechos alterados:', ...trechos.map(t => t.patch))
+  if (intervalo[0] > 0) linhas.push('código (linhas com + foram alteradas):', ...codigoNumerado(orfao.arquivo, intervalo, trechos.map(t => t.linhas), raiz, LINHAS_POR_ORFAO, 'órfão'))
+  return linhas.join('\n')
+}
+
+// undefined = fora do formato pedido, como em validar; o órfão que o modelo esqueceu fica sem frase.
+function validarOrfaos(texto: string, descritos: OrfaoDescrito[], modelo: string): NarracaoDeOrfaos | undefined {
+  const bruto = lerJson(texto)
+  if (!Array.isArray(bruto?.orfaos)) return undefined
+  const orfaos: NarracaoDeOrfaos['orfaos'] = []
+  for (const item of bruto.orfaos) {
+    if (typeof item?.id !== 'string' || !Array.isArray(item.frases)) return undefined
+    const descrito = descritos.find(d => d.id === item.id)
+    if (!descrito || orfaos.some(o => o.id === item.id)) continue
+    const frases = lerFrases(item.frases, descrito.intervalo)
+    if (!frases) return undefined
+    if (frases.length > 0) orfaos.push({ id: item.id, frases })
+  }
+  return orfaos.length > 0 ? { modelo, orfaos } : undefined
 }
 
 function lerFrases(lista: unknown[], intervalo: [number, number]): Frase[] | undefined {
@@ -155,7 +238,7 @@ function ancoraValida(linhas: unknown, [de, ate]: [number, number]): [number, nu
 }
 
 // O modelo às vezes embrulha o JSON em ```json ou escreve uma linha antes.
-function lerJson(texto: string): { passos?: unknown } | undefined {
+function lerJson(texto: string): { passos?: unknown; orfaos?: unknown } | undefined {
   try {
     return JSON.parse(texto.slice(texto.indexOf('{'), texto.lastIndexOf('}') + 1))
   } catch {

@@ -68,6 +68,7 @@ export interface Orfao {
   simbolo?: string
   hunkIds: string[]
   motivo: 'sem-chamador' | 'sem-saida' | 'arquivo-sem-import'
+  explicacao?: Explicacao          // o narrador dos órfãos: parece código morto? ninguém chama por quê? review.json antigo não tem
 }
 
 export interface Teste {
@@ -240,8 +241,8 @@ export interface EstadoDoNarrador {
   ativo: boolean                   // false: --sem-ia, sem login da assinatura ou login que cobraria API
   motivo?: string                  // por que não está ativo
   pausa?: string                   // resposta com is_error (limite de uso): só volta quando a pessoa pede
-  narrando: string[]               // ids dos fluxos na fila ou em andamento
-  falhas: Record<string, string>   // id do fluxo -> o que deu errado nele
+  narrando: string[]               // ids dos fluxos e dos grupos de órfãos ("orfaos:<arquivo>", ver orfaos.ts) na fila ou em andamento
+  falhas: Record<string, string>   // id do fluxo ou do grupo de órfãos -> o que deu errado nele
   modelo: string
   esforco: string                  // --effort do claude: low, medium, high, xhigh ou max
 }

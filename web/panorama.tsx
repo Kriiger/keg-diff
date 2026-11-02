@@ -148,7 +148,7 @@ function CartaoDosFluxos({ linhas, revisao, estado, narrador }: PropsComFluxos &
   return (
     <Cartao titulo="Fluxos" dica="do mais arriscado ao menos">
       <NotaDosFluxos linhas={linhas} />
-      <BotaoNarrarTodos fluxos={revisao.fluxos} narrador={narrador} />
+      <BotaoNarrarTodos revisao={revisao} narrador={narrador} />
       <ol className="lista-de-fluxos">
         {linhas.map(({ fluxo, hunkIds, arquivos, camadas, nasce, termina }) => {
           const feitos = decididos(hunkIds, estado)

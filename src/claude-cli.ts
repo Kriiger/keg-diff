@@ -5,7 +5,6 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-const PROMPT_DO_NARRADOR = path.join(import.meta.dirname, 'narrador.md')
 const CINCO_MINUTOS = 5 * 60 * 1000
 // No -p, uma chave no ambiente vence a assinatura e vira cobrança de API: o filho nasce sem elas.
 const VARIAVEIS_DE_COBRANCA = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY']
@@ -32,10 +31,11 @@ export async function verificarLogin(): Promise<{ motivo?: string; metodo?: stri
   return { metodo }
 }
 
-export async function chamarClaude(modelo: string, esforco: string, prompt: string): Promise<Resposta> {
+// arquivoDoSistema é o prompt de sistema: o dos fluxos (narrador.md) ou o dos órfãos (narrador-orfaos.md).
+export async function chamarClaude(modelo: string, esforco: string, prompt: string, arquivoDoSistema: string): Promise<Resposta> {
   const args = [
     '-p', '--safe-mode', '--tools', '', '--model', modelo, '--effort', esforco,
-    '--system-prompt-file', PROMPT_DO_NARRADOR, '--output-format', 'json', '--no-session-persistence',
+    '--system-prompt-file', arquivoDoSistema, '--output-format', 'json', '--no-session-persistence',
   ]
   const { saida, falha } = await executar(args, prompt)
   const resposta = lerJson(saida)

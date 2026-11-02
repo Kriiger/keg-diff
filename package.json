@@ -13,7 +13,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc && node -e \"require('node:fs').copyFileSync('src/narrador.md', 'dist/narrador.md')\" && vite build web --outDir ../dist/web --emptyOutDir --logLevel error",
+    "build": "tsc && node -e \"for (const nome of ['narrador', 'narrador-orfaos']) require('node:fs').copyFileSync('src/' + nome + '.md', 'dist/' + nome + '.md')\" && vite build web --outDir ../dist/web --emptyOutDir --logLevel error",
     "prepare": "npm run build",
     "typecheck": "tsc --noEmit && tsc -p web",
     "calibrar": "npm run build && node fixtures/calibrar.mjs"

@@ -75,6 +75,8 @@ a:focus-visible { border-radius: 10px; }
 .frases li:hover, .frases li:focus { background: var(--selecionado); }
 .frases .na-correcao { margin-left: 8px; padding: 1px 9px; font: inherit; font-size: 12px; border-radius: 999px; border: 1px solid var(--painel-borda); background: var(--botao-fundo); color: inherit; cursor: pointer; }
 .frases .na-correcao.ativa { background: var(--primario); color: var(--primario-texto); border-color: transparent; }
+/* O item atual da lista já tem o fundo de selecionado: a frase sob o mouse precisa de um tom a mais para se ver. */
+.item.atual .frases li:hover, .item.atual .frases li:focus { background: color-mix(in srgb, var(--texto) 9%, transparent); }
 .narrar-todos { margin: 8px 0 12px; }
 .item { margin-bottom: 16px; }
 /* Cada grupo de trechos é um bloco grande e independente: fora da tela o navegador pula o layout e a pintura dele (o diff dentro é

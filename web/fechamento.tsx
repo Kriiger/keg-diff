@@ -1,7 +1,8 @@
 // Fechamento: responde "Terminei?". Cobertura, nota de controle e o feedback pronto para o agente.
 import { useEffect, useState } from 'react'
-import { chaveDaFrase, type AchadosEscolhidos, type Estado, type Nota, type Revisao } from '../src/contrato'
+import { chaveDaFrase, type AchadosEscolhidos, type Estado, type Frase, type Nota, type Revisao } from '../src/contrato'
 import { formatarTempo } from './cronometro'
+import { enderecoDoOrfao } from './enderecos'
 import { tolerarQueda } from './eventos'
 import type { Checklist, EscolherAchados } from './main'
 import { decididos, useAtalhos } from './telas'
@@ -18,7 +19,7 @@ interface PropsDoFechamento {
   segundos: () => number
 }
 
-// Uma frase "atenção:" do narrador, com o passo onde ela está para o link e o lugar.
+// Uma frase "atenção:" do narrador, com o passo (ou o órfão) onde ela está para o link e o lugar.
 interface Apontamento { chave: string; texto: string; onde: string; endereco: string }
 
 export function Fechamento({ revisao, checklist, estado, achados, escolherAchados, secoes, segundos }: PropsDoFechamento) {
@@ -102,16 +103,21 @@ export function Fechamento({ revisao, checklist, estado, achados, escolherAchado
   )
 }
 
-// As frases "atenção:" de todos os passos alterados: a pessoa confirma as que são erro de verdade e elas entram no feedback.
+// As frases "atenção:" de todos os passos alterados e dos órfãos: a pessoa confirma as que são erro de verdade e elas entram no feedback.
 function AchadosDoClaude({ revisao, achados, escolher }: { revisao: Revisao; achados: AchadosEscolhidos; escolher: EscolherAchados }) {
   const passos = revisao.fluxos.flatMap(fluxo => fluxo.passos.filter(p => p.hunkIds.length > 0).map(passo => ({ fluxo, passo })))
-  if (!passos.some(({ passo }) => passo.explicacao)) return null
-  const lista = passos.flatMap(({ fluxo, passo }) => (passo.explicacao?.frases ?? [])
-    .filter(frase => /^atenção:/i.test(frase.texto))
-    .map(({ texto, linhas }): Apontamento => {
-      const [inicio, fim] = linhas ?? [passo.linhas[0], passo.linhas[0]]
-      return { chave: chaveDaFrase(passo.hunkIds, texto), texto, onde: `${passo.arquivo}:${inicio === fim ? inicio : `${inicio}–${fim}`} (${passo.simbolo})`, endereco: `#fluxo/${fluxo.id}/${passo.id}` }
-    }))
+  if (!passos.some(({ passo }) => passo.explicacao) && !revisao.orfaos.some(o => o.explicacao)) return null
+  const atencao = (frases: Frase[] | undefined) => (frases ?? []).filter(frase => /^atenção:/i.test(frase.texto))
+  const ancora = (linhas: Frase['linhas'], inicial: number) => {
+    const [inicio, fim] = linhas ?? [inicial, inicial]
+    return inicio === fim ? `${inicio}` : `${inicio}–${fim}`
+  }
+  const dosPassos = passos.flatMap(({ fluxo, passo }) => atencao(passo.explicacao?.frases)
+    .map(({ texto, linhas }): Apontamento => ({ chave: chaveDaFrase(passo.hunkIds, texto), texto, onde: `${passo.arquivo}:${ancora(linhas, passo.linhas[0])} (${passo.simbolo})`, endereco: `#fluxo/${fluxo.id}/${passo.id}` })))
+  // O órfão sem símbolo é um arquivo inteiro ou trechos soltos: o lugar dele é o arquivo, com a linha só quando a frase tem âncora.
+  const dosOrfaos = revisao.orfaos.flatMap((orfao, indice) => atencao(orfao.explicacao?.frases)
+    .map(({ texto, linhas }): Apontamento => ({ chave: chaveDaFrase(orfao.hunkIds, texto), texto, onde: `${orfao.arquivo}${linhas ? `:${ancora(linhas, linhas[0])}` : ''}${orfao.simbolo ? ` (${orfao.simbolo})` : ''} · órfão`, endereco: enderecoDoOrfao(indice) })))
+  const lista = [...dosPassos, ...dosOrfaos]
   // A mesma frase em passos que compartilham os trechos tem a mesma chave: aparece uma vez.
   const apontamentos = [...new Map(lista.map(a => [a.chave, a])).values()]
   const chaves = apontamentos.map(a => a.chave)
@@ -120,7 +126,7 @@ function AchadosDoClaude({ revisao, achados, escolher }: { revisao: Revisao; ach
     <>
       <h2>Achados do Claude</h2>
       {apontamentos.length === 0
-        ? <p className="detalhe">O narrador não apontou nenhum risco ("atenção:") nos fluxos narrados.</p>
+        ? <p className="detalhe">O narrador não apontou nenhum risco ("atenção:") nos fluxos e nos órfãos narrados.</p>
         : (
           <>
             <ul className="faltas">
@@ -138,7 +144,7 @@ function AchadosDoClaude({ revisao, achados, escolher }: { revisao: Revisao; ach
             </div>
           </>
         )}
-      <p className="detalhe">Marcado, o achado vai para o feedback abaixo. As outras frases do narrador também podem ir: use o botão "+ correção" no próprio passo.</p>
+      <p className="detalhe">Marcado, o achado vai para o feedback abaixo. As outras frases do narrador também podem ir: use o botão "+ correção" no próprio passo ou órfão.</p>
     </>
   )
 }

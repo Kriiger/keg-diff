@@ -7,7 +7,7 @@ import { chaveDaFrase, type AchadosEscolhidos, type Estado, type Frase, type Rev
 import { lerAchados, lerEstado } from './estado.js'
 import { linhasDoTrecho, nomeDaLinha } from './linhas.js'
 
-// Um lugar do diff onde uma decisão pode estar: passo de fluxo, órfão, teste ou trecho solto.
+// Um lugar do diff onde uma decisão pode estar: passo de fluxo, órfão, teste ou trecho solto. As frases são as do narrador, no passo ou no órfão.
 interface Lugar { arquivo: string; linha?: number; simbolo?: string; hunkIds: string[]; orfao: boolean; frases?: Frase[] }
 
 // Um ajuste que a revisão pede ao agente: um comentário da pessoa, uma frase do narrador que ela confirmou ou um órfão marcado como código morto.
@@ -113,7 +113,7 @@ function lugares(revisao: Revisao): Lugar[] {
     .map(p => ({ arquivo: p.arquivo, linha: p.linhas[0], simbolo: p.simbolo, hunkIds: p.hunkIds, orfao: false, frases: p.explicacao?.frases }))
   // Órfão de arquivo inteiro (sem símbolo) vai sem linha, como "lib/utils/formatarMoeda.ts: código morto".
   const orfaos = revisao.orfaos.map(o => ({
-    arquivo: o.arquivo, linha: o.simbolo ? linhaDe(o.arquivo, o.hunkIds[0]) : undefined, simbolo: o.simbolo, hunkIds: o.hunkIds, orfao: true,
+    arquivo: o.arquivo, linha: o.simbolo ? linhaDe(o.arquivo, o.hunkIds[0]) : undefined, simbolo: o.simbolo, hunkIds: o.hunkIds, orfao: true, frases: o.explicacao?.frases,
   }))
   const testes = revisao.testes.map(t => ({ arquivo: t.arquivo, linha: linhaDe(t.arquivo, t.hunkIds[0]), hunkIds: t.hunkIds, orfao: false }))
   const vistos = new Set([...passos, ...orfaos, ...testes].flatMap(l => l.hunkIds))

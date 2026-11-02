@@ -1,11 +1,17 @@
-// Fila do narrador no servidor: um fluxo por vez, e nada se repete sozinho.
+// Fila do narrador no servidor: um fluxo (ou um grupo de órfãos) por vez, e nada se repete sozinho.
 // O keg só narra com o login da assinatura; qualquer outro login, ou uma resposta com erro, para a fila.
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { verificarLogin } from './claude-cli.js'
 import type { EstadoDoNarrador, Revisao } from './contrato.js'
-import { narrarFluxo, PausaDaNarracao, preencherDoCache, type OpcoesDoNarrador } from './narrador.js'
+import { narrarFluxo, narrarOrfaos, PausaDaNarracao, preencherDoCache, type OpcoesDoNarrador } from './narrador.js'
+import { agruparOrfaos, ehGrupoDeOrfaos } from './orfaos.js'
 import type { Sessao } from './sessao.js'
+
+// Os órfãos entram depois dos fluxos: enquanto houver fluxo na fila, ele passa na frente, mesmo que o pedido dos órfãos tenha chegado antes.
+export function proximoDaFila(fila: string[]): string | undefined {
+  return fila.find(id => !ehGrupoDeOrfaos(id)) ?? fila[0]
+}
 
 export class FilaDoNarrador {
   private motivo?: string
@@ -27,14 +33,15 @@ export class FilaDoNarrador {
     return { ativo: this.motivo === undefined, motivo: this.motivo, pausa: this.pausa, narrando: [...this.fila], falhas: this.falhas, modelo: this.opcoes.modelo, esforco: this.opcoes.esforco }
   }
 
+  // "ids" são ids de fluxos e de grupos de órfãos (ver orfaos.ts).
   // "retomar" é a pessoa pedindo de novo depois da pausa; abrir um fluxo não conta.
-  pedir(fluxos: string[], retomar: boolean) {
+  pedir(ids: string[], retomar: boolean) {
     if (this.opcoes.semIa || (this.pausa && !retomar)) return
     if (retomar) {
       this.pausa = undefined
       this.login = this.conferirLogin()
     }
-    for (const id of fluxos) {
+    for (const id of ids) {
       delete this.falhas[id]
       if (!this.fila.includes(id)) this.fila.push(id)
     }
@@ -54,8 +61,9 @@ export class FilaDoNarrador {
     this.rodando = true
     await this.login
     while (this.fila.length > 0 && !this.pausa && this.motivo === undefined) {
-      await this.narrarUm(this.fila[0]!)
-      this.fila.shift()
+      const id = proximoDaFila(this.fila)!
+      await this.narrarUm(id)
+      this.fila.splice(this.fila.indexOf(id), 1)
       this.avisar()
     }
     // Parou por pausa ou por trava: o que sobrou na fila só volta se a pessoa pedir.
@@ -66,13 +74,16 @@ export class FilaDoNarrador {
 
   private async narrarUm(id: string) {
     const revisao: Revisao = JSON.parse(readFileSync(this.arquivoDaRevisao, 'utf8'))
+    const grupo = ehGrupoDeOrfaos(id) ? agruparOrfaos(revisao).find(g => g.id === id) : undefined
     const fluxo = revisao.fluxos.find(f => f.id === id)
-    if (!fluxo) {
-      this.falhas[id] = 'este fluxo não está mais no review.json; rode o keg diff de novo'
+    if (!grupo && !fluxo) {
+      this.falhas[id] = `${ehGrupoDeOrfaos(id) ? 'este grupo de órfãos' : 'este fluxo'} não está mais no review.json; rode o keg diff de novo`
       return
     }
     try {
-      await narrarFluxo(fluxo, revisao, this.raiz, { modelo: this.opcoes.modelo, esforco: this.opcoes.esforco, aoChamar: () => this.sessao.contarChamada() })
+      const opcoes = { modelo: this.opcoes.modelo, esforco: this.opcoes.esforco, aoChamar: () => this.sessao.contarChamada() }
+      if (grupo) await narrarOrfaos(grupo, revisao, this.raiz, opcoes)
+      else await narrarFluxo(fluxo!, revisao, this.raiz, opcoes)
       this.gravarRevisao()
     } catch (erro) {
       if (erro instanceof PausaDaNarracao) {

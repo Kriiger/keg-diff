@@ -1,6 +1,7 @@
 // O narrador na página: frases presas a linhas do diff, a frase mecânica quando não há IA e os avisos do topo.
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
-import { chaveDaFrase, type AchadosEscolhidos, type EstadoDoNarrador, type Fluxo, type Passo } from '../src/contrato'
+import { chaveDaFrase, type AchadosEscolhidos, type EstadoDoNarrador, type Explicacao, type Fluxo, type Passo, type Revisao } from '../src/contrato'
+import { ehGrupoDeOrfaos, gruposSemNarracao } from '../src/orfaos'
 import { escutar, tolerarQueda } from './eventos'
 import type { EscolherAchados } from './main'
 
@@ -48,31 +49,49 @@ export function AvisoDoNarrador({ narrador }: { narrador: Narrador }) {
       </p>
     )
   }
-  const fluxos = estado.narrando.length
-  if (fluxos === 0) return null
-  return <p className="detalhe">Narrando {fluxos} {fluxos === 1 ? 'fluxo' : 'fluxos'}…</p>
+  const fluxos = estado.narrando.filter(id => !ehGrupoDeOrfaos(id)).length
+  const orfaos = estado.narrando.length - fluxos
+  if (fluxos + orfaos === 0) return null
+  const dosFluxos = `${fluxos} ${fluxos === 1 ? 'fluxo' : 'fluxos'}`
+  return <p className="detalhe">Narrando {fluxos > 0 && dosFluxos}{fluxos > 0 && orfaos > 0 && ' e '}{orfaos > 0 && 'os órfãos'}…</p>
 }
 
-export function BotaoNarrarTodos({ fluxos, narrador }: { fluxos: Fluxo[]; narrador: Narrador }) {
-  const pendentes = fluxos.filter(semNarracao)
-  if (!narrador.estado?.ativo || pendentes.length === 0) return null
+// "Narrar todos" leva os fluxos sem narração e, depois deles, os grupos de órfãos; a fila narra os fluxos primeiro.
+export function BotaoNarrarTodos({ revisao, narrador }: { revisao: Revisao; narrador: Narrador }) {
+  const fluxos = revisao.fluxos.filter(semNarracao)
+  const grupos = gruposSemNarracao(revisao)
+  if (!narrador.estado?.ativo || fluxos.length + grupos.length === 0) return null
   const ocupado = narrador.estado.narrando.length > 0
+  const total = [fluxos.length > 0 && String(fluxos.length), grupos.length > 0 && 'órfãos'].filter(Boolean).join(' + ')
   return (
-    <button className="narrar-todos" disabled={ocupado} onClick={() => narrador.pedir(pendentes.map(f => f.id), true)}>
-      {ocupado ? 'Narrando…' : `Narrar todos (${pendentes.length})`}
+    <button className="narrar-todos" disabled={ocupado} onClick={() => narrador.pedir([...fluxos.map(f => f.id), ...grupos.map(g => g.id)], true)}>
+      {ocupado ? 'Narrando…' : `Narrar todos (${total})`}
     </button>
   )
 }
 
-// Passar o mouse numa frase acende no diff as linhas da âncora. Frase sem âncora válida aparece marcada.
-// O botão no fim da linha leva a frase para o feedback da correção; clicar nele não mexe no destaque.
 export function FrasesDoPasso({ passo, fluxo, narrador, destacar, achados, escolher }: { passo: Passo; fluxo: Fluxo; narrador: Narrador; destacar: (linhas: Linhas) => void; achados: AchadosEscolhidos; escolher: EscolherAchados }) {
   const { explicacao } = passo
   if (!explicacao) return <MecanicaDoPasso passo={passo} fluxo={fluxo} narrador={narrador} />
+  return <ListaDeFrases explicacao={explicacao} hunkIds={passo.hunkIds} destacar={destacar} achados={achados} escolher={escolher} />
+}
+
+// As frases do narrador de um órfão. Sem narração ainda, não há frase mecânica (o órfão não tem grafo): fica o aviso de que está narrando ou de que falhou.
+// "grupo" é o id do grupo de órfãos em que ele foi narrado, o que o estado do narrador conhece.
+export function FrasesDoOrfao({ explicacao, hunkIds, grupo, narrador, destacar, achados, escolher }: { explicacao?: Explicacao; hunkIds: string[]; grupo: string; narrador: Narrador; destacar: (linhas: Linhas) => void; achados: AchadosEscolhidos; escolher: EscolherAchados }) {
+  if (explicacao) return <ListaDeFrases explicacao={explicacao} hunkIds={hunkIds} destacar={destacar} achados={achados} escolher={escolher} />
+  const falha = narrador.estado?.falhas[grupo]
+  if (falha) return <p className="alerta">Não consegui narrar os órfãos: {falha}</p>
+  return narrador.estado?.narrando.includes(grupo) ? <p className="detalhe">Narrando…</p> : null
+}
+
+// Passar o mouse numa frase acende no diff as linhas da âncora. Frase sem âncora válida aparece marcada.
+// O botão no fim da linha leva a frase para o feedback da correção; clicar nele não mexe no destaque.
+function ListaDeFrases({ explicacao, hunkIds, destacar, achados, escolher }: { explicacao: Explicacao; hunkIds: string[]; destacar: (linhas: Linhas) => void; achados: AchadosEscolhidos; escolher: EscolherAchados }) {
   return (
     <ul className="frases">
       {explicacao.frases.map(({ texto, linhas }) => {
-        const chave = chaveDaFrase(passo.hunkIds, texto)
+        const chave = chaveDaFrase(hunkIds, texto)
         const dentro = chave in achados
         return (
           <li
@@ -82,8 +101,8 @@ export function FrasesDoPasso({ passo, fluxo, narrador, destacar, achados, escol
             {texto}{' '}
             {linhas
               ? <span className="local">linhas {linhas[0]}–{linhas[1]}</span>
-              : <span className="sem-ancora" title="As linhas citadas estão fora do passo ou faltam: confira no código">sem âncora válida</span>}
-            {passo.hunkIds.length > 0 && (
+              : <span className="sem-ancora" title="As linhas citadas estão fora do trecho ou faltam: confira no código">sem âncora válida</span>}
+            {hunkIds.length > 0 && (
               <button className={dentro ? 'na-correcao ativa' : 'na-correcao'} aria-pressed={dentro} onClick={e => { e.stopPropagation(); escolher([chave], !dentro) }}>
                 {dentro ? 'na correção ✓' : '+ correção'}
               </button>

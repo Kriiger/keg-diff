@@ -3,11 +3,12 @@ import { PatchDiff, type FileDiffOptions } from '@pierre/diffs/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AchadosEscolhidos, Estado, Revisao } from '../src/contrato'
 import { temComentario } from '../src/linhas'
+import { gruposSemNarracao } from '../src/orfaos'
 import { useComentariosDeLinha, type Anotacao, type ComentarLinha } from './comentarios-de-linha'
 import { Decisoes } from './decisoes'
 import type { Decidir, Decisao, EscolherAchados, Item } from './main'
 import { useTrocando } from './modo'
-import type { Narrador } from './narracao'
+import { FrasesDoOrfao, type Narrador } from './narracao'
 import { indiceInicial, useCursor, type Navegacao } from './proximo'
 import { MODOS, useTema } from './tema'
 
@@ -54,10 +55,25 @@ export function useAtalhos(atalhos: Record<string, () => void>) {
   }, [])
 }
 
-export function TelaDeTrechos(props: Contexto & { rota: string; titulo: string; explicacao: string; itens: Item[]; opcoes: readonly Decisao[] }) {
-  const { rota, titulo, explicacao, itens, opcoes, revisao, estado, decidir, comentarLinha, ladoALado, navegacao } = props
-  const [indice, setIndice] = useState(() => indiceInicial(navegacao, rota) ?? 0)
+// "itemInicial" é a posição do item que o endereço pede (#orfaos/3, o link do Fechamento); o n pede pelo cursor, que vale mais.
+export function TelaDeTrechos(props: Contexto & { rota: string; titulo: string; explicacao: string; itens: Item[]; opcoes: readonly Decisao[]; itemInicial?: string }) {
+  const { rota, titulo, explicacao, itens, opcoes, itemInicial, revisao, estado, decidir, comentarLinha, achados, escolherAchados, ladoALado, narrador, navegacao } = props
+  const posicaoDoEndereco = itemInicial !== undefined && /^\d+$/.test(itemInicial) ? Math.max(0, Math.min(Number(itemInicial), itens.length - 1)) : undefined
+  const [indice, setIndice] = useState(() => indiceInicial(navegacao, rota) ?? posicaoDoEndereco ?? 0)
   const [comentando, setComentando] = useState(false)
+  // As frases do narrador de um item acendem no diff dele as linhas da âncora; só um item por vez tem destaque.
+  const [destaque, setDestaque] = useState<{ chave: string; linhas: [number, number] } | null>(null)
+  // Um link para outro item da mesma tela (o Fechamento, de dentro de #orfaos) não remonta a tela: o índice acompanha o endereço.
+  useEffect(() => {
+    if (posicaoDoEndereco !== undefined) setIndice(posicaoDoEndereco)
+  }, [posicaoDoEndereco])
+  // Os órfãos são narrados quando você abre a tela deles, como o fluxo quando você o abre. Com o narrador em pausa ou desligado, o pedido nem sai.
+  const narradorPronto = narrador.estado?.ativo === true && !narrador.estado.pausa
+  const pendentes = rota === 'orfaos' ? gruposSemNarracao(revisao).map(g => g.id) : []
+  const chaveDosPendentes = pendentes.join()
+  useEffect(() => {
+    if (narradorPronto && pendentes.length > 0) narrador.pedir(pendentes, false)
+  }, [narradorPronto, chaveDosPendentes])
   useEffect(() => {
     document.getElementById(`item-${indice}`)?.scrollIntoView({ block: 'nearest' })
   }, [indice])
@@ -88,8 +104,9 @@ export function TelaDeTrechos(props: Contexto & { rota: string; titulo: string; 
         <article key={item.chave} id={`item-${i}`} className={`item ${i === indice ? 'atual' : ''}`} onClick={() => setIndice(i)}>
           <h2><span className="marcador">{marcador(item.hunkIds, estado)}</span> {item.titulo}</h2>
           {item.detalhe && <p className="detalhe">{item.detalhe}</p>}
+          {item.grupo && <FrasesDoOrfao explicacao={item.explicacao} hunkIds={item.hunkIds} grupo={item.grupo} narrador={narrador} destacar={linhas => setDestaque(linhas && { chave: item.chave, linhas })} achados={achados} escolher={escolherAchados} />}
           <Decisoes hunkIds={item.hunkIds} opcoes={opcoes} estado={estado} decidir={decidir} comentando={comentando && i === indice} setComentando={setComentando} />
-          <DiffDosTrechos revisao={revisao} arquivo={item.arquivo} hunkIds={item.hunkIds} estado={estado} comentarLinha={comentarLinha} ladoALado={ladoALado} />
+          <DiffDosTrechos revisao={revisao} arquivo={item.arquivo} hunkIds={item.hunkIds} estado={estado} comentarLinha={comentarLinha} ladoALado={ladoALado} destaque={destaque?.chave === item.chave ? destaque.linhas : null} />
         </article>
       ))}
     </section>

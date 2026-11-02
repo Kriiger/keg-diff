@@ -30,3 +30,8 @@ export function enderecoDoNo(revisao: Revisao, id: string): string | undefined {
   const achado = passosAlterados(revisao).find(a => idDoNo(a.passo) === id)
   return achado && enderecoDoPasso(achado)
 }
+
+// A tela dos órfãos abre no item de posição `indice` em revisao.orfaos (a lista da tela tem a mesma ordem).
+export function enderecoDoOrfao(indice: number): string {
+  return `#orfaos/${indice}`
+}

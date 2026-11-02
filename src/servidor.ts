@@ -88,7 +88,7 @@ function escutar(servidor: ReturnType<typeof createServer>, porta: number): Prom
   })
 }
 
-// A página pede a narração dos fluxos que abre; "retomar" só vem de um clique da pessoa depois da pausa.
+// A página pede a narração dos fluxos que abre e dos grupos de órfãos ("fluxos" leva os dois tipos de id); "retomar" só vem de um clique da pessoa depois da pausa.
 async function pedirNarracao(pedido: IncomingMessage, resposta: ServerResponse, narrador: FilaDoNarrador) {
   if (pedido.headers['content-type'] !== 'application/json') return responder(resposta, 415, 'envie JSON')
   try {
