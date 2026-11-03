@@ -15,6 +15,7 @@ import './estilo/ligacoes.css'
 import './estilo/arvore.css'
 import './estilo/alternador.css'
 import './estilo/panorama.css'
+import './estilo/folha.css'
 import { AlternadorDeModo } from './alternador'
 import { recarregarSeChunkSumiu } from './chunks'
 import { ModoArvore } from './arvore'
@@ -22,6 +23,7 @@ import { useCronometro } from './cronometro'
 import { escutar, reconectar, tolerarQueda, useServidorDesligado } from './eventos'
 import type { ComentarLinha } from './comentarios-de-linha'
 import { Fechamento } from './fechamento'
+import { FolhaDoArquivo } from './folha-do-arquivo'
 import { atenderJanelaExterna, ehJanelaExterna } from './janela-do-mapa'
 import { MapaExterno } from './mapa-externo'
 import { CabecaDaLateral, LateralDoFluxo } from './lateral'
@@ -172,6 +174,7 @@ function App() {
       {/* Fora da barra: ela corta (contain) o que passa da borda dela. */}
       {configAberta && <PainelDoNarrador narrador={narrador} fechar={() => setConfigAberta(false)} />}
       {ajuda && <Ajuda fechar={() => setAjuda(false)} />}
+      <FolhaDoArquivo revisao={revisao} />
     </div>
   )
 }
@@ -206,7 +209,7 @@ const ATALHOS = [
   ['t', 'abre o fechamento: terminei?'],
   ['1 a 5', 'dá a nota de controle (no fechamento)'],
   ['y', 'copia o feedback como prompt (no fechamento)'],
-  ['esc', 'fecha a ajuda, o mapa, a caixa de comentário ou a lateral no celular'],
+  ['esc', 'fecha a folha do arquivo, a ajuda, o mapa, a caixa de comentário ou a lateral no celular (com a folha aberta, os outros atalhos não agem na página de baixo)'],
   ['?', 'abre e fecha esta ajuda'],
 ]
 

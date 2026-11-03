@@ -1,0 +1,25 @@
+/* A folha "ver arquivo completo" (folha-do-arquivo.tsx): um painel que entra pela direita, por cima da página inteira (a raiz fica inerte).
+   Ela cobre o diff que rola e anima, então não leva backdrop-filter: o fundo é quase opaco (--vidro-denso), como a gaveta do mapa.
+   Só opacidade e transform animam, e a contenção mantém o layout de dentro dela longe do resto da página. */
+.cortina-da-folha { position: fixed; inset: 0; z-index: 40; background: var(--escurecer); animation: aparecer var(--duracao) var(--curva); }
+.folha-do-arquivo {
+  position: fixed; z-index: 41; top: 12px; right: 12px; bottom: 12px; width: min(840px, calc(100vw - 24px)); display: flex; flex-direction: column; overflow: hidden; contain: layout paint;
+  border-radius: 16px; background: var(--vidro-denso); border: 1px solid var(--vidro-borda); box-shadow: var(--vidro-brilho), var(--vidro-sombra);
+  animation: entrar-pela-direita var(--duracao-longa) var(--curva);
+}
+@keyframes entrar-pela-direita { from { opacity: 0; transform: translateX(40px); } }
+.folha-do-arquivo > header { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; padding: 12px 18px; border-bottom: 1px solid var(--painel-borda); }
+/* O título quebra em duas linhas quando o caminho é longo (o símbolo em cima, o caminho embaixo); os botões ficam à direita ou descem. */
+.folha-do-arquivo > header h2 { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; flex: 1 1 280px; min-width: 0; margin: 0; }
+.folha-do-arquivo > header .botoes { flex: none; }
+/* Quem rola é o corpo: o cabeçalho com o botão de fechar fica sempre à vista. A rolagem não passa para a página de baixo. */
+.corpo-da-folha { flex: 1; min-height: 0; overflow: auto; padding: 14px 18px 24px; overscroll-behavior: contain; }
+.corpo-da-folha:focus-visible { outline-offset: -2px; }
+.corpo-da-folha .alerta { margin-bottom: 12px; }
+
+/* No celular a folha ocupa a tela toda, sem a moldura. */
+@media (max-width: 860px) {
+  .folha-do-arquivo { inset: 0; width: auto; border: 0; border-radius: 0; }
+  .folha-do-arquivo > header { padding: 12px 14px; }
+  .corpo-da-folha { padding: 12px 12px 24px; }
+}

@@ -85,6 +85,8 @@ a:focus-visible { border-radius: 10px; }
 .aprofundamento .alerta { margin: 4px 0; }
 .aprofundar { padding: 0; border: 0; background: none; box-shadow: none; color: var(--acento); font: inherit; font-size: 12.5px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .item { margin-bottom: 16px; }
+/* "Ver arquivo completo" (abre a folha, folha-do-arquivo.tsx) é discreto como o "explicar mais": parece um link, no fim do título do bloco. */
+.ver-arquivo { margin-left: 4px; padding: 0; border: 0; background: none; box-shadow: none; color: var(--acento); font: inherit; font-size: 12.5px; font-weight: var(--peso-rotulo); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 /* Cada grupo de trechos é um bloco grande e independente: fora da tela o navegador pula o layout e a pintura dele (o diff dentro é
    a parte cara, e uma troca de largura da coluna, ao recolher a lateral, refazia todos). "auto" no tamanho lembra a altura real depois
    do primeiro desenho, então a rolagem e o scrollIntoView do j e k não pulam; a busca do navegador (Ctrl+F) continua achando o texto. */

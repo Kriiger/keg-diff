@@ -6,6 +6,7 @@ import { chaveDoPasso, type Estado, type Fluxo, type Passo, type Revisao } from 
 import { precarregar, useConteudo } from './arquivos'
 import { Caminho } from './caminho'
 import { Decisoes } from './decisoes'
+import { abrirFolha } from './folha'
 import { useTrocando } from './modo'
 import { Aprofundar, FrasesDoPasso, semNarracao } from './narracao'
 import { jaVistosDoFluxo, vizinhoNaoVisto } from './ja-visto'
@@ -147,7 +148,9 @@ function PassoAPasso({ fluxo, revisao, estado, decidir, comentarLinha, achados, 
           <PassosPorArquivo fluxo={fluxo} revisao={revisao} estado={estado} indice={indice} vistos={vistos} escolher={irPara} />
         </div>
         <article className={recolhido ? 'passo recolhido' : 'passo'}>
-          <h2><span className={`papel papel-${passo.papel}`}>{passo.papel}</span> {passo.simbolo} <span className="local"><Caminho caminho={passo.arquivo} />:{passo.linhas[0]}–{passo.linhas[1]}</span></h2>
+          <h2><span className={`papel papel-${passo.papel}`}>{passo.papel}</span> {passo.simbolo} <span className="local"><Caminho caminho={passo.arquivo} />:{passo.linhas[0]}–{passo.linhas[1]}</span>{' '}
+            <button type="button" className="ver-arquivo" onClick={() => abrirFolha({ arquivo: passo.arquivo, titulo: passo.simbolo, linhas: passo.linhas })}>ver arquivo completo</button>
+          </h2>
           {origem && (
             <p className="ja-visto-aviso">
               <span>já visto em <a href={`#fluxo/${origem.fluxo.id}/${origem.passo.id}`}>{origem.fluxo.titulo}</a></span>

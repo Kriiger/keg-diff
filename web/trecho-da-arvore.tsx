@@ -5,6 +5,7 @@ import { LINHAS_DE_CONTEXTO } from '../src/contexto'
 import { chaveDoTrecho, type AchadosEscolhidos, type Estado, type Hunk, type Revisao } from '../src/contrato'
 import type { ComentarLinha } from './comentarios-de-linha'
 import { Decisoes } from './decisoes'
+import { abrirFolha } from './folha'
 import type { DoTrecho, FluxoDoArquivo } from './frases-do-arquivo'
 import type { Decidir, Decisao, EscolherAchados } from './main'
 import { alternarModo } from './modo'
@@ -63,6 +64,7 @@ export function TrechoDaArvore({ revisao, arquivo, hunk, indice, total, atual, o
         <span className="marcador">{marcador([hunk.id], estado)}</span> Trecho {indice + 1} de {total}{' '}
         <span className="local">linhas {de}–{ate}</span>
         {orfao && <> <span className="selo risco-medio" title="Este trecho não está em nenhum fluxo">órfão</span></>}
+        {' '}<button type="button" className="ver-arquivo" onClick={evento => { evento.stopPropagation(); abrirFolha({ arquivo, linhas: hunk.linhas }) }}>ver arquivo completo</button>
       </h2>
       {dados.origens.map(origem => (
         <ListaDeFrases key={origem.hunkIds.join()} explicacao={origem.explicacao} hunkIds={origem.hunkIds} destacar={linhas => setDestaque(linhas && { hunkId: hunk.id, linhas })} achados={achados} escolher={escolherAchados} />

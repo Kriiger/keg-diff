@@ -8,6 +8,7 @@ import { gruposSemNarracao } from '../src/orfaos'
 import { useConteudo } from './arquivos'
 import { useComentariosDeLinha, type Anotacao, type AnotacaoDeLinha, type ComentarLinha } from './comentarios-de-linha'
 import { Decisoes } from './decisoes'
+import { folhaAberta } from './folha'
 import type { Decidir, Decisao, EscolherAchados, Item } from './main'
 import { useTrocando } from './modo'
 import { FrasesDoOrfao, type Narrador } from './narracao'
@@ -40,13 +41,14 @@ export function decididos(hunkIds: string[], estado: Estado): number {
   return hunkIds.filter(id => estado[id]).length
 }
 
-// Atalhos de uma letra, fora das caixas de texto.
+// Atalhos de uma letra, fora das caixas de texto. Com a folha do arquivo aberta eles não agem na página que está por baixo
+// (o Esc é da própria folha, ver folha-do-arquivo.tsx).
 export function useAtalhos(atalhos: Record<string, () => void>) {
   const atuais = useRef(atalhos)
   atuais.current = atalhos
   useEffect(() => {
     const aoTeclar = (evento: KeyboardEvent) => {
-      if (evento.metaKey || evento.ctrlKey || evento.altKey) return
+      if (evento.metaKey || evento.ctrlKey || evento.altKey || folhaAberta()) return
       if (evento.target instanceof HTMLElement && evento.target.closest('textarea, input')) return
       const acao = atuais.current[evento.key]
       if (!acao) return

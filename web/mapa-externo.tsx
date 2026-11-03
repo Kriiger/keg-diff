@@ -3,6 +3,7 @@
 // ficam todas na principal; aqui nada é gravado.
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { escutar, tolerarQueda } from './eventos'
+import { FolhaDoArquivo } from './folha-do-arquivo'
 import { useEstadoDaPrincipal } from './janela-do-mapa'
 import type { Revisao } from '../src/contrato'
 
@@ -27,6 +28,7 @@ export function MapaExterno() {
   return (
     <>
       {aviso && <p className="aviso-do-mapa-externo" role="status">{aviso}</p>}
+      {revisao && <FolhaDoArquivo revisao={revisao} />}
       {fluxo
         ? (
           <Suspense fallback={null}>

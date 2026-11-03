@@ -10,6 +10,7 @@ import { destacar, type Destaque, type Foco } from './foco'
 import { CabecalhoDoMapa } from './cabecalho'
 import { resumoDosBlocos } from './legenda'
 import { Enquadramento } from './enquadramento'
+import { abrirFolha } from './folha'
 import { useGaveta } from './gaveta'
 import { DestaqueDoMapa, linhasDosNos, montarNos, TIPOS_DE_NO } from './nos'
 import { idDaAresta, type Desenho } from './rotas'
@@ -77,6 +78,17 @@ export default function Mapa({ revisao, fluxo, indice, irParaPasso, fechar, abri
     if (passo >= 0) irParaPasso(passo)
   }
 
+  // Clicar no bloco abre a folha com o arquivo dele (folha-do-arquivo.tsx), marcado no trecho do símbolo, e o bloco fica isolado no mapa. A ação de antes
+  // (escolherNo) continua a um botão de distância, no cabeçalho da folha, e no Enter e no espaço do bloco com o foco: assim o clique não refaz o
+  // desenho do mapa (o ELK roda na thread principal) enquanto a folha entra, nem troca o passo do fluxo por trás dela sem a pessoa pedir.
+  const abrirNo = (id: string) => {
+    const no = grafo?.nos.find(n => n.id === id)
+    if (!no) return
+    setFixado({ no: id })
+    const passo = fluxo.passos.findIndex(p => idDoNo(p) === id)
+    abrirFolha({ arquivo: no.arquivo, titulo: no.simbolo, linhas: no.linhas, acao: { rotulo: passo >= 0 ? 'Ir para o passo' : 'Abrir vizinhos', executar: () => escolherNo(id) } })
+  }
+
   if (!grafo) return <aside className="mapa-do-fluxo" data-subindo={subindo}><p className="detalhe">Este review.json não tem o grafo. Rode <code>keg diff</code> de novo.</p></aside>
   return (
     <aside ref={raiz} className={`mapa-do-fluxo${externo ? ' externo' : ''}${gaveta.maximizada ? ' maximizada' : ''}`} data-subindo={subindo} onAnimationEnd={e => e.target === e.currentTarget && terminou()}>
@@ -89,7 +101,7 @@ export default function Mapa({ revisao, fluxo, indice, irParaPasso, fechar, abri
         {desenho && (
           <DestaqueDoMapa.Provider value={destaque}>
             <ReactFlow key={fluxo.id} nodes={nos} edges={ligacoes} nodeTypes={TIPOS_DE_NO} edgeTypes={TIPOS_DE_ARESTA} colorMode={MODOS[tema]}
-              {...eventosDoMapa(escolherNo, setSobre, setFixado)} tabIndex={-1}
+              {...eventosDoMapa(escolherNo, abrirNo, setSobre, setFixado)} tabIndex={-1}
               elementsSelectable={false} edgesFocusable={false} nodesConnectable={false} nodesDraggable={false} minZoom={0.1} attributionPosition="bottom-left">
               <Enquadramento nos={nos} emTorno={emTorno} atual={atual} clicado={clicado} aoEnquadrar={(fora, ajustar) => setVista({ fora, ajustar })} />
               {noFixado && <AvisoDeOutroFluxo no={noFixado} destinos={destinos} navegar={navegar} />}
@@ -182,9 +194,9 @@ function useRecorte(grafo: Grafo | undefined, fluxo: Fluxo, abertos: Set<string>
   return { doFluxo, visiveis, arestas }
 }
 
-// O mouse e o teclado chegam ao mesmo destaque (passar o mouse, Tab) e à mesma ação (clicar, Enter ou espaço). Tab só destaca: quem age é o Enter.
-// A ligação só se alcança pelo mouse.
-function eventosDoMapa(escolherNo: (id: string) => void, apontar: Apontar, fixar: Apontar) {
+// O mouse e o teclado chegam ao mesmo destaque (passar o mouse, Tab). O clique abre o arquivo do bloco (abrirNo); o Enter e o espaço, no bloco com o
+// foco, fazem a escolha de antes (escolherNo: abrir os vizinhos, isolar e ir ao passo). Tab só destaca: quem age é o Enter. A ligação só se alcança pelo mouse.
+function eventosDoMapa(escolherNo: (id: string) => void, abrirNo: (id: string) => void, apontar: Apontar, fixar: Apontar) {
   const aoApertar = (e: KeyboardEvent) => {
     const alvo = e.key === 'Enter' || e.key === ' ' ? focoDoEvento(e) : undefined
     if (!alvo || !('no' in alvo)) return
@@ -192,7 +204,7 @@ function eventosDoMapa(escolherNo: (id: string) => void, apontar: Apontar, fixar
     escolherNo(alvo.no)
   }
   return {
-    onNodeClick: (_: unknown, no: Node) => escolherNo(no.id),
+    onNodeClick: (_: unknown, no: Node) => abrirNo(no.id),
     onEdgeClick: (_: unknown, aresta: Edge) => fixar({ aresta: aresta.id }),
     // Clicar fora de bloco, ligação e botões solta o destaque e leva o foco ao mapa, de onde o Tab entra nos blocos em vez de voltar ao topo da página.
     // Fica no contêiner e não no onPaneClick do React Flow, que só dispara se o alvo for o fundo exato (o contêiner do arquivo, o desenho e o pontilhado não contam).

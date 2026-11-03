@@ -5,6 +5,7 @@
 // atual, quando muda por j/k ou pela lateral, puxa a vista, e só se ele estiver fora dela.
 import { ControlButton, Controls, getViewportForBounds, useReactFlow, useStore, useStoreApi, type Node, type Viewport } from '@xyflow/react'
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { folhaAberta } from './folha'
 import { ALTURA, LARGURA } from './rotas'
 
 // Abaixo disso o nome do bloco vira borrão (13px a 0.6 eram 7px); o resto o "ajustar" mostra.
@@ -117,7 +118,7 @@ function useAtalhoDeAjuste(ajustar: () => void) {
   useEffect(() => {
     const aoTeclar = (e: KeyboardEvent) => {
       const escrevendo = e.target instanceof HTMLElement && e.target.closest('textarea, input')
-      if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey && !escrevendo) ajustar()
+      if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey && !escrevendo && !folhaAberta()) ajustar()
     }
     addEventListener('keydown', aoTeclar)
     return () => removeEventListener('keydown', aoTeclar)
