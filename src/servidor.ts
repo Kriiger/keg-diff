@@ -5,7 +5,8 @@ import { existsSync, readFileSync, watch, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import path from 'node:path'
-import { ESFORCOS, modeloValido, type Revisao } from './contrato.js'
+import { lerAprofundamentos, localizarBloco } from './aprofundar.js'
+import { ESFORCOS, modeloValido, PREFIXO_DO_APROFUNDAMENTO, type Revisao } from './contrato.js'
 import { aplicarAchados, aplicarComentarioDeLinha, aplicarDecisao, chaveDeLinhaValida, gravarAchados, gravarNota, lerAchados, lerEstado, lerNota, TIPOS_DE_COMENTARIO, type PedidoDeComentarioDeLinha, type PedidoDeDecisao } from './estado.js'
 import { gravarFeedback } from './feedback.js'
 import { FilaDoNarrador } from './fila-do-narrador.js'
@@ -35,7 +36,7 @@ export async function abrirTela(raiz: string, opcoesDoNarrador: OpcoesDoNarrador
   })
   // A revisão que está aberta: o tempo e o consumo do narrador são dela, e ela vira uma linha do historico.jsonl.
   const sessao = Sessao.abrir(pastaDaRevisao, (JSON.parse(readFileSync(path.join(pastaDaRevisao, 'review.json'), 'utf8')) as Revisao).base)
-  const narrador = new FilaDoNarrador(raiz, opcoesDoNarrador, sessao, () => avisar('narrador'))
+  const narrador = new FilaDoNarrador(raiz, opcoesDoNarrador, sessao, () => avisar('narrador'), () => avisar('aprofundamentos'))
 
   type Rota = (pedido: IncomingMessage, resposta: ServerResponse, url: URL) => unknown
   const rotas: Record<string, Rota> = {
@@ -53,6 +54,8 @@ export async function abrirTela(raiz: string, opcoesDoNarrador: OpcoesDoNarrador
     'GET /api/narrador': (_, resposta) => responderJson(resposta, narrador.estado()),
     'POST /api/narrar': (pedido, resposta) => pedirNarracao(pedido, resposta, narrador),
     'POST /api/config-do-narrador': (pedido, resposta) => receberConfigDoNarrador(pedido, resposta, narrador),
+    'POST /api/aprofundar': (pedido, resposta) => pedirAprofundamento(pedido, resposta, narrador, pastaDaRevisao),
+    'GET /api/aprofundamentos': (_, resposta) => responderJson(resposta, lerAprofundamentos(pastaDaRevisao)),
     'GET /api/codigo': (_, resposta, url) => enviarCodigo(resposta, raiz, url.searchParams),
     'GET /api/eventos': (pedido, resposta) => {
       resposta.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
@@ -117,6 +120,20 @@ async function receberConfigDoNarrador(pedido: IncomingMessage, resposta: Server
     narrador.definirConfig({ modelo, esforco })
   } catch (erro) {
     return responder(resposta, 500, `não consegui gravar o keg.config.json: ${erro instanceof Error ? erro.message : erro}`)
+  }
+  responderJson(resposta, narrador.estado())
+}
+
+// O botão "explicar mais" de um bloco: o corpo traz a chave do bloco (ver chaveDoPasso e chaveDoTrecho), que tem de existir no review.json de agora.
+async function pedirAprofundamento(pedido: IncomingMessage, resposta: ServerResponse, narrador: FilaDoNarrador, pastaDaRevisao: string) {
+  if (pedido.headers['content-type'] !== 'application/json') return responder(resposta, 415, 'envie JSON')
+  try {
+    const { chave } = JSON.parse(await lerCorpo(pedido))
+    const revisao: Revisao = JSON.parse(readFileSync(path.join(pastaDaRevisao, 'review.json'), 'utf8'))
+    if (typeof chave !== 'string' || !localizarBloco(revisao, chave)) throw new Error('bloco desconhecido')
+    narrador.pedir([PREFIXO_DO_APROFUNDAMENTO + chave], false)
+  } catch {
+    return responder(resposta, 400, 'envie { chave: a chave de um passo ou de um trecho do review.json }')
   }
   responderJson(resposta, narrador.estado())
 }

@@ -1,13 +1,13 @@
 // Um trecho do arquivo aberto no modo árvore, com o que o passo do fluxo oferece: as frases do narrador, a decisão e o diff.
 // Os links dos fluxos do arquivo ficam aqui também, porque são o caminho de volta ao modo fluxo.
 import { useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react'
-import type { AchadosEscolhidos, Estado, Hunk, Revisao } from '../src/contrato'
+import { chaveDoTrecho, type AchadosEscolhidos, type Estado, type Hunk, type Revisao } from '../src/contrato'
 import type { ComentarLinha } from './comentarios-de-linha'
 import { Decisoes } from './decisoes'
 import type { DoTrecho, FluxoDoArquivo } from './frases-do-arquivo'
 import type { Decidir, Decisao, EscolherAchados } from './main'
 import { alternarModo } from './modo'
-import { ListaDeFrases, type Narrador } from './narracao'
+import { Aprofundar, ListaDeFrases, type Narrador } from './narracao'
 import { DiffDosTrechos, marcador } from './telas'
 
 export interface Destaque { hunkId: string; linhas: [number, number] }
@@ -68,6 +68,7 @@ export function TrechoDaArvore({ revisao, arquivo, hunk, indice, total, atual, o
         <ListaDeFrases key={origem.hunkIds.join()} explicacao={origem.explicacao} hunkIds={origem.hunkIds} destacar={linhas => setDestaque(linhas && { hunkId: hunk.id, linhas })} achados={achados} escolher={escolherAchados} />
       ))}
       <PedirNarracao ids={dados.narrar} narrador={narrador} />
+      <Aprofundar chave={chaveDoTrecho(hunk.id)} narrador={narrador} destacar={linhas => setDestaque(linhas && { hunkId: hunk.id, linhas })} />
       <Decisoes hunkIds={[hunk.id]} opcoes={opcoes} estado={estado} decidir={decidir} comentando={comentando} setComentando={setComentando} />
       {perto || atual
         ? <DiffDosTrechos revisao={revisao} arquivo={arquivo} hunkIds={[hunk.id]} estado={estado} comentarLinha={comentarLinha} ladoALado={ladoALado} destaque={destaque?.hunkId === hunk.id ? destaque.linhas : null} />

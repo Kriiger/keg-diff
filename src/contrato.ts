@@ -63,6 +63,13 @@ export interface Explicacao {
   modelo: string
 }
 
+// A explicação mais funda de um bloco (um passo do fluxo ou um trecho da árvore), pedida pelo botão "explicar mais".
+// Fica em .revisao/aprofundamentos.json, fora do review.json: não é parte da análise e pode ser pedida de novo.
+export interface Aprofundamento extends Explicacao {
+  esforco: string
+  em: string                       // ISO
+}
+
 export interface Orfao {
   arquivo: string
   simbolo?: string
@@ -228,6 +235,26 @@ export function chaveDaFrase(hunkIds: string[], texto: string): string {
   return `${[...hunkIds].sort().join('+')}|${texto}`
 }
 
+// .revisao/aprofundamentos.json — chave do bloco -> a explicação funda dele. A chave junta os hashes dos trechos com o bloco, então
+// quando o agente corrige o trecho a chave deixa de casar e a explicação some sozinha, como a frase do narrador em achados.json.
+// O passo tem o símbolo na chave (o mesmo passo em dois fluxos é um bloco só); o trecho da árvore, o hash dele.
+export type Aprofundamentos = Record<string, Aprofundamento>
+
+export function chaveDoPasso({ hunkIds, simbolo }: Pick<Passo, 'hunkIds' | 'simbolo'>): string {
+  return `passo|${[...hunkIds].sort().join('+')}|${simbolo}`
+}
+
+export function chaveDoTrecho(hunkId: string): string {
+  return `trecho|${hunkId}`
+}
+
+// Na fila do narrador o pedido de aprofundamento é o id "aprofundar:<chave>", ao lado dos ids de fluxo e de grupo de órfãos.
+export const PREFIXO_DO_APROFUNDAMENTO = 'aprofundar:'
+
+export function ehAprofundamento(id: string): boolean {
+  return id.startsWith(PREFIXO_DO_APROFUNDAMENTO)
+}
+
 // O que se escolhe do claude: o modelo vira argumento da linha de comando, então só entra nome que não pareça opção.
 export const ESFORCOS = ['low', 'medium', 'high', 'xhigh', 'max']
 export const MODELOS_CONHECIDOS = ['haiku', 'sonnet', 'opus', 'fable']
@@ -249,8 +276,8 @@ export interface EstadoDoNarrador {
   ativo: boolean                   // false: --sem-ia, sem login da assinatura ou login que cobraria API
   motivo?: string                  // por que não está ativo
   pausa?: string                   // resposta com is_error (limite de uso): só volta quando a pessoa pede
-  narrando: string[]               // ids dos fluxos e dos grupos de órfãos ("orfaos:<arquivo>", ver orfaos.ts) na fila ou em andamento
-  falhas: Record<string, string>   // id do fluxo ou do grupo de órfãos -> o que deu errado nele
+  narrando: string[]               // ids dos fluxos, dos grupos de órfãos ("orfaos:<arquivo>", ver orfaos.ts) e dos aprofundamentos ("aprofundar:<chave>") na fila ou em andamento
+  falhas: Record<string, string>   // id do fluxo, do grupo de órfãos ou do aprofundamento -> o que deu errado nele
   modelo: string
   esforco: string                  // --effort do claude: low, medium, high, xhigh ou max
 }

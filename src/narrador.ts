@@ -34,7 +34,7 @@ const MODELO_PADRAO = 'sonnet'
 // Narrar frases ancoradas em linhas não pede raciocínio longo: medium gasta bem menos tokens que o padrão do claude.
 const ESFORCO_PADRAO = 'medium'
 const FRASES_POR_PASSO = 3
-const LINHAS_POR_PASSO = 200
+export const LINHAS_POR_PASSO = 200
 const LINHAS_POR_ORFAO = 120
 // Os órfãos têm o prompt próprio (narrador-orfaos.md): a pergunta deles é "isto é código morto?", não "o que o dado faz?".
 const ARQUIVO_DO_SISTEMA = path.join(import.meta.dirname, 'narrador.md')
@@ -89,21 +89,24 @@ export async function narrarOrfaos(grupo: GrupoDeOrfaos, revisao: Revisao, raiz:
   await narrarComCache(raiz, prompt, { sistema: PROMPT_DO_SISTEMA_DE_ORFAOS, arquivoDoSistema: ARQUIVO_DO_SISTEMA_DE_ORFAOS }, opcoes, texto => validarOrfaos(texto, descritos, opcoes.modelo))
 }
 
-type OpcoesDeChamada = ConfigDoNarrador & { aoChamar: () => void; chamar?: Chamar }
+export type OpcoesDeChamada = ConfigDoNarrador & { aoChamar: () => void; chamar?: Chamar }
 
-async function narrarComCache<T>(raiz: string, prompt: string, { sistema, arquivoDoSistema }: { sistema: string; arquivoDoSistema: string }, { modelo, esforco, aoChamar, chamar = chamarClaude }: OpcoesDeChamada, validarTexto: (texto: string) => T | undefined) {
-  const arquivo = arquivoDoCache(raiz, prompt, { modelo, esforco }, sistema)
+async function narrarComCache<T>(raiz: string, prompt: string, { sistema, arquivoDoSistema }: { sistema: string; arquivoDoSistema: string }, opcoes: OpcoesDeChamada, validarTexto: (texto: string) => T | undefined) {
+  const arquivo = arquivoDoCache(raiz, prompt, opcoes, sistema)
   if (existsSync(arquivo)) return
-  // JSON fora do formato ganha uma nova tentativa, uma só.
+  const narracao = await pedirAoModelo(prompt, arquivoDoSistema, opcoes, validarTexto)
+  mkdirSync(path.dirname(arquivo), { recursive: true })
+  writeFileSync(arquivo, JSON.stringify(narracao, null, 2) + '\n')
+}
+
+// Uma chamada ao claude com a resposta já validada. JSON fora do formato ganha uma nova tentativa, uma só.
+export async function pedirAoModelo<T>(prompt: string, arquivoDoSistema: string, { modelo, esforco, aoChamar, chamar = chamarClaude }: OpcoesDeChamada, validarTexto: (texto: string) => T | undefined): Promise<T> {
   for (let tentativa = 0; tentativa < 2; tentativa++) {
     aoChamar()
     const resposta = await chamar(modelo, esforco, prompt, arquivoDoSistema)
     if (resposta.erro) throw new PausaDaNarracao(resposta.texto)
-    const narracao = validarTexto(resposta.texto)
-    if (!narracao) continue
-    mkdirSync(path.dirname(arquivo), { recursive: true })
-    writeFileSync(arquivo, JSON.stringify(narracao, null, 2) + '\n')
-    return
+    const validada = validarTexto(resposta.texto)
+    if (validada) return validada
   }
   throw new Error('a resposta do modelo veio fora do formato, mesmo na segunda tentativa')
 }
@@ -143,7 +146,7 @@ function montarPrompt(fluxo: Fluxo, revisao: Revisao, raiz: string): string {
   return [`Fluxo: ${fluxo.titulo} (risco ${fluxo.risco})`, ...passos].join('\n\n')
 }
 
-function descreverPasso(passo: Passo, fluxo: Fluxo, revisao: Revisao, raiz: string): string {
+export function descreverPasso(passo: Passo, fluxo: Fluxo, revisao: Revisao, raiz: string): string {
   const alterado = revisao.arquivos.find(a => a.caminho === passo.arquivo)
   const trechos = alterado?.hunks.filter(h => passo.hunkIds.includes(h.id)) ?? []
   const simbolos = (ids: string[]) => ids.map(id => `${id} ${fluxo.passos.find(p => p.id === id)?.simbolo}`).join(', ')
@@ -160,7 +163,7 @@ function descreverPasso(passo: Passo, fluxo: Fluxo, revisao: Revisao, raiz: stri
   return linhas.join('\n')
 }
 
-function codigoNumerado(arquivoRelativo: string, [de, ate]: [number, number], alteradas: [number, number][], raiz: string, limite: number, quem: 'passo' | 'órfão'): string[] {
+export function codigoNumerado(arquivoRelativo: string, [de, ate]: [number, number], alteradas: [number, number][], raiz: string, limite: number, quem: 'passo' | 'órfão' | 'trecho'): string[] {
   const arquivo = path.join(raiz, arquivoRelativo)
   if (!existsSync(arquivo)) return ['(arquivo não existe mais)']
   const fim = Math.min(ate, de + limite - 1)
@@ -230,13 +233,13 @@ function validarOrfaos(texto: string, descritos: OrfaoDescrito[], modelo: string
   return orfaos.length > 0 ? { modelo, orfaos } : undefined
 }
 
-function lerFrases(lista: unknown[], intervalo: [number, number]): Frase[] | undefined {
+export function lerFrases(lista: unknown[], intervalo: [number, number], maximo = FRASES_POR_PASSO): Frase[] | undefined {
   const frases: Frase[] = []
   for (const item of lista as { texto?: unknown; linhas?: unknown }[]) {
     if (typeof item?.texto !== 'string') return undefined
     if (item.texto.trim() !== '') frases.push({ texto: item.texto.trim(), linhas: ancoraValida(item.linhas, intervalo) })
   }
-  return frases.slice(0, FRASES_POR_PASSO)
+  return frases.slice(0, maximo)
 }
 
 function ancoraValida(linhas: unknown, [de, ate]: [number, number]): [number, number] | null {
@@ -247,7 +250,7 @@ function ancoraValida(linhas: unknown, [de, ate]: [number, number]): [number, nu
 }
 
 // O modelo às vezes embrulha o JSON em ```json ou escreve uma linha antes.
-function lerJson(texto: string): { passos?: unknown; orfaos?: unknown } | undefined {
+export function lerJson(texto: string): Record<string, unknown> | undefined {
   try {
     return JSON.parse(texto.slice(texto.indexOf('{'), texto.lastIndexOf('}') + 1))
   } catch {

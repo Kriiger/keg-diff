@@ -4,7 +4,7 @@
 import { useSyncExternalStore } from 'react'
 
 const ESPERAS_EM_MS = [2000, 5000, 10000, 20000, 30000]
-const EVENTOS = ['revisao', 'narrador']
+const EVENTOS = ['revisao', 'narrador', 'aprofundamentos']
 
 const acoes = new Map<string, Set<() => void>>()
 const observadores = new Set<() => void>()

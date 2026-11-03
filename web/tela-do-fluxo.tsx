@@ -1,10 +1,10 @@
 // A tela do fluxo: os passos agrupados por arquivo à esquerda, o passo atual (frases, decisão e código) à direita e o mapa em gaveta.
 import { Suspense, lazy, useEffect, useState } from 'react'
-import type { Estado, Fluxo, Passo, Revisao } from '../src/contrato'
+import { chaveDoPasso, type Estado, type Fluxo, type Passo, type Revisao } from '../src/contrato'
 import { Caminho } from './caminho'
 import { Decisoes } from './decisoes'
 import { tolerarQueda } from './eventos'
-import { FrasesDoPasso, semNarracao } from './narracao'
+import { Aprofundar, FrasesDoPasso, semNarracao } from './narracao'
 import { jaVistosDoFluxo, vizinhoNaoVisto } from './ja-visto'
 import { useJanelaExterna } from './janela-do-mapa'
 import { PassosPorArquivo } from './passos-por-arquivo'
@@ -145,6 +145,7 @@ function PassoAPasso({ fluxo, revisao, estado, decidir, comentarLinha, achados, 
           )}
           {!recolhido && <>
             <FrasesDoPasso passo={passo} fluxo={fluxo} narrador={narrador} destacar={setDestaque} achados={achados} escolher={escolherAchados} />
+            {passo.hunkIds.length > 0 && <Aprofundar chave={chaveDoPasso(passo)} narrador={narrador} destacar={setDestaque} />}
             {(passo.avisos ?? []).map(aviso => <p key={aviso} className="alerta">{aviso}</p>)}
             <Decisoes hunkIds={passo.hunkIds} opcoes={['revisado']} estado={estado} decidir={decidir} comentando={comentando} setComentando={setComentando} />
             {passo.hunkIds.length > 0

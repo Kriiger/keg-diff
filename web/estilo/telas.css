@@ -78,6 +78,12 @@ a:focus-visible { border-radius: 10px; }
 /* O item atual da lista já tem o fundo de selecionado: a frase sob o mouse precisa de um tom a mais para se ver. */
 .item.atual .frases li:hover, .item.atual .frases li:focus { background: color-mix(in srgb, var(--texto) 9%, transparent); }
 .narrar-todos { margin: 8px 0 12px; }
+/* "Explicar mais" é discreto como o "narrar" da árvore: parece um link, não uma decisão. A explicação funda fica sob as frases, com um recuo que a separa delas. */
+.aprofundamento { margin: 4px 0 8px; }
+.aprofundamento .frases { margin: 6px 0 4px; padding-left: 12px; border-left: 2px solid var(--painel-borda); }
+.aprofundamento > .detalhe { font-size: 12px; margin: 0 0 4px; }
+.aprofundamento .alerta { margin: 4px 0; }
+.aprofundar { padding: 0; border: 0; background: none; box-shadow: none; color: var(--acento); font: inherit; font-size: 12.5px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .item { margin-bottom: 16px; }
 /* Cada grupo de trechos é um bloco grande e independente: fora da tela o navegador pula o layout e a pintura dele (o diff dentro é
    a parte cara, e uma troca de largura da coluna, ao recolher a lateral, refazia todos). "auto" no tamanho lembra a altura real depois

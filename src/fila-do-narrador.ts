@@ -1,16 +1,18 @@
-// Fila do narrador no servidor: um fluxo (ou um grupo de órfãos) por vez, e nada se repete sozinho.
+// Fila do narrador no servidor: um fluxo (um grupo de órfãos ou um aprofundamento) por vez, e nada se repete sozinho.
 // O keg só narra com o login da assinatura; qualquer outro login, ou uma resposta com erro, para a fila.
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { verificarLogin } from './claude-cli.js'
-import type { EstadoDoNarrador, Revisao } from './contrato.js'
+import { aprofundar } from './aprofundar.js'
+import { ehAprofundamento, PREFIXO_DO_APROFUNDAMENTO, type EstadoDoNarrador, type Revisao } from './contrato.js'
 import { gravarConfigDoNarrador, narrarFluxo, narrarOrfaos, PausaDaNarracao, preencherDoCache, type ConfigDoNarrador, type OpcoesDoNarrador } from './narrador.js'
 import { agruparOrfaos, ehGrupoDeOrfaos } from './orfaos.js'
 import type { Sessao } from './sessao.js'
 
-// Os órfãos entram depois dos fluxos: enquanto houver fluxo na fila, ele passa na frente, mesmo que o pedido dos órfãos tenha chegado antes.
+// O aprofundamento é um clique da pessoa num bloco e passa na frente de tudo. Os órfãos entram depois dos fluxos: enquanto houver
+// fluxo na fila, ele passa na frente, mesmo que o pedido dos órfãos tenha chegado antes.
 export function proximoDaFila(fila: string[]): string | undefined {
-  return fila.find(id => !ehGrupoDeOrfaos(id)) ?? fila[0]
+  return fila.find(ehAprofundamento) ?? fila.find(id => !ehGrupoDeOrfaos(id)) ?? fila[0]
 }
 
 export class FilaDoNarrador {
@@ -22,7 +24,8 @@ export class FilaDoNarrador {
   private rodando = false
   private arquivoDaRevisao: string
 
-  constructor(private raiz: string, private opcoes: OpcoesDoNarrador, private sessao: Sessao, private avisar: () => void) {
+  // avisar é o aviso de que o estado do narrador mudou; avisarAprofundamento, o de que há aprofundamento novo para a página ler.
+  constructor(private raiz: string, private opcoes: OpcoesDoNarrador, private sessao: Sessao, private avisar: () => void, private avisarAprofundamento: () => void = () => {}) {
     this.arquivoDaRevisao = path.join(raiz, '.revisao', 'review.json')
     this.motivo = opcoes.semIa ? 'você rodou o keg diff com --sem-ia' : undefined
     // A trava de login roda antes da primeira chamada, e já na abertura da página, para o aviso aparecer logo.
@@ -43,7 +46,7 @@ export class FilaDoNarrador {
     this.avisar()
   }
 
-  // "ids" são ids de fluxos e de grupos de órfãos (ver orfaos.ts).
+  // "ids" são ids de fluxos, de grupos de órfãos (ver orfaos.ts) e de aprofundamentos ("aprofundar:<chave>").
   // "retomar" é a pessoa pedindo de novo depois da pausa; abrir um fluxo não conta.
   pedir(ids: string[], retomar: boolean) {
     if (this.opcoes.semIa || (this.pausa && !retomar)) return
@@ -84,6 +87,7 @@ export class FilaDoNarrador {
 
   private async narrarUm(id: string) {
     const revisao: Revisao = JSON.parse(readFileSync(this.arquivoDaRevisao, 'utf8'))
+    if (ehAprofundamento(id)) return this.aprofundarUm(id, revisao)
     const grupo = ehGrupoDeOrfaos(id) ? agruparOrfaos(revisao).find(g => g.id === id) : undefined
     const fluxo = revisao.fluxos.find(f => f.id === id)
     if (!grupo && !fluxo) {
@@ -96,12 +100,26 @@ export class FilaDoNarrador {
       else await narrarFluxo(fluxo!, revisao, this.raiz, opcoes)
       this.gravarRevisao()
     } catch (erro) {
-      if (erro instanceof PausaDaNarracao) {
-        this.pausa = erro.message || 'o claude devolveu um erro'
-        this.sessao.contarLimite()
-      } else {
-        this.falhas[id] = erro instanceof Error ? erro.message : String(erro)
-      }
+      this.registrarFalha(id, erro)
+    }
+  }
+
+  private registrarFalha(id: string, erro: unknown) {
+    if (erro instanceof PausaDaNarracao) {
+      this.pausa = erro.message || 'o claude devolveu um erro'
+      this.sessao.contarLimite()
+    } else {
+      this.falhas[id] = erro instanceof Error ? erro.message : String(erro)
+    }
+  }
+
+  // O aprofundamento não mexe no review.json: a resposta vai para o aprofundamentos.json e a página é avisada.
+  private async aprofundarUm(id: string, revisao: Revisao) {
+    try {
+      await aprofundar(id.slice(PREFIXO_DO_APROFUNDAMENTO.length), revisao, this.raiz, { modelo: this.opcoes.modelo, esforco: this.opcoes.esforco, aoChamar: () => this.sessao.contarChamada() })
+      this.avisarAprofundamento()
+    } catch (erro) {
+      this.registrarFalha(id, erro)
     }
   }
 
