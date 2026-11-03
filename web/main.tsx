@@ -25,6 +25,7 @@ import { Fechamento } from './fechamento'
 import { atenderJanelaExterna, ehJanelaExterna } from './janela-do-mapa'
 import { MapaExterno } from './mapa-externo'
 import { CabecaDaLateral, LateralDoFluxo } from './lateral'
+import { BotaoDoNarrador, PainelDoNarrador } from './config-do-narrador'
 import { alternarModo, useModo } from './modo'
 import { AvisoDoNarrador, useNarrador } from './narracao'
 import { Panorama } from './panorama'
@@ -78,6 +79,7 @@ function App() {
   const [erro, setErro] = useState<string>()
   const [endereco, setEndereco] = useState(location.hash.slice(1))
   const [ajuda, setAjuda] = useState(false)
+  const [configAberta, setConfigAberta] = useState(false)
   const [mapaAberto, setMapaAberto] = useState(false)
   const [ladoALado, setLadoALado] = useState(() => lerPreferencia() === 'lado-a-lado')
   const checklist = useMemo(() => revisao && montarChecklist(revisao), [revisao])
@@ -163,9 +165,12 @@ function App() {
       <AlternadorDeModo />
       <div className="dicas">
         <button onClick={alternarVisao}>{ladoALado ? 'empilhado' : 'lado a lado'} <kbd>l</kbd></button>
+        <BotaoDoNarrador narrador={narrador} aberto={configAberta} alternar={() => setConfigAberta(aberta => !aberta)} />
         <BotaoDoTema />
         <button onClick={() => setAjuda(true)}>atalhos <kbd>?</kbd></button>
       </div>
+      {/* Fora da barra: ela corta (contain) o que passa da borda dela. */}
+      {configAberta && <PainelDoNarrador narrador={narrador} fechar={() => setConfigAberta(false)} />}
       {ajuda && <Ajuda fechar={() => setAjuda(false)} />}
     </div>
   )

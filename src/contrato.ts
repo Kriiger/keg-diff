@@ -228,6 +228,14 @@ export function chaveDaFrase(hunkIds: string[], texto: string): string {
   return `${[...hunkIds].sort().join('+')}|${texto}`
 }
 
+// O que se escolhe do claude: o modelo vira argumento da linha de comando, então só entra nome que não pareça opção.
+export const ESFORCOS = ['low', 'medium', 'high', 'xhigh', 'max']
+export const MODELOS_CONHECIDOS = ['haiku', 'sonnet', 'opus', 'fable']
+
+export function modeloValido(modelo: unknown): modelo is string {
+  return typeof modelo === 'string' && /^[A-Za-z0-9][\w.[\]-]*$/.test(modelo)
+}
+
 // .revisao/nota.json — a sensação de controle de 1 a 5 ao fechar a revisão. Fica fora do estado.json,
 // cujas chaves são todas hashes de trecho. A Fase 6 lê este arquivo para montar o historico.jsonl.
 export interface Nota {

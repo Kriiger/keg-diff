@@ -186,6 +186,29 @@
 .dicas button:hover { background: var(--botao-hover); }
 .dicas svg { width: 16px; height: 16px; flex: none; }
 
+/* O painel do modelo e do esforço do narrador abre acima da barra e sobe com ela quando a gaveta do mapa abre. */
+.painel-do-narrador {
+  position: fixed; z-index: 6; right: 16px; bottom: 72px; width: min(360px, calc(100vw - 24px)); display: grid; gap: 10px; padding: 16px;
+  background: var(--vidro-fundo); border: 1px solid var(--vidro-borda); border-radius: 20px; box-shadow: var(--vidro-brilho), var(--vidro-sombra);
+  -webkit-backdrop-filter: var(--vidro-filtro); backdrop-filter: var(--vidro-filtro); animation: surgir-da-ajuda var(--duracao-longa) var(--curva);
+  transition: transform var(--duracao-longa) var(--curva);
+  /* Em janela baixa o painel não passa do topo: a altura é a que sobra acima da barra (72px) menos 16px de respiro, e o resto rola dentro dele. */
+  max-height: calc(100dvh - 72px - 16px); overflow-y: auto; overscroll-behavior: contain;
+}
+.pagina.com-mapa .painel-do-narrador { transform: translateY(calc(-1 * (var(--gaveta) + 12px))); z-index: 4; max-height: calc(100dvh - 72px - 16px - var(--gaveta) - 12px); }
+.painel-do-narrador h2 { margin: 0; font-size: 15px; }
+.painel-do-narrador fieldset { margin: 0; padding: 0; border: 0; display: grid; gap: 6px; min-width: 0; }
+.painel-do-narrador legend { padding: 0; margin-bottom: 6px; font-size: 12px; color: var(--suave); }
+.painel-do-narrador .opcoes, .painel-do-narrador .acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.painel-do-narrador .acoes { justify-content: flex-end; }
+.painel-do-narrador button { padding: 4px 12px; border-radius: 999px; border: 0; background: var(--botao-fundo); color: inherit; transition: var(--transicao-cores); }
+.painel-do-narrador button:hover:not(:disabled) { background: var(--botao-hover); }
+.painel-do-narrador button.ativa { background: var(--primario); color: var(--primario-texto); font-weight: var(--peso-destaque); }
+.painel-do-narrador button:disabled { opacity: .5; cursor: not-allowed; }
+.painel-do-narrador input { width: 100%; font: inherit; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--painel-borda); background: var(--botao-fundo); color: inherit; }
+.painel-do-narrador .detalhe { font-size: 12px; }
+.painel-do-narrador .alerta { margin: 0; }
+
 .fundo-da-ajuda { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: var(--escurecer); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: aparecer var(--duracao) var(--curva); }
 @media (prefers-reduced-transparency: reduce) { .fundo-da-ajuda { -webkit-backdrop-filter: none; backdrop-filter: none; } }
 .ajuda { max-height: 88vh; overflow-y: auto; border-radius: 16px; padding: 24px 28px; display: grid; grid-template-columns: auto 1fr; gap: 12px 18px; margin: 0; animation: surgir-da-ajuda var(--duracao-longa) var(--curva); }
@@ -205,4 +228,6 @@
   .dicas { left: 12px; right: 12px; bottom: 12px; justify-content: center; }
   .dicas kbd, .dicas .prefixo { display: none; }
   .pagina.com-mapa .dicas { transform: translateY(calc(-1 * (var(--gaveta) + 16px))); }
+  .painel-do-narrador { left: 12px; right: 12px; bottom: 64px; width: auto; max-height: calc(100dvh - 64px - 12px); }
+  .pagina.com-mapa .painel-do-narrador { transform: translateY(calc(-1 * (var(--gaveta) + 16px))); max-height: calc(100dvh - 64px - 12px - var(--gaveta) - 16px); }
 }

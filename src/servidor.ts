@@ -5,7 +5,7 @@ import { existsSync, readFileSync, watch, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import path from 'node:path'
-import type { Revisao } from './contrato.js'
+import { ESFORCOS, modeloValido, type Revisao } from './contrato.js'
 import { aplicarAchados, aplicarComentarioDeLinha, aplicarDecisao, chaveDeLinhaValida, gravarAchados, gravarNota, lerAchados, lerEstado, lerNota, TIPOS_DE_COMENTARIO, type PedidoDeComentarioDeLinha, type PedidoDeDecisao } from './estado.js'
 import { gravarFeedback } from './feedback.js'
 import { FilaDoNarrador } from './fila-do-narrador.js'
@@ -52,6 +52,7 @@ export async function abrirTela(raiz: string, opcoesDoNarrador: OpcoesDoNarrador
     'GET /api/nota': (_, resposta) => responderJson(resposta, lerNota(pastaDaRevisao)),
     'GET /api/narrador': (_, resposta) => responderJson(resposta, narrador.estado()),
     'POST /api/narrar': (pedido, resposta) => pedirNarracao(pedido, resposta, narrador),
+    'POST /api/config-do-narrador': (pedido, resposta) => receberConfigDoNarrador(pedido, resposta, narrador),
     'GET /api/codigo': (_, resposta, url) => enviarCodigo(resposta, raiz, url.searchParams),
     'GET /api/eventos': (pedido, resposta) => {
       resposta.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
@@ -96,6 +97,26 @@ async function pedirNarracao(pedido: IncomingMessage, resposta: ServerResponse, 
     narrador.pedir(Array.isArray(fluxos) ? fluxos.filter(id => typeof id === 'string') : [], retomar === true)
   } catch {
     return responder(resposta, 400, 'JSON inválido')
+  }
+  responderJson(resposta, narrador.estado())
+}
+
+// O modelo e o esforço que a página escolheu para o narrador: valem para a próxima chamada e ficam no keg.config.json.
+async function receberConfigDoNarrador(pedido: IncomingMessage, resposta: ServerResponse, narrador: FilaDoNarrador) {
+  if (pedido.headers['content-type'] !== 'application/json') return responder(resposta, 415, 'envie JSON')
+  let modelo: unknown, esforco: unknown
+  try {
+    ({ modelo, esforco } = JSON.parse(await lerCorpo(pedido)))
+  } catch {
+    return responder(resposta, 400, 'JSON inválido')
+  }
+  if (!modeloValido(modelo) || typeof esforco !== 'string' || !ESFORCOS.includes(esforco)) {
+    return responder(resposta, 400, `envie { modelo: nome de modelo (letras, números, . _ - [ ], sem começar por -), esforco: ${ESFORCOS.join(' | ')} }`)
+  }
+  try {
+    narrador.definirConfig({ modelo, esforco })
+  } catch (erro) {
+    return responder(resposta, 500, `não consegui gravar o keg.config.json: ${erro instanceof Error ? erro.message : erro}`)
   }
   responderJson(resposta, narrador.estado())
 }

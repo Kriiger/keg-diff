@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { chamarClaude } from './claude-cli.js'
-import type { Fluxo, Frase, Hunk, Orfao, Passo, Revisao } from './contrato.js'
+import { ESFORCOS, modeloValido, type Fluxo, type Frase, type Hunk, type Orfao, type Passo, type Revisao } from './contrato.js'
 import { agruparOrfaos, type GrupoDeOrfaos } from './orfaos.js'
 
 export interface ConfigDoNarrador {
@@ -31,7 +31,6 @@ interface NarracaoDeOrfaos {
 type Chamar = typeof chamarClaude
 
 const MODELO_PADRAO = 'sonnet'
-const ESFORCOS = ['low', 'medium', 'high', 'xhigh', 'max']
 // Narrar frases ancoradas em linhas não pede raciocínio longo: medium gasta bem menos tokens que o padrão do claude.
 const ESFORCO_PADRAO = 'medium'
 const FRASES_POR_PASSO = 3
@@ -61,9 +60,19 @@ export function lerConfigDoNarrador(raiz: string): ConfigDoNarrador {
   } catch {}
   const { modelo, esforco } = narrador ?? {}
   return {
-    modelo: typeof modelo === 'string' && /^[A-Za-z0-9][\w.[\]-]*$/.test(modelo) ? modelo : MODELO_PADRAO,
+    modelo: modeloValido(modelo) ? modelo : MODELO_PADRAO,
     esforco: typeof esforco === 'string' && ESFORCOS.includes(esforco) ? esforco : ESFORCO_PADRAO,
   }
+}
+
+// A escolha feita na página vai para o mesmo arquivo. As outras chaves do keg.config.json ficam como estão; um arquivo
+// que existe mas não lê como JSON não é sobrescrito (jogaria fora o que a pessoa escreveu).
+export function gravarConfigDoNarrador(raiz: string, config: ConfigDoNarrador) {
+  const arquivo = path.join(raiz, 'keg.config.json')
+  const atual = existsSync(arquivo) ? JSON.parse(readFileSync(arquivo, 'utf8')) : {}
+  if (typeof atual !== 'object' || atual === null || Array.isArray(atual)) throw new Error('o keg.config.json não é um objeto JSON')
+  const narrador = typeof atual.narrador === 'object' && atual.narrador !== null ? atual.narrador : {}
+  writeFileSync(arquivo, JSON.stringify({ ...atual, narrador: { ...narrador, modelo: config.modelo, esforco: config.esforco } }, null, 2) + '\n')
 }
 
 // Deixa a narração do fluxo no cache; quem chama a aplica ao review.json com preencherDoCache.

@@ -8,6 +8,8 @@ import type { EscolherAchados } from './main'
 export interface Narrador {
   estado?: EstadoDoNarrador
   pedir: (fluxos: string[], retomar: boolean) => void
+  // Troca o modelo e o esforço das próximas chamadas; devolve o motivo da recusa, ou undefined quando o servidor aceitou.
+  configurar: (modelo: string, esforco: string) => Promise<string | undefined>
 }
 
 type Linhas = [number, number] | null
@@ -29,7 +31,15 @@ export function useNarrador(): Narrador {
       .then(setEstado)
       .catch(tolerarQueda)
   }
-  return { estado, pedir }
+  const configurar = (modelo: string, esforco: string) =>
+    fetch('/api/config-do-narrador', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ modelo, esforco }) })
+      .then(async r => {
+        if (!r.ok) return (await r.text()) || `erro ${r.status}`
+        setEstado(await r.json())
+        return undefined
+      })
+      .catch(() => 'não consegui falar com o servidor')
+  return { estado, pedir, configurar }
 }
 
 export function semNarracao(fluxo: Fluxo): boolean {

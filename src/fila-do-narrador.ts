@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { verificarLogin } from './claude-cli.js'
 import type { EstadoDoNarrador, Revisao } from './contrato.js'
-import { narrarFluxo, narrarOrfaos, PausaDaNarracao, preencherDoCache, type OpcoesDoNarrador } from './narrador.js'
+import { gravarConfigDoNarrador, narrarFluxo, narrarOrfaos, PausaDaNarracao, preencherDoCache, type ConfigDoNarrador, type OpcoesDoNarrador } from './narrador.js'
 import { agruparOrfaos, ehGrupoDeOrfaos } from './orfaos.js'
 import type { Sessao } from './sessao.js'
 
@@ -31,6 +31,16 @@ export class FilaDoNarrador {
 
   estado(): EstadoDoNarrador {
     return { ativo: this.motivo === undefined, motivo: this.motivo, pausa: this.pausa, narrando: [...this.fila], falhas: this.falhas, modelo: this.opcoes.modelo, esforco: this.opcoes.esforco }
+  }
+
+  // O modelo e o esforço da página valem já para a próxima chamada, sem reiniciar: o objeto de opções é o mesmo do cli, então a
+  // análise do --watch também enxerga a mudança. A chamada que está em andamento termina com a config com que começou.
+  // Grava no keg.config.json primeiro: se a gravação falhar, a config de agora continua valendo.
+  definirConfig(config: ConfigDoNarrador) {
+    gravarConfigDoNarrador(this.raiz, config)
+    this.opcoes.modelo = config.modelo
+    this.opcoes.esforco = config.esforco
+    this.avisar()
   }
 
   // "ids" são ids de fluxos e de grupos de órfãos (ver orfaos.ts).
