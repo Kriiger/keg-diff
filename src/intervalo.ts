@@ -1,12 +1,14 @@
 // O intervalo que o git diff compara: de onde até onde, os commits no meio e o conteúdo dos arquivos nas duas pontas.
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { git } from './coletor.js'
 import type { Commit, Intervalo } from './contrato.js'
 
 const COMMITS_MOSTRADOS = 30
 const SEPARADOR = '\x1f'
 export const STAGE = ':'
+export const DIRETORIO_DE_TRABALHO = 'diretório de trabalho'
 
 // "depois" sem valor é o diretório de trabalho; STAGE é o índice (--staged).
 export interface Pontas { antes: string; depois?: string }
@@ -60,8 +62,15 @@ export function descreverIntervalo({ antes, depois }: Pontas): Intervalo {
 }
 
 function nomeDaPonta(depois: string | undefined): string {
-  if (depois === undefined) return 'diretório de trabalho'
+  if (depois === undefined) return DIRETORIO_DE_TRABALHO
   return depois === STAGE ? 'stage' : depois
+}
+
+// O caminho de volta: a ponta de chegada que o review.json registrou (intervalo.depois) como lerNaPonta a entende.
+// Sem intervalo (review.json antigo) vale o diretório de trabalho, como no keg diff sem argumento.
+export function pontaDeChegada(intervalo: Pick<Intervalo, 'depois'> | undefined): string | undefined {
+  if (intervalo === undefined || intervalo.depois === DIRETORIO_DE_TRABALHO) return undefined
+  return intervalo.depois === 'stage' ? STAGE : intervalo.depois
 }
 
 function linhaDeCommit(linha: string): Commit {
@@ -70,28 +79,28 @@ function linhaDeCommit(linha: string): Commit {
 }
 
 // Os arquivos numa ponta: uma chamada do git para todos (cat-file --batch), em vez de uma por arquivo.
-// Arquivo que não existe lá (novo, ou removido) fica fora do mapa.
-export function lerNaPonta(ponta: string | undefined, caminhos: string[]): Map<string, string> {
+// Arquivo que não existe lá (novo, ou removido) fica fora do mapa. Os caminhos são relativos à raiz (o pacote onde o keg roda).
+export function lerNaPonta(ponta: string | undefined, caminhos: string[], raiz = process.cwd()): Map<string, string> {
   if (caminhos.length === 0) return new Map()
-  return ponta === undefined ? lerDoDisco(caminhos) : lerDoGit(ponta === STAGE ? '' : ponta, caminhos)
+  return ponta === undefined ? lerDoDisco(caminhos, raiz) : lerDoGit(ponta === STAGE ? '' : ponta, caminhos, raiz)
 }
 
-function lerDoDisco(caminhos: string[]): Map<string, string> {
+function lerDoDisco(caminhos: string[], raiz: string): Map<string, string> {
   const lidos = new Map<string, string>()
   for (const caminho of caminhos) {
     try {
-      lidos.set(caminho, readFileSync(caminho, 'utf8'))
+      lidos.set(caminho, readFileSync(path.resolve(raiz, caminho), 'utf8'))
     } catch {}
   }
   return lidos
 }
 
-function lerDoGit(prefixo: string, caminhos: string[]): Map<string, string> {
+function lerDoGit(prefixo: string, caminhos: string[], raiz: string): Map<string, string> {
   const entrada = caminhos.map(caminho => `${prefixo}:./${caminho}\n`).join('')
   const lidos = new Map<string, string>()
   let saida: Buffer
   try {
-    saida = execFileSync('git', ['cat-file', '--batch'], { input: entrada, maxBuffer: 256 * 1024 * 1024, stdio: ['pipe', 'pipe', 'ignore'] })
+    saida = execFileSync('git', ['cat-file', '--batch'], { cwd: raiz, input: entrada, maxBuffer: 256 * 1024 * 1024, stdio: ['pipe', 'pipe', 'ignore'] })
   } catch {
     // Ponta que o git não resolve, como o HEAD de um repositório sem commit: é como se nenhum arquivo existisse lá.
     return lidos

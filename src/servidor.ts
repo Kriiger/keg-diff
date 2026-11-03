@@ -6,12 +6,13 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net'
 import path from 'node:path'
 import { lerAprofundamentos, localizarBloco } from './aprofundar.js'
-import { arquivoPermitido } from './arquivos-da-revisao.js'
+import { arquivoCitado, arquivoPermitido } from './arquivos-da-revisao.js'
 import { ESFORCOS, modeloValido, PREFIXO_DO_APROFUNDAMENTO, type Revisao } from './contrato.js'
 import { aplicarAchados, aplicarComentarioDeLinha, aplicarDecisao, chaveDeLinhaValida, gravarAchados, gravarNota, lerAchados, lerEstado, lerNota, TIPOS_DE_COMENTARIO, type PedidoDeComentarioDeLinha, type PedidoDeDecisao } from './estado.js'
 import { gravarFeedback } from './feedback.js'
 import { FilaDoNarrador } from './fila-do-narrador.js'
 import { registrarRevisao } from './historico.js'
+import { lerNaPonta, pontaDeChegada } from './intervalo.js'
 import type { OpcoesDoNarrador } from './narrador.js'
 import { Sessao } from './sessao.js'
 
@@ -58,6 +59,7 @@ export async function abrirTela(raiz: string, opcoesDoNarrador: OpcoesDoNarrador
     'POST /api/aprofundar': (pedido, resposta) => pedirAprofundamento(pedido, resposta, narrador, pastaDaRevisao),
     'GET /api/aprofundamentos': (_, resposta) => responderJson(resposta, lerAprofundamentos(pastaDaRevisao)),
     'GET /api/codigo': (_, resposta, url) => enviarCodigo(resposta, raiz, pastaDaRevisao, url.searchParams),
+    'GET /api/arquivo': (_, resposta, url) => enviarConteudo(resposta, raiz, pastaDaRevisao, url.searchParams),
     'GET /api/eventos': (pedido, resposta) => {
       resposta.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
       // O comentário manda os cabeçalhos já: é o que dispara o "open" na página.
@@ -236,6 +238,28 @@ function enviarCodigo(resposta: ServerResponse, raiz: string, pastaDaRevisao: st
   const ate = Number(parametros.get('ate') ?? de)
   const linhas = readFileSync(arquivo, 'utf8').split('\n').slice(de - 1, ate)
   responderJson(resposta, { de, linhas })
+}
+
+// O arquivo inteiro como ele está na ponta de chegada do diff (o diretório de trabalho, o stage ou o commit que o review.json registra em
+// panorama.intervalo): a página monta com ele as linhas de contexto dos trechos e a folha "ver arquivo completo". Como o /api/codigo,
+// só sai arquivo que o review.json de agora cita; no diretório de trabalho o link simbólico que sai do projeto também não passa.
+const TAMANHO_MAXIMO_DO_ARQUIVO = 2 * 1024 * 1024
+
+function enviarConteudo(resposta: ServerResponse, raiz: string, pastaDaRevisao: string, parametros: URLSearchParams) {
+  const revisao: Revisao = JSON.parse(readFileSync(path.join(pastaDaRevisao, 'review.json'), 'utf8'))
+  const citado = arquivoCitado(revisao, parametros.get('arquivo') ?? '')
+  if (!citado) return responder(resposta, 404, 'arquivo fora da revisão')
+  const ponta = pontaDeChegada(revisao.panorama?.intervalo)
+  let conteudo: string | undefined
+  if (ponta === undefined) {
+    const real = arquivoPermitido(raiz, revisao, citado)
+    conteudo = real === undefined ? undefined : readFileSync(real, 'utf8')
+  } else {
+    conteudo = lerNaPonta(ponta, [citado], raiz).get(citado)
+  }
+  if (conteudo === undefined) return responder(resposta, 404, 'o arquivo não existe na revisão de chegada')
+  if (conteudo.length > TAMANHO_MAXIMO_DO_ARQUIVO || conteudo.includes('\0')) return responder(resposta, 413, 'arquivo grande demais ou binário')
+  responderJson(resposta, { conteudo })
 }
 
 function enviarPagina(resposta: ServerResponse, caminho: string) {

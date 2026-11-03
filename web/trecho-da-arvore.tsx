@@ -1,6 +1,7 @@
 // Um trecho do arquivo aberto no modo árvore, com o que o passo do fluxo oferece: as frases do narrador, a decisão e o diff.
 // Os links dos fluxos do arquivo ficam aqui também, porque são o caminho de volta ao modo fluxo.
 import { useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react'
+import { LINHAS_DE_CONTEXTO } from '../src/contexto'
 import { chaveDoTrecho, type AchadosEscolhidos, type Estado, type Hunk, type Revisao } from '../src/contrato'
 import type { ComentarLinha } from './comentarios-de-linha'
 import { Decisoes } from './decisoes'
@@ -8,7 +9,7 @@ import type { DoTrecho, FluxoDoArquivo } from './frases-do-arquivo'
 import type { Decidir, Decisao, EscolherAchados } from './main'
 import { alternarModo } from './modo'
 import { Aprofundar, ListaDeFrases, type Narrador } from './narracao'
-import { DiffDosTrechos, marcador } from './telas'
+import { ALTURA_DA_LINHA, DiffDosTrechos, marcador } from './telas'
 
 export interface Destaque { hunkId: string; linhas: [number, number] }
 
@@ -39,7 +40,6 @@ interface PropsDoTrecho {
 // Cada trecho tem o seu diff (o PatchDiff e o Shiki são a parte cara): só monta quando chega perto da tela, e o trecho atual monta já.
 // Montado, fica: desmontar perderia a caixa de comentário de linha aberta. A altura estimada pelas linhas do patch segura o lugar.
 const MARGEM_DE_ANTECIPACAO = '1200px 0px'
-const ALTURA_DA_LINHA = 20
 
 function useChegouPerto(ref: RefObject<HTMLElement | null>): boolean {
   const [perto, setPerto] = useState(false)
@@ -72,7 +72,7 @@ export function TrechoDaArvore({ revisao, arquivo, hunk, indice, total, atual, o
       <Decisoes hunkIds={[hunk.id]} opcoes={opcoes} estado={estado} decidir={decidir} comentando={comentando} setComentando={setComentando} />
       {perto || atual
         ? <DiffDosTrechos revisao={revisao} arquivo={arquivo} hunkIds={[hunk.id]} estado={estado} comentarLinha={comentarLinha} ladoALado={ladoALado} destaque={destaque?.hunkId === hunk.id ? destaque.linhas : null} />
-        : <div className="diff-adiado" style={{ minHeight: hunk.patch.split('\n').length * ALTURA_DA_LINHA }} aria-hidden="true" />}
+        : <div className="diff-adiado" style={{ minHeight: (hunk.patch.split('\n').length + 2 * LINHAS_DE_CONTEXTO) * ALTURA_DA_LINHA }} aria-hidden="true" />}
     </article>
   )
 }

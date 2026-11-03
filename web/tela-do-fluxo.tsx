@@ -1,15 +1,19 @@
 // A tela do fluxo: os passos agrupados por arquivo à esquerda, o passo atual (frases, decisão e código) à direita e o mapa em gaveta.
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { PatchDiff, type FileDiffOptions } from '@pierre/diffs/react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { patchDeLeitura } from '../src/contexto'
 import { chaveDoPasso, type Estado, type Fluxo, type Passo, type Revisao } from '../src/contrato'
+import { precarregar, useConteudo } from './arquivos'
 import { Caminho } from './caminho'
 import { Decisoes } from './decisoes'
-import { tolerarQueda } from './eventos'
+import { useTrocando } from './modo'
 import { Aprofundar, FrasesDoPasso, semNarracao } from './narracao'
 import { jaVistosDoFluxo, vizinhoNaoVisto } from './ja-visto'
 import { useJanelaExterna } from './janela-do-mapa'
 import { PassosPorArquivo } from './passos-por-arquivo'
 import { indiceInicial, useCursor, type Navegacao } from './proximo'
-import { DiffDosTrechos, decididos, useAtalhos, type Contexto } from './telas'
+import { DiffDosTrechos, TEMAS, decididos, useAtalhos, type Contexto } from './telas'
+import { MODOS, useTema } from './tema'
 
 // O mapa leva o React Flow e o ELK (mais de 1 MB): só baixa quando alguém aperta m.
 const carregarMapa = () => import('./mapa')
@@ -110,6 +114,13 @@ function PassoAPasso({ fluxo, revisao, estado, decidir, comentarLinha, achados, 
     setIndice(Math.min(Math.max(destino, 0), fluxo.passos.length - 1))
   }
   useCursor(navegacao, `fluxo/${fluxo.id}`, indice, irPara)
+  // Os arquivos do passo de agora e dos próximos chegam antes da hora: o diff com contexto e o código dos passos de contexto nascem sem espera.
+  useEffect(() => {
+    for (const vizinho of fluxo.passos.slice(Math.max(0, indice - 1), indice + 4)) {
+      const status = revisao.arquivos.find(a => a.caminho === vizinho.arquivo)?.status
+      if (status !== 'novo' && status !== 'removido') precarregar(revisao, vizinho.arquivo)
+    }
+  }, [fluxo.id, indice, revisao])
   const marcar = () => {
     if (passo.hunkIds.length === 0) return andar(1)
     const pronto = passo.hunkIds.every(id => estado[id]?.decisao === 'revisado')
@@ -150,7 +161,7 @@ function PassoAPasso({ fluxo, revisao, estado, decidir, comentarLinha, achados, 
             <Decisoes hunkIds={passo.hunkIds} opcoes={['revisado']} estado={estado} decidir={decidir} comentando={comentando} setComentando={setComentando} />
             {passo.hunkIds.length > 0
               ? <DiffDosTrechos revisao={revisao} arquivo={passo.arquivo} hunkIds={passo.hunkIds} estado={estado} comentarLinha={comentarLinha} ladoALado={ladoALado} destaque={destaque} />
-              : <CodigoDoPasso key={passo.id} passo={passo} />}
+              : <CodigoDoPasso key={passo.id} revisao={revisao} passo={passo} />}
           </>}
         </article>
       </div>
@@ -158,18 +169,24 @@ function PassoAPasso({ fluxo, revisao, estado, decidir, comentarLinha, achados, 
   )
 }
 
-// Passo de contexto: não mudou, mas o revisor precisa ver o que ele faz com o dado.
-function CodigoDoPasso({ passo }: { passo: Passo }) {
-  const [codigo, setCodigo] = useState<{ de: number; linhas: string[] }>()
-  useEffect(() => {
-    const [de, ate] = passo.linhas
-    const busca = new URLSearchParams({ arquivo: passo.arquivo, de: String(de), ate: String(Math.min(ate, de + 199)) })
-    fetch(`/api/codigo?${busca}`).then(r => (r.ok ? r.json() : undefined)).then(setCodigo).catch(tolerarQueda)
-  }, [passo])
-  if (!codigo) return null
-  return (
-    <pre className="codigo">
-      {codigo.linhas.map((linha, i) => <div key={i}><span className="numero">{codigo.de + i}</span>{linha}</div>)}
-    </pre>
-  )
+// Passo de contexto: não mudou, mas o revisor precisa ver o que ele faz com o dado. É o código de agora (do arquivo de chegada do diff) pintado
+// como o dos diffs: o mesmo realce e o mesmo tema, que acompanha o claro e o escuro. A biblioteca só numera a partir de 1 quando mostra um arquivo
+// solto, então o trecho vai como um patch só de contexto, que ela numera a partir da linha de verdade.
+const LINHAS_DO_CONTEXTO = 200
+const OPCOES_DO_CODIGO = { diffStyle: 'unified', theme: TEMAS, overflow: 'wrap', disableFileHeader: true, hunkSeparators: 'simple' } as const
+
+function CodigoDoPasso({ revisao, passo }: { revisao: Revisao; passo: Passo }) {
+  const tema = useTema()
+  const trocando = useTrocando()
+  const conteudo = useConteudo(revisao, passo.arquivo)
+  const patch = useMemo(() => {
+    if (!conteudo) return undefined
+    const de = Math.max(passo.linhas[0], 1)
+    const ate = Math.min(passo.linhas[1], de + LINHAS_DO_CONTEXTO - 1, conteudo.linhas.length)
+    return patchDeLeitura(passo.arquivo, de, conteudo.linhas.slice(de - 1, ate))
+  }, [conteudo, passo])
+  const opcoes = useMemo<FileDiffOptions<undefined, undefined>>(() => ({ ...OPCOES_DO_CODIGO, themeType: MODOS[tema] }), [tema])
+  // Na troca de modo o realce espera a animação acabar, como o diff (ver DiffDosTrechos).
+  if (!patch || trocando) return null
+  return <PatchDiff patch={patch} options={opcoes} />
 }

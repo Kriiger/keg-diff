@@ -1,6 +1,7 @@
 // O modo árvore: a lateral mostra as pastas com os arquivos alterados e a área principal mostra o diff do arquivo escolhido.
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import type { AchadosEscolhidos, ArquivoAlterado, Estado, Revisao } from '../src/contrato'
+import { precarregar } from './arquivos'
 import type { ComentarLinha } from './comentarios-de-linha'
 import { frasesDosTrechos, fluxosDoArquivo } from './frases-do-arquivo'
 import { Icone } from './icones'
@@ -229,6 +230,10 @@ function ArquivoEscolhido({ revisao, arquivo, estado, decidir, comentarLinha, la
   // Só mudam com a revisão e o arquivo: as frases e os fluxos não se refazem a cada decisão ou tecla.
   const frases = useMemo(() => frasesDosTrechos(revisao, arquivo), [revisao, arquivo])
   const fluxos = useMemo(() => fluxosDoArquivo(revisao, arquivo.caminho), [revisao, arquivo.caminho])
+  // O arquivo inteiro chega uma vez para todos os trechos dele: o contexto de cada diff nasce sem esperar a busca de cada um.
+  useEffect(() => {
+    if (arquivo.status === 'alterado' && arquivo.hunks.length > 0) precarregar(revisao, arquivo.caminho)
+  }, [revisao, arquivo.caminho])
   const hunkIds = arquivo.hunks.map(h => h.id)
   const inteiro = hunkIds.length > 0 && hunkIds.every(id => estado[id]?.decisao === 'revisado')
   return (

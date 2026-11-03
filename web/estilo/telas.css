@@ -106,12 +106,19 @@ a:focus-visible { border-radius: 10px; }
 .comentario-de-linha .comentario { margin-top: 0; }
 .comentario-de-linha.salvo p { margin: 0 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .comentario-de-linha .botoes button { font-size: 12px; }
+/* O "mostrar mais" do diff com contexto (mais-contexto.tsx): uma linha fina entre os blocos do diff, na fonte da página e sem o fundo do diff. */
+.mais-contexto { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 3px 12px 3px 56px; background: color-mix(in srgb, var(--texto) 4%, transparent); color: var(--texto-miudo); font: var(--peso-rotulo) 12px/1.4 var(--fonte); text-align: left; white-space: normal; }
+/* O conteúdo da anotação vem do diff com word-break: break-word, e isso herdado deixa o mínimo de cada item em uma letra: numa coluna estreita
+   o texto e os botões quebravam uma letra por linha. Aqui nada quebra no meio da palavra: o botão é uma peça só, que passa para a linha de baixo
+   inteira, e o rótulo, que também quebra de linha como peça, só reticencia se nem sozinho couber. */
+.mais-contexto, .mais-contexto * { word-break: normal; overflow-wrap: normal; }
+.mais-contexto { min-width: 0; }
+.mais-contexto .escondidas { margin-right: auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mais-contexto button { flex: none; white-space: nowrap; padding: 0 10px; border: 0; border-radius: 999px; background: var(--botao-fundo); font-size: 12px; line-height: 20px; transition: var(--transicao-cores); }
+.mais-contexto button:hover { background: var(--botao-hover); }
 blockquote { margin: 12px 0 0; padding: 8px 14px; border-radius: 8px; background: var(--botao-fundo); box-shadow: inset 3px 0 0 var(--suave); white-space: pre-wrap; }
 
 /* O código e o diff ficam numa superfície opaca: a translucidez só emoldura, nunca atrapalha a leitura. */
-.codigo { font: var(--peso-texto) 12.5px/1.55 var(--fonte-codigo); background: var(--codigo-fundo); border: 1px solid var(--codigo-borda); border-radius: var(--painel-raio); padding: 10px 0; overflow-x: auto; margin: 0; }
-.codigo div { padding: 0 14px; white-space: pre; }
-.codigo .numero { display: inline-block; width: 4ch; margin-right: 12px; text-align: right; color: var(--suave); user-select: none; }
 diffs-container {
   display: block; border: 1px solid var(--codigo-borda); border-radius: var(--painel-raio); overflow: hidden;
   --diffs-light-bg: #fcfcfc; --diffs-dark-bg: #141414;
