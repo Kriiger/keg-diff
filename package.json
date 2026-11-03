@@ -2,6 +2,7 @@
   "name": "keg-diff",
   "version": "0.0.0",
   "description": "Revisor de código por fluxo: reorganiza o diff em onde o dado nasce, é processado e termina.",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "keg": "dist/cli.js"

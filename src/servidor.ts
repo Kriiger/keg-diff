@@ -6,6 +6,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net'
 import path from 'node:path'
 import { lerAprofundamentos, localizarBloco } from './aprofundar.js'
+import { arquivoPermitido } from './arquivos-da-revisao.js'
 import { ESFORCOS, modeloValido, PREFIXO_DO_APROFUNDAMENTO, type Revisao } from './contrato.js'
 import { aplicarAchados, aplicarComentarioDeLinha, aplicarDecisao, chaveDeLinhaValida, gravarAchados, gravarNota, lerAchados, lerEstado, lerNota, TIPOS_DE_COMENTARIO, type PedidoDeComentarioDeLinha, type PedidoDeDecisao } from './estado.js'
 import { gravarFeedback } from './feedback.js'
@@ -56,7 +57,7 @@ export async function abrirTela(raiz: string, opcoesDoNarrador: OpcoesDoNarrador
     'POST /api/config-do-narrador': (pedido, resposta) => receberConfigDoNarrador(pedido, resposta, narrador),
     'POST /api/aprofundar': (pedido, resposta) => pedirAprofundamento(pedido, resposta, narrador, pastaDaRevisao),
     'GET /api/aprofundamentos': (_, resposta) => responderJson(resposta, lerAprofundamentos(pastaDaRevisao)),
-    'GET /api/codigo': (_, resposta, url) => enviarCodigo(resposta, raiz, url.searchParams),
+    'GET /api/codigo': (_, resposta, url) => enviarCodigo(resposta, raiz, pastaDaRevisao, url.searchParams),
     'GET /api/eventos': (pedido, resposta) => {
       resposta.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
       // O comentário manda os cabeçalhos já: é o que dispara o "open" na página.
@@ -70,9 +71,12 @@ export async function abrirTela(raiz: string, opcoesDoNarrador: OpcoesDoNarrador
     const url = new URL(pedido.url ?? '/', 'http://127.0.0.1')
     // Outro site no navegador não lê o seu código: só atende quem chama pelo endereço local.
     if (!/^(127\.0\.0\.1|localhost):\d+$/.test(pedido.headers.host ?? '')) return responder(resposta, 403, 'endereço não permitido')
-    const rota = rotas[`${pedido.method === 'POST' ? 'POST' : 'GET'} ${url.pathname}`]
+    const rota = rotas[`${pedido.method} ${url.pathname}`]
     // Corpo que não é JSON ou arquivo ilegível vira resposta de erro: a rejeição solta derrubaria o servidor no meio da revisão.
     if (rota) return Promise.resolve().then(() => rota(pedido, resposta, url)).catch(() => responder(resposta, 400, 'pedido inválido'))
+    // OPTIONS, PUT e os outros não viram GET: a API só atende o método de cada rota, e a página só sai por GET.
+    if (url.pathname.startsWith('/api/')) return responder(resposta, Object.keys(rotas).some(chave => chave.endsWith(` ${url.pathname}`)) ? 405 : 404, 'rota ou método desconhecido')
+    if (pedido.method !== 'GET') return responder(resposta, 405, 'método não permitido')
     enviarPagina(resposta, url.pathname)
   })
 
@@ -223,10 +227,11 @@ function registrar(pastaDaRevisao: string, sessao: Sessao) {
   }
 }
 
-// O passo de contexto não tem diff: a página mostra o código atual dele.
-function enviarCodigo(resposta: ServerResponse, raiz: string, parametros: URLSearchParams) {
-  const arquivo = path.resolve(raiz, parametros.get('arquivo') ?? '')
-  if (!arquivo.startsWith(raiz + path.sep) || !existsSync(arquivo)) return responder(resposta, 404, 'arquivo fora do projeto')
+// O passo de contexto não tem diff: a página mostra o código atual dele. Só sai arquivo que o review.json de agora cita (ver arquivoPermitido).
+function enviarCodigo(resposta: ServerResponse, raiz: string, pastaDaRevisao: string, parametros: URLSearchParams) {
+  const revisao: Revisao = JSON.parse(readFileSync(path.join(pastaDaRevisao, 'review.json'), 'utf8'))
+  const arquivo = arquivoPermitido(raiz, revisao, parametros.get('arquivo') ?? '')
+  if (!arquivo) return responder(resposta, 404, 'arquivo fora da revisão')
   const de = Number(parametros.get('de') ?? 1)
   const ate = Number(parametros.get('ate') ?? de)
   const linhas = readFileSync(arquivo, 'utf8').split('\n').slice(de - 1, ate)
@@ -235,7 +240,7 @@ function enviarCodigo(resposta: ServerResponse, raiz: string, parametros: URLSea
 
 function enviarPagina(resposta: ServerResponse, caminho: string) {
   const arquivo = path.join(PASTA_DA_PAGINA, path.normalize(caminho))
-  const existe = arquivo.startsWith(PASTA_DA_PAGINA) && existsSync(arquivo) && path.extname(arquivo) !== ''
+  const existe = arquivo.startsWith(PASTA_DA_PAGINA + path.sep) && existsSync(arquivo) && path.extname(arquivo) !== ''
   // Só rota de página cai no index.html. Um asset que sumiu (o pedaço de um build antigo) responde 404: com o html no lugar,
   // o import() da aba aberta recebia text/html, falhava sem um erro que a página entendesse e deixava a tela em branco.
   if (!existe && caminho.startsWith('/assets/')) return responder(resposta, 404, 'asset não encontrado')

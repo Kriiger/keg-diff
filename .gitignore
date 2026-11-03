@@ -1,4 +1,24 @@
+# build e dependências
 node_modules
 dist
+coverage/
+
+# o que o keg grava quando revisa este próprio repositório
 .revisao
+keg.config.json
+
+# repositórios que o npm run calibrar clona
 fixtures/.repos
+
+# grafo local do graphify: tem caminhos absolutos da máquina
+graphify-out/
+
+# segredos e configurações locais
+.env
+.env.*
+!.env.example
+.claude/
+
+# sistema e logs
+.DS_Store
+*.log

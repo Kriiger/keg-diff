@@ -164,8 +164,18 @@ Cada passo alterado ganha até três frases curtas, cada uma presa a linhas do p
 | `.revisao/sessao.json` | A revisão em andamento: o tempo contado pela página e as chamadas do narrador |
 | `.revisao/cache/` | As frases do narrador, uma por fluxo narrado e uma por grupo de órfãos |
 | `.revisao/keg.config.json` | Opcional: chamadas próprias da equipe, como `{ "nasce": ["api.get"], "termina": ["api.post", "api.*"] }` |
+| `keg.config.json` | Opcional, na raiz: o modelo e o esforço do narrador (ver Narrador). O painel do narrador na página grava aqui; é uma preferência sua, então vale pôr no `.gitignore` |
 
 O keg acrescenta `.revisao/` ao `.git/info/exclude` do repositório, então a pasta não aparece no `git status` e o `.gitignore` do projeto não muda.
+
+## Privacidade e segurança
+
+O keg roda inteiro na sua máquina e não precisa de chave nem de variável de ambiente: não há `.env` para configurar.
+
+- **Servidor local:** a página é servida só em `127.0.0.1`, e o servidor recusa pedido com outro cabeçalho `Host` (um site aberto no navegador não alcança a API). O código que a página pede sai só de arquivo que a revisão aberta cita, dentro do projeto e depois de seguir links simbólicos: `.env`, `.git/config` e o resto do disco nunca saem.
+- **Credenciais:** o keg nunca lê nem guarda credencial do Claude. Ele chama o `claude` instalado, que usa o próprio login, numa pasta temporária vazia, com `--safe-mode`, sem nenhuma ferramenta e sem `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` e as variáveis de Bedrock, Vertex e Foundry no ambiente.
+- **O que sai da máquina:** o diff e os trechos de código de cada pedido ao narrador (a narração e o `explicar mais`), mandados à Anthropic pela sua assinatura do Claude, o mesmo caminho do Claude Code. Com `--sem-ia` o narrador não roda e nada sai.
+- **O que fica:** tudo o que o keg grava vai para `.revisao/`, que ele acrescenta ao `.git/info/exclude`. A única exceção é o `keg.config.json` da raiz, quando você troca o modelo pela página.
 
 ## Desenvolver
 
@@ -190,3 +200,7 @@ Cada arquivo em `fixtures/` é um PR real feito por um agente de código, com o 
 ## Logo
 
 Os arquivos da logo estão em `assets/logo/`: `icone.svg` e `icone-escuro.svg` (só o barril, para fundo claro e escuro), `icone-app.svg` (com fundo próprio, o mesmo do favicon) e `logo-horizontal.svg` e `logo-horizontal-escuro.svg` (ícone e nome; o nome é texto e usa a fonte do sistema).
+
+## Licença
+
+MIT. Veja o arquivo [LICENSE](LICENSE).
